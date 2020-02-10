@@ -93,6 +93,10 @@ t[0]  # __getitem__, (LoggingTensor([1]), 0,), {}
 torch.sum(t)  # sum, (LoggingTensor([1]),), {}
 ```
 
+To make the protocol operate only on functions rather than methods, one can
+check for `func not in type(self).__dict__.values()`. To check for operators
+and/or indexing, one can check `func.__name__.endswith("__")`.
+
 ### Performance
 There are a few requirements for the performance of this proposal, when
 implemented:
