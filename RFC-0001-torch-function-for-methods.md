@@ -101,9 +101,10 @@ and/or indexing, one can check `func.__name__.endswith("__")`.
 There are a few requirements for the performance of this proposal, when
 implemented:
 
-* No difference in the performance of `torch.Tensor` objects.
+* No sub-100 ns deterioration per function call on `torch.Tensor` objects.
 * No deterioration of current `__torch_function__` overhead
-* Sub-µs impact on the performance of subclasses. 
+* Sub-µs impact on the performance of subclasses not implementing
+  `__torch_function__`. 
 
 ## Backwards Compatibility
 ### With PyTorch `master` as of writing
