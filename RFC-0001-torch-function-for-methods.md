@@ -8,17 +8,19 @@ public, and a change in the signature of `__torch_function__`.
 Quoting [[1]], [[2]] and [[3]], the goals of this proposal are:
 
 1. Support subclassing `torch.Tensor` in Python
-2. Preserve `Tensor` subclasses when calling `torch` functions on them
-3. Use the PyTorch API with `torch.Tensor`-like objects that are _not_ `Tensor`
+2. Preserve `torch.Tensor` subclasses when calling `torch` functions on them
+3. Use the PyTorch API with `torch.Tensor`-like objects that are _not_ `torch.Tensor`
    subclasses
-4. Preserve `Tensor` subclasses when calling `Tensor` methods.
-5. The ability to give external libraries a way to also define
-   functions/methods that follow the `__torch_function__` protocol.
-6. Propagating subclass instances correctly also with operators, using
+4. Preserve `torch.Tensor` subclasses when calling `torch.Tensor` methods.
+5. Propagating subclass instances correctly also with operators, using
    views/slices/indexing/etc.
-7. Preserve subclass attributes when using methods or views/slices/indexing.
-8. A way to insert code that operates on both functions and methods uniformly
+6. Preserve subclass attributes when using methods or views/slices/indexing.
+7. A way to insert code that operates on both functions and methods uniformly
    (so we can write a single function that overrides all operators).
+8. The ability to give external libraries a way to also define
+   functions/methods that follow the `__torch_function__` protocol.
+
+Goals 1‒6 are explicitly about subclassing, goal 7 is already partially achieved via the `__torch_function__` protocol (which we're proposing to extend to methods), and goal 8 is a by-product required to make overridden `torch.Tensor` subclass methods behave similar to `torch.Tensor` methods.
 
 Achieving interoperability with NumPy and adopting its array protocols is out
 of scope for this proposal and we propose to defer it to a later proposal.
@@ -29,7 +31,7 @@ We propose to solve this problem with the following changes to PyTorch:
    `__torch_function__` machinery.
 2. Add a `types` argument to `__torch_function__`, to make it match NumPy's
    `__array_function__`.
-3. Make `torch.Tensor._make_subclass` public API.
+3. Make `torch.Tensor._make_subclass` public API by renaming it to `torch.Tensor.make_subclass`.
 4. Make `torch.Tensor` gain a generic implementation of `__torch_function__`.
 
 ## Usage and Impact
@@ -101,10 +103,15 @@ and/or indexing, one can check `func.__name__.endswith("__")`.
 There are a few requirements for the performance of this proposal, when
 implemented:
 
-* No sub-100 ns deterioration per function call on `torch.Tensor` objects.
-* No deterioration of current `__torch_function__` overhead
-* Sub-µs impact on the performance of subclasses not implementing
-  `__torch_function__`. 
+1. No deterioration for function/method calls on `torch.Tensor` objects.
+2. No deterioration of current `__torch_function__` overhead
+3. Sub-µs impact on the performance of subclasses not implementing
+  `__torch_function__`.
+
+Requirement 1 seems unachievable due to the structure of the code at this
+point, as processing will have to be added for `self` in methods, as well as
+adding argument processing for methods where it doesn't already exist. We think
+an overhead of sub-100 ns per method call is feasible.
 
 ## Backwards Compatibility
 ### With PyTorch `master` as of writing
@@ -180,7 +187,7 @@ optimisation to avoid overhead for concrete `Tensor` objects.
 
 ```python
 class Tensor:
-    def __torch_tensor__(self, func, types, args, kwargs):
+    def __torch_function__(self, func, types, args, kwargs):
         if not all(issubclass(type(self), t) for t in types):
             return NotImplemented
         
@@ -216,7 +223,7 @@ Python these operators are just dunder methods of the corresponding class.
 To access super, one would do the following:
 ```python
 class SubTensor(torch.Tensor):
-    def __torch_tensor__(self, func, types, args, kwargs):
+    def __torch_function__(self, func, types, args, kwargs):
         # Pre-processing here
         val = super().__torch_function__(
             func,
@@ -309,6 +316,10 @@ and it will become public API. This method will create an object that has the
 same data pointer as the original object, which means that modifications to
 this will be reflected in the original object. More or less, it will have the
 same effect as modifying an object's `__class__` attribute in Python.
+
+This method is already used in external libraries, and they may need it as a
+way to e.g. bypass the processing of `torch.Tensor.__torch_function__`
+entirely, while still creating `torch.Tensor` subclasses in their own code.
 
 ## Implementation
 To implement this proposal requires three main steps:
