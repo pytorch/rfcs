@@ -185,9 +185,16 @@ The process followed during a function/method call would be equivalent to:
 
 In practice, for most PyTorch functions, the list of tensor-likes is already
 available and the dispatcher doesn't need to be called. Additionally, while
-equivalent to the code above, if the `Tensor`-likes are all `Tensor`, the
-internal implementation is called immediately. This is done as a performance
-optimisation to avoid overhead for concrete `Tensor` objects.
+equivalent to the code above, if the `Tensor`-likes are all `Tensor` or don't have
+an `__torch_function__` implementation, the internal implementation is called
+immediately. This is done as a performance optimisation to avoid overhead for
+concrete `Tensor` objects.
+
+It will be the job of the dispatcher to extract `Tensor`-like objects from the
+argument list, however, arguments of type `Optional[Tensor]` will be considered
+`Tensor`-like. If one gets a compound or dependent type such as `List[Tensor]`
+or `Tuple[Tensor, ...]` or `Tuple[Tensor, int]`, the dispatcher will have the job
+of extracting an iterable of objects that *could* be `Tensor`-like.
 
 ### Generic implementation of `__torch_function__`
 `torch.Tensor` will gain a generic `__torch_function__` of the following form:
