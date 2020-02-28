@@ -109,9 +109,16 @@ implemented:
   `__torch_function__`.
 
 Requirement 1 seems unachievable due to the structure of the code at this
-point, as processing will have to be added for `self` in methods, as well as
-adding argument processing for methods where it doesn't already exist. We think
-an overhead of sub-100 ns per method call is feasible.
+point, as:
+
+1. In methods defined in C++, `self` is excluded from the argument processing
+   that gathers `Tensor`-likes in C++.
+2. Similar to point 1, C++ methods that take only `self` as a `Tensor`-like don't
+   pass through this processing, and they will be required to.
+3. For methods defined in Python, the processing for handling `__torch_function__`
+   will need to be added, similar to the original `__torch_function__` PR [[5]].
+
+We think an overhead of sub-100 ns per method call is feasible.
 
 ## Backwards Compatibility
 ### With PyTorch `master` as of writing
@@ -341,3 +348,4 @@ would miss out on the one to provide a hook for methods and operators.
 [2]: https://github.com/pytorch/pytorch/issues/28361#issuecomment-544520934 "Comment on GitHub Issue 28361 on pytorch/pytorch"
 [3]: https://github.com/pytorch/pytorch/issues/28361#issuecomment-557285807 "Comment on GitHub Issue 28361 on pytorch/pytorch"
 [4]: https://numpy.org/neps/nep-0018-array-function-protocol.html "NEP 18 — A dispatch mechanism for NumPy’s high level array functions"
+[5]: https://github.com/pytorch/pytorch/pull/32194 "GitHub Pull request 32194 on pytorch/pytorch"
