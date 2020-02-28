@@ -75,7 +75,7 @@ class LoggingTensor(torch.Tensor):
         return super().__torch_function__(
             func,
             tuple(
-                t for t in types if not issubclass(t, LoggingTensor)
+                t if not issubclass(t, LoggingTensor) else torch.Tensor for t in types
             ),
             args,
             kwargs
@@ -255,7 +255,7 @@ class SubTensor(torch.Tensor):
         # Pre-processing
         ret = super().__torch_function__(
             func,
-            tuple(t for t in types if not issubclass(t, SubTensor)),
+            tuple(t if not issubclass(t, SubTensor) else torch.Tensor for t in types),
             args,
             kwargs
         )
