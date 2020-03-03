@@ -70,13 +70,12 @@ example:
 import logging
 
 class LoggingTensor(torch.Tensor):
-    def __torch_function__(self, func, types, args, kwargs):
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
         logging.info(f"func: {func.__name__}, args: {args!r}, kwargs: {kwargs!r}")
         return super().__torch_function__(
             func,
-            tuple(
-                t if not issubclass(t, LoggingTensor) else torch.Tensor for t in types
-            ),
+            types,
             args,
             kwargs
         )
@@ -88,8 +87,8 @@ indicates the code run, with the logging output in the comments.
 ```python
 t = LoggingTensor([1])
 
-t.sum()  # sum, (LoggingTensor([1]),), {}
-t[0]  # __getitem__, (LoggingTensor([1]), 0,), {}
+t.sum()  # Tensor.sum, (LoggingTensor([1]),), {}
+t[0]  # Tensor.__getitem__, (LoggingTensor([1]), 0,), {}
 
 # This is already possible
 torch.sum(t)  # sum, (LoggingTensor([1]),), {}
@@ -158,7 +157,8 @@ match NumPy: [[4]]
 
 ```python
 class SubTensor(torch.Tensor):
-    def __torch_function__(self, func, types, args, kwargs):
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
         # Implementation here
 ```
 
@@ -201,14 +201,15 @@ of extracting an iterable of objects that *could* be `Tensor`-like.
 
 ```python
 class Tensor:
-    def __torch_function__(self, func, types, args, kwargs):
-        if not all(issubclass(type(self), t) for t in types):
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
+        if not all(issubclass(cls, t) for t in types):
             return NotImplemented
         
         # Defer to internal implementation
         ret = func._implementation(*args, **kwargs)
-        if type(self) is not Tensor and isinstance(ret, Tensor):
-            ret = Tensor.make_subclass(ret, type(self))
+        if cls is not Tensor and isinstance(ret, Tensor):
+            ret = Tensor.make_subclass(ret, cls)
         return ret
 ```
 
@@ -233,36 +234,76 @@ data is created and returned.
 This also works for all operators: `__add__`, `__getitem__` and so on since in
 Python these operators are just dunder methods of the corresponding class.
 
+### Checking for compatibility
+One can check for compatibility with supported classes in the following manner:
+
+```python
+class MyTensor:
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
+        HANDLED_CLASSES = (MyTensor, Tensor, ...)
+        if not issubclass(t, HANDLED_CLASSES) for t in types:
+            return NotImplemented
+        # Do further processing here.
+```
+
+### Implementing a subset of the API
+One can directly follow the following procedure to implement a subset of the
+API by using a hashmap to your own implementations of a function:
+
+```python
+_TORCH_IMPLEMENTATIONS = {}
+
+def implements(torch_function):
+    def inner(f):
+        _TORCH_IMPLEMENTATIONS[torch_function] = f
+        return f
+    return inner
+
+@implements(torch.add)
+def my_add(self, other):
+    # Implementation here
+
+class MyTensor:
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
+        compatible = ...
+        if not compatible:
+            return NotImplemented
+        
+        if func not in _TORCH_IMPLEMENTATIONS:
+            return NotImplemented
+
+        return _TORCH_IMPLEMENTATIONS[func](*args, **kwargs)
+```
+
 ### The need for `super().__torch_function__`
 To access super, one would do the following:
 ```python
 class SubTensor(torch.Tensor):
-    def __torch_function__(self, func, types, args, kwargs):
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
         # Pre-processing here
         val = super().__torch_function__(
             func,
-            tuple(
-                t for t in types if not issubclass(t, SubTensor)
-            ),
+            types
             args,
             kwargs
         )
         # Post processing here
 ```
 
-This way `__torch_function__` knows the list of types to dispatch to, and it
-will _not_ dispatch to `SubTensor` anymore in this example.
-
 To make the need for `super()` to be available concrete, let's consider the
 following scenario:
 
 ```python
 class SubTensor(torch.Tensor):
+    @classmethod
     def __torch_function__(...):
         # Pre-processing
         ret = super().__torch_function__(
             func,
-            tuple(t if not issubclass(t, SubTensor) else torch.Tensor for t in types),
+            types
             args,
             kwargs
         )
@@ -270,21 +311,12 @@ class SubTensor(torch.Tensor):
         return ret
 
 class SubSubTensor(SubTensor):
-    @torch_function_dispatch(...)
     def __add__(self, other):
         # Pre-processing
-        ret = super().__add__()
+        ret = super().__add__(other)
         # Post-processing
         return ret
 ```
-
-If `super().__torch_function__` wasn't possible here (or if the signature
-didn't include `types`), then there would be an infinite recursion in this
-instance. This is because `__add__` would call `SubTensor.__torch_function__`,
-`super().__torch_function__` would call `SubSubTensor.__add__` (realise, this
-is a different object than `Tensor.__add__`), which, not realising that it has
-been processed already, would pass control *back* to
-`SubTensor.__torch_function__` and so on ad infinitum.
 
 In this instance, with the proposed changes, processing would follow the
 `__torch_function__` protocol. This means that control would end up in
@@ -294,14 +326,25 @@ and and then come to `SubSubTensor.__add__`, from where it would go to
 that great care needs to be taken when writing `SubTensor.__torch_function__`
 to take into account the fact that it has to handle subclass methods.
 
+In general, control flow will follow this pattern:
+
+![Control flow diagram](./RFC-0001-assets/dispatch-flow.svg)
+
+The reason we use `super().__torch_function__` instead of `func` directly is
+
+1. We do not know if there are other `Tensor`-likes that may need to be
+   handled.
+2. Calling `func` directly would dispatch back to `__torch_function__`,
+   leading to an infinite recursion.
+
 ### Protocol support for external libraries
-We will also recommend that all `Tensor` subclasses make their own methods go
-through `__torch_function__` via a decorator `@torch_function_dispatch`. This
-decorator was added and then removed for performance reasons, however it will
-be added back to allow external libraries to interface with the protocol. It
-will take a single argument: a dispatcher, i.e. a callable that returns an
-iterable of all the "duck-Tensors", or possible candidates for classes that may
-implement `__torch_function__`.
+We will also recommend that all `Tensor` subclasses make their own methods that
+do not exist on `torch.Tensor` go through `__torch_function__` via a decorator
+`@torch_function_dispatch`. This decorator was added and then removed for
+performance reasons, however it will be added back to allow external libraries
+to interface with the protocol. It will take a single argument: a dispatcher,
+i.e. a callable that returns an iterable of all the "duck-`Tensor`s", or
+possible candidates for classes that may implement `__torch_function__`.
 
 If a library forgets to add the aforementioned decorator, then the method will
 no longer dispatch at all to any form of `__torch_function__`. In other words,
@@ -323,6 +366,18 @@ We do not propose automatic marking of functions with this decorator due to the
 potential backwards-compatibility break it could cause, as well as the
 parameters that are needed in order to allow this to happen (namely the
 dispatcher, which isn't in our control).
+
+### Getting the method from its `__name__` and `__module__`
+To construct the function given its `__name__` and `__module__`, one can do
+the following, as an example:
+
+```python
+def get_function(name, module):
+    func = __import__(module)
+    for n in name.split('.'):
+        func = getattr(func, n)
+    return func
+```
 
 ### Making `torch.Tensor._make_subclass` public API
 `torch.Tensor._make_subclass` will be renamed to `torch.Tensor.make_subclass`
