@@ -318,12 +318,12 @@ class SubSubTensor(SubTensor):
         return ret
 ```
 
-In this instance, with the proposed changes, processing would follow the
-`__torch_function__` protocol. This means that control would end up in
-`SubTensor.__torch_function__`, go to `Tensor.__torch_function__` from there
-and and then come to `SubSubTensor.__add__`, from where it would go to
-`Tensor.__add__`, and then back up the stack in the reverse order. This means
-that great care needs to be taken when writing `SubTensor.__torch_function__`
+In this instance, processing would follow the `__torch_function__` protocol.
+This means that control would end up in `SubSubTensor.__add__`, go to `Tensor._add__`,
+`SubTensor.__torch_function__` from there and and then come to
+`Tensor.__torch_function__`, from where it would go to `Tensor.__add__`, and
+then back up the stack in the reverse order. This means that great care needs
+to be taken when writing `SubTensor.__torch_function__`
 to take into account the fact that it has to handle subclass methods.
 
 In general, control flow will follow this pattern:
