@@ -153,7 +153,7 @@ limited.
 
 ### Proposal
 We propose the following signature change to `__torch_function__`, to make it
-match NumPy: [[4]]
+match NumPy, other than the `@classmethod` decorator: [[4]]
 
 ```python
 class SubTensor(torch.Tensor):
@@ -162,10 +162,9 @@ class SubTensor(torch.Tensor):
         # Implementation here
 ```
 
-The reason for adding `types` to the signature is necessitated by the need for
-`super()`. If we set a requirement for `super().__torch_function__` to work
-properly, we would need to provide an easy way for users to signal to
-`__torch_function__` that they are calling to the next-specific implementation.
+The reason for adding `types` to the signature is necessitated so we can
+check for support of the types if `Tensor`-likes coming in and we do not
+mix unrelated class trees.
 
 ### Process followed during a function/method call
 
@@ -216,10 +215,10 @@ class Tensor:
 This method has the effect of passing through subclasses through all
 functions/methods as intended.
 
-This corresponds exactly to the implementation `numpy.ndarray` gains in [[4]],
+This corresponds roughly to the implementation `numpy.ndarray` gains in [[4]],
 except for the fact that subclasses are passed through via another internal
 mechanism (namely the `__array_finalize__` protocol) there, as well as the fact
-that we are checking subclassing against `type(self)` instead of `Tensor`. This
+that we are checking subclassing against `cls` instead of `Tensor`. This
 has the side-effect of ensuring unrelated class trees are not merged, which is
 an inconsistency in NumPy's own design. Specifically, consider the example of
 two direct subclasses of `torch.Tensor`. Both will return `NotImplemented`, and
@@ -227,8 +226,8 @@ therefore, the check will fail and `TypeError` will be raised.
 
 Since subclasses are checked before superclasses in `__torch_function__`, it is
 guaranteed that the subclass implementation will be called first. In this
-instance, since `type(self)` is a subclass of all types, the code will
-continue. Since `type(self)` is not `torch.Tensor`, a view into the original
+instance, since `cls` is a subclass of all types, the code will
+continue. Since `cls` is not `torch.Tensor`, a view into the original
 data is created and returned.
 
 This also works for all operators: `__add__`, `__getitem__` and so on since in
