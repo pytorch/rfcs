@@ -31,7 +31,8 @@ We propose to solve this problem with the following changes to PyTorch:
    `__torch_function__` machinery.
 2. Add a `types` argument to `__torch_function__`, to make it match NumPy's
    `__array_function__`.
-3. Make `torch.Tensor._make_subclass` public API by renaming it to `torch.Tensor.make_subclass`.
+3. Add a new method to `torch.Tensor`, `as_subclass`, which creates a subtype
+   _view_ into the original object.
 4. Make `torch.Tensor` gain a generic implementation of `__torch_function__`.
 
 ## Usage and Impact
@@ -208,7 +209,7 @@ class Tensor:
         # Defer to internal implementation
         ret = func._implementation(*args, **kwargs)
         if cls is not Tensor and isinstance(ret, Tensor):
-            ret = Tensor.make_subclass(ret, cls)
+            ret = ret.as_subclass(cls)
         return ret
 ```
 
@@ -378,12 +379,14 @@ def get_function(name, module):
     return func
 ```
 
-### Making `torch.Tensor._make_subclass` public API
-`torch.Tensor._make_subclass` will be renamed to `torch.Tensor.make_subclass`
-and it will become public API. This method will create an object that has the
-same data pointer as the original object, which means that modifications to
-this will be reflected in the original object. More or less, it will have the
-same effect as modifying an object's `__class__` attribute in Python.
+### Adding the `torch.Tensor.as_subclass` method
+The `torch.Tensor.as_subclass` method will be added, taking a single non-`self`
+argument: `cls`, the class for which an instance will be created with a view
+into the data of the original `Tensor`. It will become public API. This method
+will create an object that has the same data pointer as the original object,
+which means that modifications to this will be reflected in the original object.
+More or less, it will have the same effect as modifying an object's `__class__`
+attribute in Python.
 
 This method is already used in external libraries, and they may need it as a
 way to e.g. bypass the processing of `torch.Tensor.__torch_function__`
@@ -396,7 +399,7 @@ To implement this proposal requires three main steps:
    arguments that are instances of a type in `types` are processed.
 2. Making sure that all `Tensor` methods except `__new__` and `__init__` go
    through `__torch_function__`.
-3. Make `Tensor._make_subclass` and `@torch_function_dispatch` public API. 
+3. Add `Tensor.as_subclass` and make `@torch_function_dispatch` public API. 
 
 ## Proposed alternatives
 One alternative that has been proposed is to automatically pass through
