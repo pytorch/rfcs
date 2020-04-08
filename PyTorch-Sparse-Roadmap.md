@@ -2,7 +2,7 @@
 
 |            |                 |
 | ---------- | --------------- |
-| Author     | Dhavide Aruliah |
+| Authors    | Dhavide Aruliah |
 | Status     | Draft           |
 | Type       | Process         |
 | Created    | 2020-04-07      |
@@ -20,7 +20,7 @@ twenty of those issues deals with *multiplication* of sparse PyTorch
 matrices and at least one of those is a high priority issue.
 
 This proposal summarizes an overarching strategy for addressing a number 
-`torch.sparse` issues related to the *speed of sparse matrix multiplication* in 
+`torch.sparse` issues related to the *performance of sparse matrix multiplication* in 
 PyTorch. There are, of course, many other `torch.sparse` issues flagged on 
 GitHub that point to other desired features & API design considerations; these 
 particular matrix multiplication issues are a useful starting point for further 
@@ -29,14 +29,14 @@ seed development of additional new `torch.sparse` features.
 
 ## Motivation and Scope
 
-Almost one third of the current `torch.sparse` issues relate to the speed of 
+Almost one third of the current `torch.sparse` issues relate to the timings of 
 matrix multiplication with sparse matrices (i.e., sparse tensors of rank 2) in 
 PyTorch (e.g., issue [\#5262](https://github.com/pytorch/pytorch/issues/5262)). 
 There are additional issues relating to batching sparse matrix products (e.g., 
 issue [\#33430](https://github.com/pytorch/pytorch/issues/33430)) and computing 
 gradients (e.g., issue 
 [\#12498](https://github.com/pytorch/pytorch/issues/12498)) but these can 
-likely be addressed *after* the speed-up issues. Note also that some issues 
+likely be addressed *after* the performance issues. Note also that some issues 
 that refer to "multiplication" explicitly are unrelated in that they refer to 
 *elementwise* products & *broadcasting* with sparse tensors (e.g., issue 
 [\#2909](https://github.com/pytorch/pytorch/issues/2909)).
@@ -61,31 +61,38 @@ One unusual feature of the PyTorch COO representation of tensors is that it
 permits a *hybrid* of sparse and dense dimensions. That is, the leading
 dimensions can be sparse and the remaining dimensions are dense; the methods
 `sparse_dim` and `dense_dim` reveal those dimensions explicitly. Another way
-to think of this is as a sparse tensor with dense tensors as entries.
+to think of this is as a (sparse) tensor with (dense) tensors as entries.
 
 It is important to observe that the `torch.sparse` API currently supports 
 *uncoalesced* sparse tensors (i.e., sparse tensors in COO format with duplicate 
-coordinates in the indices). Allowing uncoalesced sparse tensors improves the 
+coordinates in the indices). Values associated with repeated indices in an
+uncoalesced sparse tensor are added together to yield the value associated with
+that index. Permitting uncoalesced sparse tensors improves the 
 efficiency of certain operations (notably addition of sparse tensors and 
-insertion of new nonzero elements into a sparse tensor). Values associated with 
-repeated indices in an uncoalesced sparse tensor are added together to yield 
-the final value. Requiring coalesced COO tensors instead means that, e.g., when 
-adding sparse tensors, the indices must be sorted first and the values updated
-(as opposed to simply concatenating the corresponding index & value lists).
+insertion of new nonzero elements into a sparse tensor).
 
-Issue [\#16187](https://github.com/pytorch/pytorch/issues/16187) (among others)
-draws attention to deficiencies in the speed of PyTorch sparse matrix products
-through timed comparisons with SciPy. One possible explanation is that the
-internal PyTorch implementation does not use optimized libraries that employ,
-e.g., [sparse BLAS](https://math.nist.gov/spblas/) for *matvecs*
-(*matrix-vector products*, Level 2 BLAS operations) and, in turn, sparse
-matrix-matrix products (Level 3 BLAS operations). A number of sparse linear
-algebra libraries&mdash;including
+For instance, in computing `(A + B + C) * D` for some tensors `A`, `B`, `C`,
+& `D` of identical shape, the uncoalesced sum `(A + B + C)` can be computed
+by concatenating the lists of indices & values from all three tensors. To
+compute the elementwise product with `(A + B + C) * D`, the tensor
+`(A + B + C)` must be coalesced first; this involves sorting the indices and
+summing values associated with repeated indices). By contrast, forcing
+sparse tensor operations to yield coalesced sparse COO tensors requires
+unnecessary additional work: sorting indices to compute `(A + B)` and then
+again to compute `(A + B) + C`.
+
+A number of sparse linear algebra libraries&mdash;including
 [`scipy.sparse`](https://docs.scipy.org/doc/scipy/reference/sparse.html)&mdash;permit
 the use of
 [*CSR* (*compressed sparse row*)](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format))
-format to represent sparse matrices, thereby enabling certain known efficient
-algorithms for BLAS operations of Level 1, 2, & 3.
+format to represent sparse matrices as well. The CSR sparse format enables
+certain known efficient algorithms for BLAS operations of Level 2 & 3.
+Indeed, the SciPy documentation for the
+[`csr_matrix`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html#scipy.sparse.csr_matrix)
+class implies that COO format is mainly useful for assembling sparse matrices
+(e.g., in the context of finite element analysis) while CSR format is more
+useful for sparse *matvecs* (*matrix-vector products*, Level 2 BLAS operations)
+and sparse matrix-matrix products (Level 3 BLAS operations).
 
 Lower-level libraries like
 [Intel's MKL](https://software.intel.com/en-us/mkl-developer-reference-fortran-blas-and-sparse-blas-routines)
@@ -103,10 +110,24 @@ there are additional concerns about deterministic computations on GPUs that
 arise due to nonuniqueness of the internal representation in both the sequence
 and contents of the index and values arrays.
 
-With the considerations above, it makes sense to extend `torch.sparse` to
-provide support for storing sparse matrices in CSR format (in the special case
-of tensors of rank 2 or with `sparse_dim()==2`). There are two alternatives to
-consider:
+Numerous GitHub issues&mdash;e.g., issue
+[\#16187](https://github.com/pytorch/pytorch/issues/16187)
+that presents timed comparisons of PyTorch & SciPy&mdash;draw attention to
+performance deficiencies of PyTorch sparse matrix products. The precise causes
+are not obvious & require a fairly deep exploration of the internal PyTorch
+implementation. The performance penalty could be caused by conversions from
+COO to CSR format, from coalescing sparse COO tensors, from
+not using optimized libraries that employ, e.g.,
+[sparse BLAS](https://math.nist.gov/spblas/), or some combination of these.
+[This Stack Overflow
+question](https://stackoverflow.com/questions/30118673/why-cusparse-is-much-slower-than-cublas-for-sparse-matrix-multiplication)
+provides some additional discussion of why the cause of this performance
+penalty is difficult to assess.
+
+With the considerations above, it makes sense to explore extending
+`torch.sparse` to provide support storing sparse matrices in CSR format
+(in the special case of tensors of rank 2 or with `sparse_dim()==2`). There
+are two alternative schemes to consider:
 
 + providing user-accessible conversion routines between COO & CSR 
 representations for rank 2 tensors (or tensors with `sparse_dim()==2`); and
@@ -269,9 +290,11 @@ The basic outline, then, is as follows:
 
    + Link to CUDA libraries like [cuSPARSE](https://docs.nvidia.com/cuda/cusparse/index.html)
      or [CUSP](https://developer.nvidia.com/cusp) if possible.
+   + This is explicitly requested in issue
+     [\#21782](https://github.com/pytorch/pytorch/issues/21782).
    + Include test cases with sparse-matrix/dense-vector matvecs.
    + Include test cases with sparse-matrix/sparse-vector matvecs.
-   + Verify against benchmarks to ensure improved speed when using GPUs.
+   + Verify against benchmarks to ensure improved performance when using GPUs.
    + Include test cases to ensure that gradients are computed as expected as
      with `backward`.
 
@@ -282,7 +305,7 @@ The basic outline, then, is as follows:
      or [CUSP](https://developer.nvidia.com/cusp) if possible.
    + Include test cases with sparse-matrix/dense-matrix products.
    + Include test cases with sparse-matrix/sparse-matrix products.
-   + Verify against benchmarks to ensure improved speed when using GPUs.
+   + Verify against benchmarks to ensure improved performance when using GPUs.
    + Include test cases to ensure that gradients are computed as expected as
      with `backward`.
    
@@ -303,6 +326,12 @@ The basic outline, then, is as follows:
      specified in [PEP 465](https://www.python.org/dev/peps/pep-0465/).
    + Include test cases with mixtures of sparse & dense inputs for robustness.
 
+8. Deprecate redundant portions of the `torch` and `torch.sparse` namespace to
+   favor the infix operator for matrix multiplication over, say, `torch.matmul`
+   (or `torch.mm`, `torch.mv`, etc.).
+
+   + This change is optional; it depends on the volume of PyTorch code that
+     exists in the wild that would break as a result of these deprecations.
 
 Item (3) in the steps outlined above consists of constructing a table as follows
 for each combination of inputs to a given operator:
@@ -347,14 +376,13 @@ representations (e.g.,
 [*CSC* (*compressed sparse column*)](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)),
 [*DOK* (*dictionary of keys*)](https://en.wikipedia.org/wiki/Sparse_matrix#Dictionary_of_keys_(DOK)), 
 and blocked versions of other formats). The principal reason these are not 
-seriously considered in this proposal is that, apart from the known speed-ups 
+seriously considered in this proposal is that, apart from the known enhancements 
 attainable using CSR (or CSC) format, it is not obvious that DOK or other 
 representations yield practical advantages. Again, supporting other storage 
 formats requires reimplementing every method associated with the sparse tensor 
-classes. Although there is some theoretical work describing these approaches, 
-it is not obvious that the development & maintenance effort is justified. By 
-contrast, there is a clear demand for faster sparse matrix products that use 
-CSR format.
+classes. At present, there is a clear demand for faster sparse matrix products
+that use CSR format. Other formats may outperform CSR in certain contexts and
+can, in principle, be added at a later time when it makes sense to do so.
 
 ## Discussion
 
@@ -389,6 +417,7 @@ tensor by a dense tensor?](https://github.com/pytorch/pytorch/issues/26234)
 -   [PEP 465: A dedicated infix operator for matrix multiplication](https://www.python.org/dev/peps/pep-0465/)
 -   [Sparse matrix (Wikipedia)](https://en.wikipedia.org/wiki/Sparse_matrix)
 -   [Sparse Basic Linear Algebra Subprograms (BLAS) Library](https://math.nist.gov/spblas/)
+-   [Why is cuSPARSE so much slower than cuBLAS for sparse matrix multiplication?](https://stackoverflow.com/questions/30118673/why-cusparse-is-much-slower-than-cublas-for-sparse-matrix-multiplication)
 -   [`torch.sparse` documentation](https://pytorch.org/docs/stable/sparse.html)
 -   [`scipy.sparse` 
 documentation](https://docs.scipy.org/doc/scipy/reference/sparse.html)
