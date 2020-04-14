@@ -85,19 +85,54 @@ A number of sparse linear algebra libraries&mdash;including
 [`scipy.sparse`](https://docs.scipy.org/doc/scipy/reference/sparse.html)&mdash;permit
 the use of
 [*CSR* (*compressed sparse row*)](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format))
-format to represent sparse matrices as well. The CSR sparse format enables
-certain known efficient algorithms for BLAS operations of Level 2 & 3.
-Indeed, the SciPy documentation for the
+storage format to represent sparse matrices.
+The CSR format represents a sparse matrix by three (rank 1) arrays, that
+respectively contain the extents of rows, the column indices, and the nonzero
+values. It resembles COO storage, but compresses the row indices, hence the
+name. There is a closely related
+[*CSC* (*compressed sparse column*)](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS))
+storage format where the roles of rows & columns are interchanged. Notice
+that both CSR & CSC are storage formats restricted to sparse tensors of rank two;
+generalizations for sparse tensors of arbitrary rank `n` exist (e.g.,
+[GCRS](https://epubs.siam.org/doi/10.1137/060676489) and
+[CSF](https://dl.acm.org/doi/10.1145/2833179.2833183)), but these formats are not
+currently supported by most libraries for sparse linear algebra.
+
+As an illustration, consider the `4x6` matrix `A` given by
+```{python}
+
+[[10, 20,  0,  0,  0,  0],
+ [ 0, 30,  0, 40,  0,  0],
+ [ 0,  0, 50, 60, 70,  0],
+ [ 0,  0,  0,  0,  0, 80]]
+```
+This matrix can be stored in three separate arrays:
+```{python}
+values = [10, 20, 30, 40, 50, 60, 70, 80]
+col_index = [0, 1, 1, 3, 2, 3, 4, 5]
+row_index = [0, 2, 4, 7, 8] 
+```
+The first entry of `row_index` is `0` and the last is `nnz`, the number of
+nonzeros in the matrix. The values of the `r`th row of `A` can be sliced by
+extracting elements `row_index[r]` to `row_index[r+1]` from `values`. These
+values are aligned using the corresponding elements of
+`col_index[row_index[r]]` to `col_index[row_index[r+1]]`.
+As slicing the nonzero elements of rows of `A` is straightforward in CSR
+format, this storage scheme leads to efficient algorithms for computing sparse
+*matvecs* (*matrix-vector products*).
+
+Indeed, using the CSR or CSC sparse formats enables certain known efficient
+algorithms for BLAS operations of Level 2 & 3. The SciPy documentation for the
 [`csr_matrix`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html#scipy.sparse.csr_matrix)
 class implies that COO format is mainly useful for assembling sparse matrices
-(e.g., in the context of finite element analysis) while CSR format is more
-useful for sparse *matvecs* (*matrix-vector products*, Level 2 BLAS operations)
-and sparse matrix-matrix products (Level 3 BLAS operations).
+(e.g., in the context of finite element analysis). By contrast, CSR format is
+more widely used for sparse *matvecs* (Level 2 BLAS operations) and sparse
+matrix-matrix products (Level 3 BLAS operations).
 
 Lower-level libraries like
 [Intel's MKL](https://software.intel.com/en-us/mkl-developer-reference-fortran-blas-and-sparse-blas-routines)
 provide sparse BLAS algorithms using numerous internal representations including
-COO & CSR. On CUDA architecture GPUs,
+COO & CSR. On CUDA architecture GPUs, the sparse linear algebra libraries
 [cuSPARSE](https://developer.nvidia.com/cusparse),
 [CUSP](https://developer.nvidia.com/cusp), and
 [MAGMA](https://ceed.exascaleproject.org/magma/#magma-sparse)
@@ -105,37 +140,39 @@ all support sparse matrix computations in both CSR & COO formats.
 There are
 [benchmarks](https://pdfs.semanticscholar.org/5478/de620de99b1d4e41599a8950c7d3d9ff07b5.pdf)
 that suggest that sparse matvecs can be between 2 and 2.5 times faster when
-using CSR format over COO format. Of course, with uncoalesced COO format,
+using CSR format over COO storage. Of course, with uncoalesced COO format,
 there are additional concerns about deterministic computations on GPUs that
 arise due to nonuniqueness of the internal representation in both the sequence
 and contents of the index and values arrays.
 
-Numerous GitHub issues&mdash;e.g., issue
-[\#16187](https://github.com/pytorch/pytorch/issues/16187)
-that presents timed comparisons of PyTorch & SciPy&mdash;draw attention to
-performance deficiencies of PyTorch sparse matrix products. The precise causes
-are not obvious & require a fairly deep exploration of the internal PyTorch
-implementation. The performance penalty could be caused by conversions from
-COO to CSR format, from coalescing sparse COO tensors, from
-not using optimized libraries that employ, e.g.,
-[sparse BLAS](https://math.nist.gov/spblas/), or some combination of these.
+GitHub issue [\#16187](https://github.com/pytorch/pytorch/issues/16187)
+presents timed comparisons of PyTorch & SciPy; this is one of several issues
+that draws attention to performance deficiencies of PyTorch sparse matrix
+products. This performance penalty in PyTorch sparse matrix products has numerous
+potential causes:
+
++ converting from COO to CSR format;
++ coalescing sparse COO tensors;
++ not using optimized libraries that employ, e.g., [sparse BLAS](https://math.nist.gov/spblas/); or
++ some combination of the above.
+
 [This Stack Overflow
-question](https://stackoverflow.com/questions/30118673/why-cusparse-is-much-slower-than-cublas-for-sparse-matrix-multiplication)
-provides some additional discussion of why the cause of this performance
-penalty is difficult to assess.
+discussion](https://stackoverflow.com/questions/30118673/why-cusparse-is-much-slower-than-cublas-for-sparse-matrix-multiplication)
+provides some additional context; a fairly deep exploration is needed to assess
+the precise cause of the slowdown.
 
 With the considerations above, it makes sense to explore extending
-`torch.sparse` to provide support storing sparse matrices in CSR format
-(in the special case of tensors of rank 2 or with `sparse_dim()==2`). There
+`torch.sparse` to provide support for storing sparse matrices in CSR format
+(in the special case of tensors of rank 2). There
 are two alternative schemes to consider:
 
 + providing user-accessible conversion routines between COO & CSR 
-representations for rank 2 tensors (or tensors with `sparse_dim()==2`); and
+representations for rank 2 tensors; and
 + using a cached internal CSR representation.
 
 The first approach is most obvious; its primary disadvantage is that 
 supporting alternative storage formats requires modifying large portions of the 
-code obscured by the API (because, e.g., the algorithms for elementwise
+codebase (because, e.g., the algorithms for elementwise
 arithmetic operations differ for CSR & COO formats). These code overheads can
 be avoided using the second option instead, i.e., by caching. However, caching
 a CSR representation of a sparse tensor on top of the COO representation
@@ -147,7 +184,7 @@ approach only in this proposal.
 The main goals of this proposal, then, are:
 
 1. to implement a CSR representation for `torch.sparse` tensors of 
-   rank 2 or `sparse_dim()==2` with appropriate modifications to the API;
+   rank 2 with appropriate modifications to the API;
 2. to implement changes to *all* associated elementwise arithmetic operations
    and similar methods that would, by necessity, need to be updated to ensure
    compatibility with the new CSR representation; and
@@ -191,7 +228,7 @@ assumption will become clear in the early stages of prototyping.
 
 Ideally, none of the proposed work will break backward compatibility. The 
 proposed alterations largely consist of adding an API for a CSR representation 
-of sparse tensors of rank 2 (or with `sparse_dim()==2`) to enable certain 
+of sparse tensors of rank 2 to enable certain 
 sparse linear algebra improvements. Unfortunately, adding a CSR representation
 for sparse tensors does require modifying the implementation of sparse tensor
 classes significantly. In particular, all relevant sparse tensor operations
@@ -200,12 +237,26 @@ for the CSR and COO representations. Prior work on caching CSR representations
 in PyTorch in PR [#6225](https://github.com/pytorch/pytorch/pull/6225)
 illustrates some of these implementation issues.
 
+One future feature to be mindful of is a `fill_value` attribute for sparse
+tensors; this would allow a value other than zero to fill all the unspecified
+entries. Enabling nonzero fill values is useful in certain sparse tensor
+computations. As an example, the tensor `B` computed by `B = torch.cos(A)`
+contains ones in all locations that `A==0`; if `A` is sparse with
+`A.fill_value==0`, then `B` would also be sparse with `B.fill_value==1.0`.
+This capability is implemented in
+[`pydata/sparse`](https://github.com/pydata/sparse)
+and is required for some features requested (see, e.g.,
+[issue \#8853](https://github.com/pytorch/pytorch/issues/8853)). This feature
+is not covered by this proposal, but it will affect matrix products when it is.
+
 Finally, there is some additional work required to ensure that every way of
 computing matrix products is tested & updated appropriately (e.g.,
 `torch.matmul`, `torch.sparse.mm`, `torch.sparse.FloatTensor.mm`, etc.).
-A suitably robust suite of unit tests should be designed to verify that correct
-behavior is preserved with any modifications to the code. This would also
-include ensuring GPU support as well as compliance with `autograd`.
+There should be a thorough pass through the existing PyTorch codebase to ensure
+that any code relying on sparse tensors still functions as intended with the
+changes made. A suitably robust suite of unit tests should be designed to verify
+that correct behavior is preserved with any modifications to the code. This
+would include ensuring GPU support as well as compliance with `autograd`.
 
 ## Related Work
 
@@ -214,8 +265,8 @@ Much prior work on sparse matrices is implemented in the
 module; the [`pydata/sparse`](https://github.com/pydata/sparse) project extends 
 some of those ideas to sparse arrays of generic rank `n`. As a stretch goal, it 
 may make sense to have general rank `n` PyTorch tensors being supported in most 
-of the same ways as `pydata/sparse` and to have sparse tensors of rank 2 (or 
-with `sparse_dim()==2`) supported in most of the same ways as `scipy.sparse`. 
+of the same ways as `pydata/sparse` and to have sparse tensors of rank 2
+supported in most of the same ways as `scipy.sparse`. 
 
 Among projects tailored to neural networks & deep learning,
 [Tensorflow](https://www.tensorflow.org/api_docs/python/tf/raw_ops/SparseMatrixSparseMatMul)
@@ -240,13 +291,21 @@ The module `torch` already contains an attribute `torch.sparse_coo` of type
 proposed CSR implementation should extend the API by adding a few attributes
 to the `torch` module with similar names:
 
-+ `torch.sparse_csr2d` (an attribute of type `torch.layout`);
-+ `torch.sparse_csr2d_tensor` (an associated constructor); and
-+ functions `torch.to_sparse_csr2d` & `torch.to_sparse_coo` for explicit
-  conversion between representations (in the case `sparse_dims()==2`).
++ `torch.sparse_csr` (an attribute of type `torch.layout`);
++ `torch.sparse_csr_tensor` (an associated constructor); and
++ functions `torch.to_sparse_csr` & `torch.to_sparse_coo` for explicit
+  conversion between representations (for rank 2 sparse tensors).
 
-The use of `_csr2d` in the new identifiers emphasizes the fact that the CSR
-format applies only to tensors of rank 2.
+The `torch.sparse_csr_tensor` constructor would have a similar signature to `torch.sparse_coo_tensor`, i.e.,
+
+```{python}
+sparse_csr_tensor(indices, values, size=None, dtype=None,
+                  device=None, requires_grad=False)       -> Tensor
+```
+
+where `indices` would be a list of two lists (e.g., `row_index` & `col_index`
+from the example before) and `values` would be a tensor containing the
+corresponding nonzero entries of the sparse tensor.
 
 The basic outline, then, is as follows:
 
@@ -267,13 +326,16 @@ The basic outline, then, is as follows:
    + The implementation of related functions in 
      [Tensorflow](https://www.tensorflow.org/api_docs/python/tf/raw_ops/SparseMatrixSparseMatMul)
      can serve as a useful model for these transformations.
-   + Include exception handling to ensure `sparse_dim()==2` before converting to from COO to CSR.
+   + Include exception handling to ensure rank 2 tensors before converting
+     from COO to CSR storage.
+   + Include tests to ensure that conversion functions work as intended on CUDA,
+     i.e., when executed on GPU hardware.
    + See also comments in issue
      [\#16187](https://github.com/pytorch/pytorch/issues/16187).
 
 3. Update & test the API for PyTorch sparse tensors for *all* relevant methods
-   to ensure correct support for both COO format and CSR format (in the case of
-   tensors with `sparse_dim()==2`).
+   to ensure correct support for both COO format and CSR format for rank 2
+   tensors.
 
    + This would include, e.g., the `__add__`, `__sub__`, `__mul__`, `__div__`,
      and most other methods (specifically those that do *not* rely on computing
@@ -326,7 +388,18 @@ The basic outline, then, is as follows:
      specified in [PEP 465](https://www.python.org/dev/peps/pep-0465/).
    + Include test cases with mixtures of sparse & dense inputs for robustness.
 
-8. Deprecate redundant portions of the `torch` and `torch.sparse` namespace to
+8. Investigate existing PyTorch C++ codebase to ensure that all logic involving
+   sparse tensors is sound with the modifications imposed.
+
+   + As an example, consider the code in
+     [`accumulate_grad.h`](https://github.com/pytorch/pytorch/blob/5bbcddae3bfb7abaeaada29369c6ed5964d390fe/torch/csrc/autograd/functions/accumulate_grad.h#L61-L68)
+     that explicitly makes reference to the `_values` and `_indices` attributes
+     of sparse COO tensors. It would be necessary to include a test for COO vs.
+     CSR sparse tensors and to use an appropriate algorithm for the CSR case.
+   + In principle, such special cases could be caught by unit tests using
+     sparse tensors as inputs.
+
+9. Deprecate redundant portions of the `torch` and `torch.sparse` namespace to
    favor the infix operator for matrix multiplication over, say, `torch.matmul`
    (or `torch.mm`, `torch.mv`, etc.).
 
@@ -424,6 +497,8 @@ documentation](https://docs.scipy.org/doc/scipy/reference/sparse.html)
 -   [`pydata/sparse` project](https://github.com/pydata/sparse)
 -   [Sparse Matrix-Vector Multiplication with CUDA](https://medium.com/analytics-vidhya/sparse-matrix-vector-multiplication-with-cuda-42d191878e8f)
 -   [A Performance Comparison of Linear Algebra Libraries for Sparse Matrix-Vector Product](https://pdfs.semanticscholar.org/5478/de620de99b1d4e41599a8950c7d3d9ff07b5.pdf)
+-   [Efficient MATLAB Computations with Sparse and Factored Tensors](https://epubs.siam.org/doi/10.1137/060676489)
+-   [Tensor-matrix products with a compressed sparse tensor](https://dl.acm.org/doi/10.1145/2833179.2833183)
 -   [The tensor algebra compiler](https://dl.acm.org/doi/10.1145/3133901)
 -   [Sparse Tensor Algebra Optimizations with 
 Workspaces](https://arxiv.org/abs/1802.10574)
