@@ -44,7 +44,7 @@ that refer to "multiplication" explicitly are unrelated in that they refer to
 For context, the internal representation of PyTorch sparse tensors uses
 [*COO* (*coordinate*) format](https://en.wikipedia.org/wiki/Sparse_matrix#Coordinate_list_(COO)),
 i.e., using a rank 1 `FloatTensor` of length `nnz` for the non-zero values and 
-a `nnz x d` `IntTensor` to store the positions of those entries in a sparse 
+a `d x nnz` `IntTensor` to store the positions of those entries from a sparse 
 tensor of rank `d`:
 
 ```{python}
@@ -56,6 +56,11 @@ tensor of rank `d`:
  4  0  5
 [torch.FloatTensor of size 2x3]
 ```
+The COO storage scheme is favoured for representing high-dimensional sparse
+tensors in practice because it is easy to insert new elements: simply
+append a value to the end of the values array and concatenate a column of
+height `d` to the right of the index matrix. It is also flexible in that
+the elements do not need to be sorted in any particular order.
 
 One unusual feature of the PyTorch COO representation of tensors is that it 
 permits a *hybrid* of sparse and dense dimensions. That is, the leading
@@ -81,53 +86,72 @@ sparse tensor operations to yield coalesced sparse COO tensors requires
 unnecessary additional work: sorting indices to compute `(A + B)` and then
 again to compute `(A + B) + C`.
 
-A number of sparse linear algebra libraries&mdash;including
-[`scipy.sparse`](https://docs.scipy.org/doc/scipy/reference/sparse.html)&mdash;permit
-the use of
+The SciPy documentation for the [`csr_matrix`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html#scipy.sparse.csr_matrix)
+class implies that COO format is useful mainly for assembling sparse matrices
+(e.g., in the context of finite element analysis). By contrast, a number of
+sparse linear algebra libraries&mdash;including
+[`scipy.sparse`](https://docs.scipy.org/doc/scipy/reference/sparse.html)&mdash;make
+use of the
 [*CSR* (*compressed sparse row*)](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format))
 storage format to represent sparse matrices.
-The CSR format represents a sparse matrix by three (rank 1) arrays, that
-respectively contain the extents of rows, the column indices, and the nonzero
-values. It resembles COO storage, but compresses the row indices, hence the
-name. There is a closely related
+It resembles COO storage, but compresses the row indices, hence the name.
+There is a closely related
 [*CSC* (*compressed sparse column*)](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS))
 storage format where the roles of rows & columns are interchanged. Notice
-that both CSR & CSC are storage formats restricted to sparse tensors of rank two;
-generalizations for sparse tensors of arbitrary rank `n` exist (e.g.,
-[GCRS](https://epubs.siam.org/doi/10.1137/060676489) and
+that both CSR & CSC are mostly used with sparse tensors of rank two;
+they can generalize to sparse tensors of arbitrary rank `n` (see below). Other
+related formats exist (e.g.,
+[GCRS](https://ieeexplore.ieee.org/document/7237032) and
 [CSF](https://dl.acm.org/doi/10.1145/2833179.2833183)), but these formats are not
 currently supported by most libraries for sparse linear algebra.
 
-As an illustration, consider the `4x6` matrix `A` given by
-```{python}
+The CSR format replaces a dense matrix by three (rank 1) arrays, that
+respectively contain the extents of rows, the column indices, and the numerical
+values. That is, to represent an `M x N` sparse matrix `A` with `nnz` nonzero
+entries (floating-point) in CSR format requires three separate rank 1 arrays:
+`RO` (an integer array of length `M+1`), `CO` (an integer array of length
+`nnz`), and `VL` (a floating-point array of length `nnz`). In the
+extension of CSR format to tensors of rank greater `d>2`, the array `CO`
+would be a matrix of dimensions `(d-1) x nnz`.
 
+The entry in `RO[r]` is the cumulative number of nonzero entries in the matrix
+up to and including row `r` (`r=0...M+1`). Thus, the first entry of `RO` is `0`
+and the last&mdash;`RO[M+1]`&mdash;is `nnz`. The arrays `CO` and `VL` of length
+`nnz`, then, store the column indices and the values of the nonzero entries of
+the matrix when sorted lexicographically by the `(row, column)` index pairs.
+This means that the values of the `r`th row of `A` can be sliced by extracting
+elements `RO[r]` to `RO[r+1]` from the remaining arrays `CO` and `VL`. The
+slice `CO[RO[r]:RO[r+1]]` give the column locations of the nonzero entries in
+row `r` in increasing column order. The corresponding numerical entries would
+be stored in the slice `VL[RO[r]:RO[r+1]]`. For CSC format for representing
+sparse matrices, `RO` and `CO` are still tensors of rank 1 but the roles of
+rows and columns are reversed from CSR format. In the extension of CSR storage
+to tensors of rank `d>2`, the columns of `CO` contain the remaining `d-1`
+index entries that correspond to the nonzero entries of `A` sorted in
+lexicographic order.
+
+As an illustration of CSR storage, consider this `MxN` sparse matrix `A` with
+`M=4` rows, `N=6` columns and `nnz=8` nonzero entries:
+```{python}
 [[10, 20,  0,  0,  0,  0],
  [ 0, 30,  0, 40,  0,  0],
  [ 0,  0, 50, 60, 70,  0],
  [ 0,  0,  0,  0,  0, 80]]
 ```
-This matrix can be stored in three separate arrays:
+For this matrix, the corresponding arrays are:
 ```{python}
-values = [10, 20, 30, 40, 50, 60, 70, 80]
-col_index = [0, 1, 1, 3, 2, 3, 4, 5]
-row_index = [0, 2, 4, 7, 8] 
+RO = [0, 2, 4, 7, 8] 
+CO = [0, 1, 1, 3, 2, 3, 4, 5]
+VL = [10, 20, 30, 40, 50, 60, 70, 80]
 ```
-The first entry of `row_index` is `0` and the last is `nnz`, the number of
-nonzeros in the matrix. The values of the `r`th row of `A` can be sliced by
-extracting elements `row_index[r]` to `row_index[r+1]` from `values`. These
-values are aligned using the corresponding elements of
-`col_index[row_index[r]]` to `col_index[row_index[r+1]]`.
+
 As slicing the nonzero elements of rows of `A` is straightforward in CSR
 format, this storage scheme leads to efficient algorithms for computing sparse
-*matvecs* (*matrix-vector products*).
-
-Indeed, using the CSR or CSC sparse formats enables certain known efficient
-algorithms for BLAS operations of Level 2 & 3. The SciPy documentation for the
-[`csr_matrix`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html#scipy.sparse.csr_matrix)
-class implies that COO format is mainly useful for assembling sparse matrices
-(e.g., in the context of finite element analysis). By contrast, CSR format is
-more widely used for sparse *matvecs* (Level 2 BLAS operations) and sparse
-matrix-matrix products (Level 3 BLAS operations).
+*matvecs* (*matrix-vector products*). Indeed, the principle reason to favour CSR
+& CSC formats for storing sparse matrices is that those formats lend themselves
+easily to row- or column-oriented operations on sparse matrices (e.g., BLAS
+Level 2 operations like a matvec & BLAS Level 3 operations like a
+matrix-matrix product).
 
 Lower-level libraries like
 [Intel's MKL](https://software.intel.com/en-us/mkl-developer-reference-fortran-blas-and-sparse-blas-routines)
@@ -255,7 +279,7 @@ computing matrix products is tested & updated appropriately (e.g.,
 There should be a thorough pass through the existing PyTorch codebase to ensure
 that any code relying on sparse tensors still functions as intended with the
 changes made. A suitably robust suite of unit tests should be designed to verify
-that correct behavior is preserved with any modifications to the code. This
+that correct behaviour is preserved with any modifications to the code. This
 would include ensuring GPU support as well as compliance with `autograd`.
 
 ## Related Work
@@ -303,9 +327,12 @@ sparse_csr_tensor(indices, values, size=None, dtype=None,
                   device=None, requires_grad=False)       -> Tensor
 ```
 
-where `indices` would be a list of two lists (e.g., `row_index` & `col_index`
-from the example before) and `values` would be a tensor containing the
-corresponding nonzero entries of the sparse tensor.
+where `indices` would be a list of two lists (e.g., `RO` & `CO`
+from the description of CSR format above) and `values` would be a tensor
+containing the corresponding (presumably) nonzero entries of the sparse
+tensor. This is sufficiently general to account for tensors of rank `d>2`,
+thereby enabling batches of sparse matrices. It should also be acceptable
+for `values` to contain tensors (of fixed dimensions) rather than scalars.
 
 The basic outline, then, is as follows:
 
@@ -320,7 +347,7 @@ The basic outline, then, is as follows:
      the timings.
 
 2. Construct and test a prototype implementation of conversion functions
-   `torch.to_sparse_csr2d` and `torch.to_sparse_coo` to convert sparse PyTorch
+   `torch.to_sparse_csr` and `torch.to_sparse_coo` to convert sparse PyTorch
    tensors of sparse rank 2 between COO and CSR formats.
 
    + The implementation of related functions in 
@@ -400,7 +427,7 @@ The basic outline, then, is as follows:
      sparse tensors as inputs.
 
 9. Deprecate redundant portions of the `torch` and `torch.sparse` namespace to
-   favor the infix operator for matrix multiplication over, say, `torch.matmul`
+   favour the infix operator for matrix multiplication over, say, `torch.matmul`
    (or `torch.mm`, `torch.mv`, etc.).
 
    + This change is optional; it depends on the volume of PyTorch code that
@@ -418,7 +445,7 @@ for each combination of inputs to a given operator:
 
 The goal is to get all the "not implemented" entries to "supported" for
 each combination of inputs. Ideally, there would be comprehensive unit
-tests for each case to ensure correct behavior.
+tests for each case to ensure correct behaviour.
 
 
 The principle GitHub issues related to this work are:
@@ -498,6 +525,8 @@ documentation](https://docs.scipy.org/doc/scipy/reference/sparse.html)
 -   [Sparse Matrix-Vector Multiplication with CUDA](https://medium.com/analytics-vidhya/sparse-matrix-vector-multiplication-with-cuda-42d191878e8f)
 -   [A Performance Comparison of Linear Algebra Libraries for Sparse Matrix-Vector Product](https://pdfs.semanticscholar.org/5478/de620de99b1d4e41599a8950c7d3d9ff07b5.pdf)
 -   [Efficient MATLAB Computations with Sparse and Factored Tensors](https://epubs.siam.org/doi/10.1137/060676489)
+-   [Efficient data compression methods for multidimensional sparse array operations based on the EKMR scheme](https://ieeexplore.ieee.org/abstract/document/1252859)
+-   [Efficient storage scheme for n-dimensional sparse array: GCRS/GCCS](https://ieeexplore.ieee.org/document/7237032)
 -   [Tensor-matrix products with a compressed sparse tensor](https://dl.acm.org/doi/10.1145/2833179.2833183)
 -   [The tensor algebra compiler](https://dl.acm.org/doi/10.1145/3133901)
 -   [Sparse Tensor Algebra Optimizations with 
