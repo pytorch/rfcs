@@ -1,3 +1,11 @@
+|            |                                                 |
+| ---------- | ----------------------------------------------- |
+| Authors    | Hameer Abbasi, Edward Z. Yang and Ralf Gommers  |
+| Status     | Accepted                                        |
+| Type       | Proposal                                        |
+| Created    | 2020-01-24                                      |
+| Resolution | TBD                                             |
+
 # Improving subclassing Tensor by propagating subclass instances
 This RFC describes changes necessary to allow `__torch_function__` to be used
 by methods of `torch.Tensor` in an attempt to make subclassing more accessible
