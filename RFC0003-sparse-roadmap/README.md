@@ -371,12 +371,12 @@ dimension while interpreting the unspecified elements as zero valued
 elements. We denote the softmax normalization factors along sparse
 dimension as follows:
 
-<img data-latex="$$
+<img data-latex="
 \begin{align*}
 d_1 &= \exp(11) + \exp(0) + \exp(13) + \exp(0) + \exp(15)\\
 d_2 &= \exp(21) + \exp(0) + \exp(23) + \exp(0) + \exp(25)
 \end{align*}
-$$" src="to-be-generated" alt="latex">
+" src=".images/7a1bcad2ed640da5f4bbc3f00ac9cf6d.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 so that
 
