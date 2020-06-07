@@ -1,3 +1,25 @@
+<!--watch-latex-md
+
+This document is processed by watch_latex_md.py program, see
+
+  https://github.com/Quansight/pearu-sandbox/latex_in_markdown/
+
+You can edit this document as you wish. You can also edit the LaTeX
+data in img elements, but only the content of `latex-data`:
+
+  1. To automatically update the LaTeX rendering in img element, edit
+     the file while watch_latex_md.py is running.
+
+  2. Never change the beginning (`<img latex-data="...`) and the end
+     (`...alt="latex">`) parts of the LaTeX img elements as these are
+     used by the watch_latex_md.py script.
+
+  3. Changes to other parts of the LaTeX img elements will be
+     overwritten.
+
+Enjoy LaTeXing!
+-->
+
 # Roadmap for PyTorch Sparse Tensors
 
 
@@ -13,8 +35,8 @@
 
 The aim of this document is to define the future of PyTorch sparse
 tensors. We propose that
-> :large_blue_circle:<!--:proposal:--> a sparse tensor is a drop-in replacement of dense tensors for all
-> tensor operations.
+> :large_blue_circle:<!--:proposal:--> a sparse tensor is a drop-in
+> replacement of dense tensors for all tensor operations.
 
 ## Motivation and Scope
 
@@ -99,16 +121,16 @@ When representing data as an array in computer memory, a array storage
 format must be selected. The simplest and most general array storage
 format is the strided array format where the data values are stored
 continuously in memory so that the storage location any array element
-can be easily (<!--$O(1)$--><img src="https://latex.codecogs.com/svg.latex?\inline O(1)">) determined
-from its index tuple and therefore efficient concurrent algorithms can
-be designed that process data in the most efficient way.  However,
-when data poses certain characteristics that would lead to arrays
-where majority of array elements have the same value, choosing a
-strided array format may lead to inefficient use of memory and
-processor resources. For such cases various sparse array formats have
-been proposed that provide considerable storage savings as well as
-more efficient processing possibilities but a the cost of increased
-complexity in the sparse storage format.
+can be easily (<img data-latex="$O(1)$" src=".images/ef0cdc8ea95d866c1fb30b9f9724a739.svg"  valign="-4.289px" width="37.737px" height="17.186px" style="display:inline;" alt="latex">) determined from its index tuple and therefore
+efficient concurrent algorithms can be designed that process data in
+the most efficient way.  However, when data poses certain
+characteristics that would lead to arrays where majority of array
+elements have the same value, choosing a strided array format may lead
+to inefficient use of memory and processor resources. For such cases
+various sparse array formats have been proposed that provide
+considerable storage savings as well as more efficient processing
+possibilities but a the cost of increased complexity in the sparse
+storage format.
 
 To be specific, in this document we consider three array storage
 formats: strided dense, COO sparse, and CSR sparse array storage
@@ -308,11 +330,11 @@ the interpretation of unspecified elements is none.
 #### Unspecified elements - fill-value
 
 Many mathematical operations map zero values to non-zero values, for
-instance, <!--$\cos 0 = 1$--><img src="https://latex.codecogs.com/svg.latex?\inline \cos 0 = 1">
-etc. With the aim of defining such nonhomogeneous operations on sparse
-arrays in a memory efficient way, we propose that
-> :large_blue_circle:<!--:proposal:--> Element-wise operations on coalesced sparse arrays result
-> sparse arrays with the same set of indices as the input.
+instance, <img data-latex="$\cos 0 = 1$" src=".images/49363cf83f64b9ed17d981377a98f496.svg"  width="65.992px" height="11.097px" style="display:inline;" alt="latex"> etc. With the aim of defining such
+nonhomogeneous operations on sparse arrays in a memory efficient way,
+we propose that > :large_blue_circle:<!--:proposal:--> Element-wise
+operations on coalesced sparse arrays result > sparse arrays with the
+same set of indices as the input.
 
 For nonhomogeneous operations on sparse arrays, we'll need to
 introduce fill-value property that represents the value of unspecified
@@ -329,10 +351,16 @@ formally a dense array.
 
 Let us consider a 2-D PyTorch COO sparse storage format
 with one sparse and one dense dimensions:
-<!--$$A = \begin{bmatrix}
+
+<img data-latex="
+$$
+A = \begin{bmatrix}
 11 & ? & 13 & ? & 15\\
 21 & ? & 23 & ? & 25
-\end{bmatrix}$$--><img src="https://latex.codecogs.com/svg.latex?A = \begin{bmatrix}%0A11 & ? & 13 & ? & 15\\%0A21 & ? & 23 & ? & 25%0A\end{bmatrix}">
+\end{bmatrix}
+$$
+" src=".images/ea550b2ce1400a64d1a3c677bc359a13.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
 
 where `?` represents unspecified entries, the sparse dimension is
 horizontal and dense dimension is vertical.
@@ -342,25 +370,39 @@ Let's apply softmax operation
 dimension while interpreting the unspecified elements as zero valued
 elements. We denote the softmax normalization factors along sparse
 dimension as follows:
-<!--$$\begin{align*}
+
+<img data-latex="$$
+\begin{align*}
 d_1 &= \exp(11) + \exp(0) + \exp(13) + \exp(0) + \exp(15)\\
 d_2 &= \exp(21) + \exp(0) + \exp(23) + \exp(0) + \exp(25)
-\end{align*}$$--><img src="https://latex.codecogs.com/svg.latex?\begin{align*}%0Ad_1 &= \exp(11) %2B \exp(0) %2B \exp(13) %2B \exp(0) %2B \exp(15)\\%0Ad_2 &= \exp(21) %2B \exp(0) %2B \exp(23) %2B \exp(0) %2B \exp(25)%0A\end{align*}">
+\end{align*}
+$$" src="to-be-generated" alt="latex">
 
 so that
-<!--$$\mathbf{softmax}(A) = 
+
+<img data-latex="
+$$
+\mathbf{softmax}(A) = 
 \begin{bmatrix}
   \exp(11)/d_1 & 1/d_1  & \exp(13)/d_1 & 1/d_1 & \exp(15)/d_1\\
   \exp(21)/d_2 & 1/d_2 &  \exp(23)/d_2 & 1/d_2 & \exp(25)/d_2
-\end{bmatrix}$$--><img src="https://latex.codecogs.com/svg.latex?\mathbf{softmax}(A) = %0A\begin{bmatrix}%0A  \exp(11)/d_1 & 1/d_1  & \exp(13)/d_1 & 1/d_1 & \exp(15)/d_1\\%0A  \exp(21)/d_2 & 1/d_2 &  \exp(23)/d_2 & 1/d_2 & \exp(25)/d_2%0A\end{bmatrix}">
+\end{bmatrix}
+$$
+" src=".images/046f962195414fdd52dc1a351eebdd3c.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
 
 To represent this result as a sparse matrix with the same sparsity as
 the input, the fill-value must be a 1-D array:
 
-<!--$$\begin{bmatrix}
+<img data-latex="
+$$
+\begin{bmatrix}
 1/d_1\\
 1/d_2
-\end{bmatrix}$$--><img src="https://latex.codecogs.com/svg.latex?\begin{bmatrix}%0A1/d_1\\%0A1/d_2%0A\end{bmatrix}">
+\end{bmatrix}
+$$
+" src=".images/f367b4731af9e0c15e4859dc22d12367.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
 
 
 ##### Example 3
