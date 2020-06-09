@@ -115,8 +115,8 @@ extension of CSR format to tensors of rank greater `d>2`, the array `CO`
 would be a matrix of dimensions `(d-1) x nnz`.
 
 The entry in `RO[r]` is the cumulative number of nonzero entries in the matrix
-up to and including row `r` (`r=0...M+1`). Thus, the first entry of `RO` is `0`
-and the last&mdash;`RO[M+1]`&mdash;is `nnz`. The arrays `CO` and `VL` of length
+up to and including row `r` (`r=0...M`). Thus, the first entry of `RO` is `0`
+and the last&mdash;`RO[M]`&mdash;is `nnz`. The arrays `CO` and `VL` of length
 `nnz`, then, store the column indices and the values of the nonzero entries of
 the matrix when sorted lexicographically by the `(row, column)` index pairs.
 This means that the values of the `r`th row of `A` can be sliced by extracting
