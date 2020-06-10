@@ -460,54 +460,9 @@ operations on sparse arrays:
 op(COO(indices, values, fill_value=<fill-value>)) == COO(indices, op(values), fill_value=op(<fill-value>))
 ```
 
-
-##### :large_blue_diamond:<!--:impl:-->Fill-value implementation
-
-Implementation-wise, it would be advantageous to store the
-`A.fill_values` as a part of `A.values` (say, as the last row) because
-all element-wise operations would be performed on `A.values` only.  As
-a result, when a sparse array `A` has a fill-value property set then
-`A.values.shape == (NNZ+1, Nd)`, otherwise `A.values.shape == (NNZ,
-Nd)`.
-
-So, a pseudo-implementation of `fill_value` property is
-```python
-@property
-def fill_value(self):
-    nnz = self.nnz
-    if self._values.shape[0] == nnz + 1:
-        return self._values[-1]
-```
-
-The advantage of this proposal is the simplicity for applying
-element-wise operations:
-```python
-op(A) = COO(A.indices, op(A.values))
-```
-as well as one does not need to manage the storage location and
-
-As a side-effect, the construction of `COO` must not allow using
-`fill_value` when it is already specified in `values`:
-```python
-def __init__(self, indices, values, shape, fill_value=None):
-    ...
-    nnz = self.nnz
-    if self.values.shape[0] == nnz + 1 and fill_value is not None:
-        raise ValueError('Fill-value is already defined in values')
-```
-
-
-##### Implementation proposal 1 - alternative
-
-Introduce `fill_value` property to PyTorch COO sparse storage format.
-
-For element-wise operations we have:
-```
-op(A) = COO(A.indices, op(A.values), op(A.fill_value) if A.fill_value is not None else None)
-```
-
-The existing implementations need to be updated to process the
-`fill_value` property for algorithm correctness.
+Note 2: Implementation-wise, the fill-value is stored as a separate
+attribute in an array instance and exposed as a get-only property
+named `_fill_value` of an array instance.
 
 #### Fill-value alternative is additive-value
 
@@ -526,14 +481,84 @@ While `A'` is equivalent to `A` for arithmetic operations, it is not
 suitable representation for sparse arrays applications in graph theory
 and we shall skip discussing its possible advantages.
 
-### CSR sparse array storage format
+### CRS/CCS sparse array storage format
 
-TBD: explain the relation between array item index and the
-corresponding memory location of the item value.
+The CRS/CCS sparse array storage format has a long history for
+representing sparce matrices because this format is particularly
+suitable for multiplying matrices efficiently. However, the CRS/CCS
+format is mostly used for storing sparse two-dimensional arrays and
+many generalizations of CRS/CCS format exists for representing sparse
+multi-dimensional arrays (see GCRS paper for review).
 
-## Interpretation of unspecified sparse array entries
+Here we propose to use a modification of GCRS for multi-dimensional
+sparse arrays that for the two-dimensional arrays coincides with the
+standard CRS sparse array storage format so that existing
+high-performat libraries can be reused, and for higher than two
+dimensions the format does not introduce new data structures for
+representing multi-dimensional sparse arrays efficiently.
 
-TBD: discuss fill value vs offset vs mapping model
+The GCRS paper explains an idea of representing a N-dimensional sparse
+array as a two-dimensional array that is stored in the standard
+CRS/CSS sparse array storage format. The mapping of N-dimensional
+indexes to two-dimensional indices is choosen so that all the even/odd
+dimensions of N-D indices (dimensions are numbered starting from 0)
+contribute the row/column index of the 2-D indices. For example, a
+five-dimensional index <img data-latex="$(i_0, i_1, i_2, i_3, i_4)$" src=".images/c99132adb8a9296e6dda9a9bc1012cef.svg"  valign="-4.289px" width="107.206px" height="17.186px" style="display:inline;" alt="latex"> of an array <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> with the shape <img data-latex="$(d_0, d_1, d_2, d_3, d_4)$" src=".images/e7f47b0dbd3844274016bfb2d8212945.svg"  valign="-4.289px" width="122.248px" height="17.186px" style="display:inline;" alt="latex"> is mapped to two-dimensional
+index <img data-latex="$(a, b)$" src=".images/b1eae3c210005046a31e1777e9e3c513.svg"  valign="-4.289px" width="40.058px" height="17.186px" style="display:inline;" alt="latex"> of a sparse array <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> as follows:
+
+<img data-latex="
+\begin{align*}
+a_0 &= i_0 d_4 d_2 + i_2 d_4 + i_4\\
+a_1 &= i_1 d_3 + i_3
+\end{align*}
+" src=".images/0bf4c59d8fec08c14625acd0c6be1710.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+and we have
+
+<img data-latex="
+$$
+A[i_0, i_1, i_2, i_3, i_4] = A'[a_0, a_1]
+$$
+" src=".images/cc03110ccc3bff6e30efb8d391078c2a.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+where the two-dimensional array <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> has a shape <img data-latex="$(\delta_0, \delta_1)$" src=".images/2ddba22fae20976bf7ea71b0273dff8e.svg"  valign="-4.289px" width="51.676px" height="17.186px" style="display:inline;" alt="latex"> where
+
+<img data-latex="
+\begin{align*}
+\delta_0 &= d_0 d_2 d_4\\
+\delta_1 &= d_1 d_3
+\end{align*}
+" src=".images/88c0a42e30c3bcfb3e6e9dc3a1a7116e.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+and the array <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> will be stored using CRS format.
+To reconstruct <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> from <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex">, the following inverse mapping is used:
+
+<img data-latex="
+\begin{align*}
+i_4 &= a_0 \% d_4\\
+i_3 &= a_1 \% d_3\\
+i_2 &= (a_0 - i_4) / d_4\\
+i_1 &= (a_1 - i_3) / d_3\\
+i_0 &= (a_0 - i_2d_4 - i_4)/(d_4d_2)
+\end{align*}
+" src=".images/12c7c4760c984fe4a9b75b8d0cf39f27.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+Notice that the splitting the N dimensions using the even/odd
+dimension number rule is an arbitrary choice and other splitting
+choices could be used as well. So, in the following we parameterize
+the GCRS method by a pair of tuples of dimension numbers, <img data-latex="$(r, d)$" src=".images/667c8b4e51b4da55668b0e213fa3e3a0.svg"  valign="-4.289px" width="39.93px" height="17.186px" style="display:inline;" alt="latex">, that define
+the splitting of the N array axes to row or column parts:
+
+<img data-latex="
+\begin{align*}
+r &= (d_i, \ldots)\\
+c &= (d_j, \ldots)
+\end{align*}
+" src=".images/0cf19c24bc4733f7c338b8b7983bab27.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+such that 
+<img data-latex="$r \cap c = \emptyset$" src=".images/d6eb86c4b442ca789b77d2c2c107bf5a.svg"  valign="-0.956px" width="69.309px" height="13.868px" style="display:inline;" alt="latex">
+and <img data-latex="$r \cup c =\{0, ..., N-1\}$" src=".images/bdf58147422ffcf30acf2ec57f8cd481.svg"  valign="-4.304px" width="159.196px" height="17.215px" style="display:inline;" alt="latex">.
 
 ## Operations with PyTorch tensors
 
