@@ -18,6 +18,8 @@ data in img elements, but only the content of `latex-data`:
      overwritten.
 
 Enjoy LaTeXing!
+
+watch-latex-md:no-force-rerender
 -->
 
 # Roadmap for PyTorch Sparse Tensors
@@ -215,7 +217,7 @@ where `b` is a reference location (e.g. the starting point of the
 allocated memory).
 
 
-#### Contiguous arrays and dimensionality reduction
+#### Contiguous arrays
 
 The following results about contiguous arrays are required for
 generalizing the CRS/CCS sparse storage format to multidimensional
@@ -238,15 +240,18 @@ use C-contiguous storage as a reference storage method that
 corresponds to the following strides values:
 
 <img data-latex="
-\begin{align*}
+\begin{equation}
+\label{eq:strides}
+\begin{aligned}
 s_{N-1} &= 1\\
 s_{N-2} &= d_{N-1}\\
 &\vdots\\
 s_{i} &= d_{i+1} s_{i+1}\\
 &\vdots\\
-s_{0} &= d_1\cdots d_{N-1}\\
-\end{align*}
-" src=".images/139127efad63d6db2673759898d83dce.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+s_{0} &= d_1\cdots d_{N-1}
+\end{aligned}
+\end{equation}
+" src=".images/e150f494a46f0feebf94f3663e90c6f1.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq:strides" alt="latex">
 
 which have notable property of being sorted (non-strickly) decreasing
 order.
@@ -671,19 +676,38 @@ and we shall skip discussing its possible advantages.
 
 ### CRS/CCS sparse array storage format
 
-The CRS/CCS sparse array storage format has a long history for
-representing sparce matrices because this format is particularly
-suitable for multiplying matrices efficiently. However, the CRS/CCS
-format is mostly used for storing sparse two-dimensional arrays and
-many generalizations of CRS/CCS format exists for representing sparse
-multi-dimensional arrays (see GCRS paper for review).
+The [CRS/CCS](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)) sparse array storage format has a long history (since
+mid-1960s) for representing sparse matrices because this format is memory
+efficient and convinient for multiplying sparse matrices.  However,
+the CRS/CCS format was designed for storing sparse two-dimensional
+arrays. A number of generalizations of CRS/CCS format exists that
+makes the choice of generalization for PyTorch not as straightforward
+as one could wish.
 
-Here we propose to use a modification of GCRS for multi-dimensional
-sparse arrays that for the two-dimensional arrays coincides with the
-standard CRS sparse array storage format so that existing
-high-performat libraries can be reused, and for higher than two
-dimensions the format does not introduce new data structures for
-representing multi-dimensional sparse arrays efficiently.
+Here we propose to use our modification of [Generalized Compressed
+Row/Column Storage format
+(GCRS/GCCS)](https://ieeexplore.ieee.org/document/7237032). The basic
+idea behind GCRS/GCCS is as follows:
+- a multidimensional array is represented as two-dimensional array
+  using [dimensionality reduction](#dimensionality-reduction),
+- the associated two-dimensional array is stored using the standard
+  Compressed Row/Column Storage format (CRS/CCS).
+
+The original version of GCRS/GCCS format uses a specific choice of
+dimensionality reduction where the dimensions are split into two parts
+using the evenness of dimensions numbers. This choice does not seem to
+have obvious advantages over other possible choises from the view
+point of data locality and performance. So, our modification will be
+parameterized verion of GCRS/GCCS where the choice of splitting the
+set of dimensions to two sets can be user's choice. Also, this
+approach allows one implementation for both CRS and CCS format cases.
+
+A particularly important property of the GCRS/GCCS format is that in
+the two-dimensional case it will coincide with the standard CRS/CCS
+format so that existing high-performance libraries implementing the
+CRS/CSS format support can be used within PyTorch at low cost.
+
+#### Example
 
 The GCRS paper explains an idea of representing a N-dimensional sparse
 array as a two-dimensional array that is stored in the standard
@@ -730,23 +754,6 @@ i_1 &= (a_1 - i_3) / d_3\\
 i_0 &= (a_0 - i_2d_4 - i_4)/(d_4d_2)
 \end{align*}
 " src=".images/12c7c4760c984fe4a9b75b8d0cf39f27.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
-
-Notice that the splitting the N dimensions using the even/odd
-dimension number rule is an arbitrary choice and other splitting
-choices could be used as well. So, in the following we parameterize
-the GCRS method by a pair of tuples of dimension numbers, <img data-latex="$(r, d)$" src=".images/667c8b4e51b4da55668b0e213fa3e3a0.svg"  valign="-4.289px" width="39.93px" height="17.186px" style="display:inline;" alt="latex">, that define
-the splitting of the N array axes to row or column parts:
-
-<img data-latex="
-\begin{align*}
-r &= (d_i, \ldots)\\
-c &= (d_j, \ldots)
-\end{align*}
-" src=".images/0cf19c24bc4733f7c338b8b7983bab27.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
-
-such that 
-<img data-latex="$r \cap c = \emptyset$" src=".images/d6eb86c4b442ca789b77d2c2c107bf5a.svg"  valign="-0.956px" width="69.309px" height="13.868px" style="display:inline;" alt="latex">
-and <img data-latex="$r \cup c =\{0, ..., N-1\}$" src=".images/bdf58147422ffcf30acf2ec57f8cd481.svg"  valign="-4.304px" width="159.196px" height="17.215px" style="display:inline;" alt="latex">.
 
 ## Operations with PyTorch tensors
 
@@ -802,3 +809,5 @@ TBD: high-priority fill value/offset support
 - Where do I need sparse tensor?... https://github.com/pytorch/pytorch/issues/10043
 
 - The state of sparse tensors  https://github.com/pytorch/pytorch/issues/9674
+
+<!--EOF-->

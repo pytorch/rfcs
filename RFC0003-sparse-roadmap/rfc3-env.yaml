@@ -11,3 +11,4 @@ dependencies:
   - pandoc
   - pytest
   - pytest-cov
+  - flake8
