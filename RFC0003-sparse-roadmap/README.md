@@ -674,6 +674,54 @@ While `A'` is equivalent to `A` for arithmetic operations, it is not
 suitable representation for sparse arrays applications in graph theory
 and we shall skip discussing its possible advantages.
 
+#### PyTorch implementation of COO sparse format
+
+##### COO layout and constructor
+
+The sparse layout that manifests as the `torch.layout` object is implemented
+as a C++ function in the Layout.h file in c10. This file defines the enum
+`kSparse` that represents the COO sparse matrix within the C++ source code.
+The `torch.sparse_coo_tensor` method is the main method for construction
+of a COO sparse matrix. Various versions of this method can be found
+in [native\_functions.yaml_](URL), and each is defined in [SparseTensor.cpp](URL). 
+
+Unlike other ATen native functions, the `sparse_coo_tensor` implementation cannot be
+only done by specifying the functions in `native\_functions.yaml` and then implementing
+it in the CPP file. Edward Yang in a [slack communication]() states you need to create
+manual bindings for this function, and the same will need to be done for a CSR format
+constructor too. However, making changes to [gen\_python\_functions.py](URL ) can potentially
+fix this problem and allow autogeneration of both COO and CSR python bindings. The manual
+python bindings for COO can be found in [python\_torch\_functions.cpp](URL).
+
+The general flow of the COO constructor is:
+1. Check dimensions and data of supplied arguments.
+2. Compute sparse and dense dimensions.
+3. Actually construct the tensor object.
+
+##### Autograd on COO tensors 
+
+A very important consideration here is the implementation of autograd on COO tensors.
+The autograd support for COO constructor is implemented via a separate function
+called `\_sparse\_coo\_tensor\_with\_dims\_and\_tensors`. This is done because
+abstract methods (those with a type-specific dispatch) lose autograd tracking on
+the actual method that they dispatch to (`\_sparse\_coo\_tensor\_with\_dims\_and\_tensors`
+in this case).
+
+A note in [native\_functions.yaml](URL) describes this in detail.
+
+##### Method calls on COO sparse tensors
+
+The internal implementation of COO tensors is done within the `SparseTensorImpl` class defined
+in [SparseTensorImpl.cpp](URL). This is a subclass of `TensorImpl` that specialize it for COO sparse
+by including some extra members and functions found in [SparseTensorImpl.h](URL).
+.
+
+
+
+
+
+##### Sparse method dispatch
+
 ### CRS/CCS sparse array storage format
 
 The [CRS/CCS](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)) sparse array storage format has a long history (since
