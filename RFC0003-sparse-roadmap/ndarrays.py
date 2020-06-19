@@ -13,7 +13,7 @@ To run unit-tests:
 # Created: June 2020
 
 import itertools
-
+from collections import defaultdict
 
 class NDArray(object):
     """Base class for N-D array implementations.
@@ -121,7 +121,7 @@ class Strided(NDArray):
         if isinstance(data, NDArray):
             if data.ndims == 0:
                 return cls((), [data[()]], ())
-            if isinstance(data, (COO, CRS)):
+            if isinstance(data, (COO, GCS)):
                 shape = data.shape
                 ndims = data.ndims
                 strides = make_strides(shape)
@@ -219,7 +219,7 @@ class COO(NDArray):
             if isinstance(data, COO):
                 assert data._fill_value == fill_value
                 return cls(data._indices, data._values, data.shape, fill_value=fill_value)
-            if isinstance(data, CRS):
+            if isinstance(data, GCS):
                 assert data._fill_value == fill_value
         elif is_sequence(data):
             return cls(*get_coo_data(data), **dict(fill_value=fill_value))
@@ -269,34 +269,154 @@ class COO(NDArray):
         return type(self)(indices, values, self._shape[n:], fill_value = self._fill_value)
 
 
-class CRS(NDArray):
-
-    def __init__(self, pointers, indices, values, shape, fill_value=None):
+class GCS(NDArray):
+    """
+    Generalized compressed storage.
+    """
+    def __init__(self, pointers, indices, values, reduction, shape, fill_value=None):
         """
         Parameters
         ----------
         pointers : M-sequence
           M = shape[0] + 1
-        indices : (N-1, NNZ)-sequence
+          `pointers[i + 1] - pointers[i]` is the number of nz elements in i-th row
+          assert pointers[0] == 0
+          assert pointers[-1] == NNZ
+        indices : NNZ-sequence
         values : NNZ-sequence
+        reduction : (N+1)-sequence
+          l = reduction[-1]
+          pi = reduction[:l]
+          rho = reduction[l:]
+          assert set(pi + rho) == set(range(N))
         shape : N-tuple
         fill_value : {None, scalar, type(values[0])}
+
+        Notes
+        -----
+        1. For N==2 and `A` in CRS format, we have
+          n = 0
+          for i in range(shape[0]):
+              for j in indices[pointers[i]:pointers[i+1]]:
+                  assert A[i, j] == values[n]
+                  n += 1
+
+        2. For general case, we have
+
+          N = len(shape)
+          l = reduction[-1]
+          pi = reduction[:l]
+          rho = reduction[l:N]
+          n = 0
+          for p in range(product(pi)):
+              for q in indices[pointers[p]:pointers[p+1]]
+                  index = unpack(p, q, reduction)
+                  assert A[*index] == values[n]
+                  assert pack(index, reduction) == (p, q)
+                  n += 1
         """
+        N = len(shape)
+        if reduction is None:
+            # For N == 2 this choice corresponds to CRS format.
+            l = N//2
+            reduction = shape + (l,)
+        assert 0 <= reduction[-1] < N, repr((reduction, shape))
+        assert set(reduction[:-1]) == set(range(N)), repr((reduction, shape))
+
         self._pointers = pointers
         self._indices = indices
         self._values = values
-        self._fill_value = fill_value
+        self._reduction = reduction
         self._shape = shape
+        self._fill_value = fill_value
 
     def __repr__(self):
-        return f'{type(self).__name__}({self._pointers!r}, {self._indices!r}, {self._values!r}, {self.shape}, fill_value={self._fill_value})'
+        return f'{type(self).__name__}({self._pointers!r}, {self._indices!r}, {self._values!r}, {self._reduction}, {self.shape}, fill_value={self._fill_value})'
 
+    @classmethod
+    def from_data(cls, data, reduction=None, fill_value=None):
+        if isinstance(data, NDArray):
+            if data.ndims == 0:
+                return cls([], [], [data[()]], (), ())
+            if isinstance(data, Strided):
+                raise NotImplementedError('gcs from Strided')
+                shape = data.shape
+                indices = [[] for j in range(len(shape))]
+                values = []
+                for index, value in data.items():
+                    if value == fill_value:
+                        continue
+                    for j in range(len(shape)):
+                        indices[j].append(index[j])
+                    values.append(value)
+                return cls(indices, values, shape, fill_value=fill_value)
+            if isinstance(data, COO):
+                raise NotImplementedError('gcs from COO')
+                assert data._fill_value == fill_value
+                return cls(data._indices, data._values, data.shape, fill_value=fill_value)
+            if isinstance(data, GCS):
+                assert data._fill_value == fill_value
+        elif is_sequence(data):
+            return cls(*get_gcs_data(data, reduction=reduction, fill_value=fill_value), **dict(fill_value=fill_value))
+        elif is_scalar(data):
+            return cls([], [], [data], (), (), fill_value=fill_value)
+        return super(GCS, cls).from_data(data)
+    
+    @classmethod
+    def apply_reduction(cls, index, strides, dims):
+        print(index, strides, dims)
+        return sum(strides[k] * index[dims[k]] for k in range(len(dims)))
+        
+    def _reduce(self, index):
+        l = self._reduction[-1]
+        dims1 = self._reduction[:l]
+        dims2 = self._reduction[l:-1]
+        s1 = make_strides(self.shape, dims=dims1)
+        s2 = make_strides(self.shape, dims=dims2)
+        p1 = self.apply_reduction(index, s1, dims1)
+        p2 = self.apply_reduction(index, s2, dims2)
+        return p1, p2
 
+    def _invreduce(self, p1, p2):
+        N = self.ndims
+        l = self._reduction[-1]
+        pi1 = self._reduction[:l]
+        pi2 = self._reduction[l:-1]
+        s1 = make_strides(pi1)
+        s2 = make_strides(pi2)
+        invpi = [None] * N
+        for i, k in enumerate(self._reduction[:-1]):
+            invpi[k] = i
+        assert None not in invpi
+        index = [None] * len(self._shape)
+        for r, s, pi in [
+                (p1, s1, pi1),
+                (p2, s2, pi2)]:
+            d = 1
+            for i, next_d in reversed(enumerate(pi)):
+                ii = (r // d) % next_d
+                r -= s[i] * ii
+                index[invpi[i]] = ii
+                d = next_d
+        assert None not in index
+        return tuple(index)
+
+    def __getitem__(self, index):
+        if not isinstance(index, tuple):
+            index = (index,)
+        p1, p2 = self._reduce(index)
+        nc1 = self._pointers[p1]
+        nc2 = self._pointers[p1 + 1]
+        for nc in range(nc1, nc2):
+            if self._indices[nc] == p2:
+                return self._values[nc]
+        return self._fill_value
+            
 ############################################
 ##### Array format conversion funtions #####
 ############################################
 
-def make_strides(shape):
+def make_strides(shape, dims=None):
     """Return strides of a contiguous array in row-major storage order.
     
     Parameters
@@ -307,12 +427,14 @@ def make_strides(shape):
     -------
     strides : tuple
     """
-    ndims = len(shape)
+    if dims is None:
+        dims = tuple(range(len(shape)))
+    ndims = len(dims)
     if ndims == 0:
         return ()
     strides = [1]
     for i in range(ndims - 1):
-        strides.insert(0, strides[0] * shape[ndims - i - 1])
+        strides.insert(0, strides[0] * shape[dims[ndims - i - 1]])
     return tuple(strides)    
 
 
@@ -325,6 +447,21 @@ def get_shape(data):
             return (0,)
         return (dims, ) + get_shape(data[0])
     return ()
+
+
+def reduction_forward(index, strides_lst):
+    k = 0
+    rindex = ()
+    for strides in strides_lst:
+        n = len(strides)
+        p = sum(strides[i] * index[k + i] for i in range(n))
+        rindex += (p, )
+        k += n
+    return rindex
+
+
+def reduction_backward(rindex, strides_lst):
+    index = ()
 
 
 # def get_items(data, fill_value=None):
@@ -396,49 +533,48 @@ def get_coo_data(data, fill_value=None):
         return [], [data], ()
 
 
-def get_crs_data(data, fill_value=None):
-    if is_sequence(data):
-        pointers = [0]
-        indices = []
-        values = []
-        shape = (len(data),)
-        for i, item in enumerate(data):
-            item_pointers, item_indices, item_values, item_shape = get_crs_data(item, fill_value=fill_value)
-            pointers.append(pointers[-1] + len(item_values))
-            if i == 0:
-                shape += item_shape
-                indices = [[] for d in shape]
-            else:
-                assert shape[1:] == item_shape
-            indices[0].extend([i] * len(item_values))
-            for d in range(len(item_shape)):
-                indices[d + 1].extend(item_indices[d])            
-            values.extend(item_values)
-        return pointers, indices, values, shape
+def get_gcs_data(data, reduction=None, fill_value=None):    
+    shape = get_shape(data)
+    N = len(shape)
+    # TODO: N=0, N=1
+    if reduction is None:
+        dims1 = tuple(range(N//2))
+        dims2 = tuple(range(N//2, N))
+        reduction = dims1 + dims2 + (N//2,)
     else:
-        if data == fill_value:
-            return [], [], [], ()
-        return [], [], [data], ()
+        l = reduction[-1]
+        dims1 = reduction[:l]
+        dims2 = reduction[l:-1]
+
+    strides1 = make_strides(dims1)
+    strides2 = make_strides(dims2)
+    print(f'{shape=} {strides1=} {strides2=} {dims1=} {dims2=}')
+    # <row>: <list of (colindex, value)>
+    col_value = defaultdict(list)
+    for index in itertools.product(*map(range, shape)):
+        print(index)
+        v = data
+        for i in index:
+            v = v[i]
+        if v == fill_value:
+            continue
+        p1 = GCS.apply_reduction(index, strides1, dims1)
+        p2 = GCS.apply_reduction(index, strides2, dims2)
+        col_value[p1].append((p2, v))
+    ro = [0]
+    co = []
+    values = []
+    for i in range(max(col_value)):
+        cv = col_value.get(i, [])
+        ro.append(ro[-1] + len(cv))
+        cv.sort()
+        c, v = zip(*cv)
+        co.extend(c)
+        values.extend(v)
+
+    return ro, co, values, reduction, shape
 
 
-def get_gcrs_data(data, fill_value=None):
-    """
-    """
-    if is_sequence(data):
-        cr = []
-        co = []
-        values = []
-        shape = get_shape(data)
-
-        # TODO
-        
-        return cr, co, values, shape
-    else:
-        if data == fill_value:
-            return [], [], [], ()
-        return [], [], [values], ()
-
-    
 #############################
 ##### Utility functions #####
 #############################
@@ -519,8 +655,9 @@ def test_dense_array_api():
     assert repr(a) == 'COO([[0, 0, 1, 1], [0, 1, 0, 1]], [1, 2, 3, 4], (2, 2), fill_value=None)'
     arrays.append(a)
 
-    a = CRS.from_data([[1, 2], [3, 4]])
+    a = GCS.from_data([[1, 2], [3, 4]])
 
+    print(a)
     
     for a in arrays:
         assert a.shape == (2, 2)

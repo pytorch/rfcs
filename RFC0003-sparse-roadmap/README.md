@@ -406,6 +406,193 @@ $$
 
 for all <img data-latex="$0\leqslant p_0<m_0$" src=".images/b46d280e9a531b8f52f6d3c803335836.svg"  valign="-3.347px" width="93.231px" height="14.445px" style="display:inline;" alt="latex"> and <img data-latex="$0\leqslant p_1<m_1$" src=".images/e46e22e98bcee3d1d6feaad6fe042461.svg"  valign="-3.347px" width="93.231px" height="14.445px" style="display:inline;" alt="latex"> where <img data-latex="$m_0=\prod_{k=0}^{l-1}d_{\pi^{-1}(k)}$" src=".images/b480383a8b10e59e032d441f2b13b902.svg"  valign="-6.933px" width="133.074px" height="23.531px" style="display:inline;" alt="latex"> and <img data-latex="$m_1=\prod_{k=l}^{N-1}d_{\rho^{-1}(k)}$" src=".images/3dc7fc92022e67b71d00ccda89a695d2.svg"  valign="-6.933px" width="136.369px" height="23.398px" style="display:inline;" alt="latex">.
 
+#### Slicing
+
+Slicing of an array <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is an operation
+that selects certain array elements from which a new array is
+constructed:
+
+<img data-latex="
+$$
+A'[j_0,\ldots,j_{N'-1}] = A[\iota_0(j_0,\ldots,j_{N'-1}),\ldots,\iota_{N-1}(j_0,\ldots,j_{N'-1})]
+$$
+" src=".images/9eeb37b4b7fb6548d135c27f3723a63f.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+where <img data-latex="$0\leqslant j_k <d'_k$" src=".images/bb4cf0f6382ec48b1d12846ae180b621.svg"  valign="-4.809px" width="87.032px" height="17.698px" style="display:inline;" alt="latex">, <img data-latex="$0\leqslant k<N'$" src=".images/6e28839942e6524f12508d2f8acd360c.svg"  valign="-2.353px" width="85.751px" height="15.242px" style="display:inline;" alt="latex">.
+
+Let's consider a case where the reduction of <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> to one-dimensional
+array is a subset of the <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> reduction to one-dimensional array:
+
+<img data-latex="
+\begin{equation}
+\label{eq-slice-1d-reduction}
+b' + \sum_{k'=0}^{N'-1} s'_{k'} j_{k'} = b + \sum_{k=0}^{N-1} s_{k} \iota_k(j_0, \ldots, j_{N'-1})
+\end{equation}
+" src=".images/50aef0f2925216c1e45f3f6a0c136ec6.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-slice-1d-reduction" alt="latex">
+
+We assume that <img data-latex="$\iota_k$" src=".images/9d25e3b123925b09ae0f25e86a2db0e4.svg"  valign="-2.582px" width="16.745px" height="9.995px" style="display:inline;" alt="latex"> are linear functions with respect to  all its arguments <img data-latex="$j_{k'}$" src=".images/0293fc5e92da599c143293fe09b9f4c4.svg"  valign="-3.347px" width="20.501px" height="14.634px" style="display:inline;" alt="latex">:
+<img data-latex="
+$$
+\iota_k(j_0, \ldots, j_{N'-1}) = c_k + \sum_{k'=0}^{N'-1} a_{kk'} j_{k'}
+$$
+" src=".images/66560f5d1eebaaf57b99ee6a11d73d16.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+The [Eq. 2](#eq-slice-1d-reduction) must hold for all <img data-latex="$0\leqslant j_{k'}<d'_{k'}$" src=".images/041cfffd12bab7778c96c8d833a16748.svg"  valign="-5.496px" width="93.009px" height="18.385px" style="display:inline;" alt="latex">, so we have:
+
+<img data-latex="
+\begin{equation}
+\label{eq-slice-1d-reduction-solution}
+\begin{aligned}
+b' &= b + \sum_{k=0}^{N-1}s_k c_k\\
+s'_{k'} &= \sum_{k=0}^{N-1} s_k a_{kk'}
+\end{aligned}
+\end{equation}
+" src=".images/299a7bc55ed4704920cbf82d3f6fecec.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-slice-1d-reduction-solution" alt="latex">
+
+or
+
+<img data-latex="
+\begin{equation}
+\label{eq-slice-1d-reduction-solution-matrix}
+\begin{pmatrix}
+b'\\
+s'_{0}\\
+\vdots\\
+s'_{N'-1}
+\end{pmatrix}=
+\begin{bmatrix}
+1 & c_0 & \cdots & c_{N-1}\\
+0 & a_{0,0} & \cdots & a_{0,N-1}\\
+\vdots\\
+0 & a_{N'-1,0} & \cdots & a_{N'-1,N-1}
+\end{bmatrix}
+\begin{pmatrix}
+b\\
+s_{0}\\
+\vdots\\
+s_{N-1}
+\end{pmatrix}
+\end{equation}
+" src=".images/3f64a5d6965fa44def4bbb81fbcae298.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-slice-1d-reduction-solution-matrix" alt="latex">
+
+that is, the composition of linear slicing operations is determined by
+the matrix products of the corresponding slicing matrices.
+
+Linear slicing operations result views of array values stored in
+memory because the operations can be performed on the stride values
+only. However, nonlinear slicing operations require creating a new
+array instance and copying array values to a new array one-by-one.
+
+##### Example: swapping axes
+
+For swapping axes, we have
+
+<img data-latex="
+$$
+A_{m\leftrightarrow n}[i_0,\ldots,i_{n}, \ldots, i_{m}, \ldots, i_{N-1}] = A[i_0,\ldots,i_m, \ldots, i_n, \ldots, i_{N-1}]
+$$
+" src=".images/72cfabaaf4db096986222feb8be86b74.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+<img data-latex="
+$$
+\begin{aligned}
+N' &= N\\
+b' &= b\\
+s'_{k'} &= s_{k'}[k \not= n][k \not= m] + s_{m}[k = n] + s_{n}[k = m]
+\end{aligned}
+$$
+" src=".images/5df0c398f77dcd003905d79c324025dd.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+<img data-latex="
+\begin{equation}
+\label{eq-swap-axes-matrix}
+\begin{pmatrix}
+b'\\
+s'_{0}\\
+\vdots\\
+s'_{n}\\
+\vdots\\
+s'_{m}\\
+\vdots\\
+s'_{N'-1}
+\end{pmatrix}=
+\begin{bmatrix}
+1 & 0 & \cdots & 0 &\cdots &0 & \cdots & 0\\
+0 & 1 & \cdots & 0 &\cdots &0 & \cdots & 0\\
+\vdots \\
+0 & 0 & \cdots & 0 &\cdots &1 & \cdots & 0\\
+\vdots\\
+0 & 0 & \cdots & 1 &\cdots &0 & \cdots & 0\\
+\vdots\\
+0 & 0 & \cdots & 0 &\cdots &0 & \cdots & 1
+\end{bmatrix}
+\begin{pmatrix}
+b\\
+s_{0}\\
+\vdots\\
+s_{n}\\
+\vdots\\
+s_{m}\\
+\vdots\\
+s_{N-1}
+\end{pmatrix}
+\end{equation}
+" src=".images/ebcf375d220894d492569b93e979269a.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-swap-axes-matrix" alt="latex">
+
+##### Example: Python slice along one dimension
+
+A Python slice along the <img data-latex="$n$" src=".images/15c6035d5801568a33a038eeff87cf78.svg"  width="14.36px" height="7.412px" style="display:inline;" alt="latex">-th axis is described by a triple <img data-latex="$(b_n, e_n, \Delta_n)$" src=".images/c527e49a2aafa31e724ed74995e7e64a.svg"  valign="-4.289px" width="82.323px" height="17.186px" style="display:inline;" alt="latex"> such that
+
+<img data-latex="
+$$
+A_{b_n:e_n:\Delta_n}[i_0,\ldots, i, \ldots, i_{N-1}] = A[i_0,\ldots, b_n + i\Delta_n + d_n\delta_{\Delta_n < 0}, \ldots, i_{N-1}], \qquad 0\leqslant i < N'
+$$
+" src=".images/d6275b017414fcbef6d64f4d4155f29c.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+where  <img data-latex="$b_n$" src=".images/51c3f4d22a352813a79c381706c6d127.svg"  valign="-2.582px" width="18.452px" height="14.537px" style="display:inline;" alt="latex">, <img data-latex="$e_n$" src=".images/3f2f81a029f6084d917469e23dba8e43.svg"  valign="-2.582px" width="19.098px" height="9.995px" style="display:inline;" alt="latex"> are reduced with respect to <img data-latex="$d_n$" src=".images/14450bd0ff5b1231cd38f92b6504f14a.svg"  valign="-2.582px" width="20.044px" height="14.537px" style="display:inline;" alt="latex">. We have
+
+
+<img data-latex="
+$$
+\begin{aligned}
+N' &= \lfloor (e_n - b_n + \Delta_n - \mathrm{sign}{\Delta_n}) / \Delta_n\rfloor\\
+b' &= b + s_{n}(b_n+d_n\delta_{\Delta_n < 0}) \\
+s'_{k'} &= s_{k'}[k' \not= n] + \Delta_n s_{n}[k' = n]
+\end{aligned}
+$$
+" src=".images/6982080c72d82d495da6b16f8d9692e3.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+<img data-latex="
+\begin{equation}
+\label{eq-python-slice-matrix}
+\begin{pmatrix}
+b'\\
+s'_{0}\\
+\vdots\\
+s'_{k'}\\
+\vdots\\
+s'_{N'-1}
+\end{pmatrix}=
+\begin{bmatrix}
+1 & 0 & \cdots & b_n +d_n\delta_{\Delta_n < 0} & \cdots & 0\\
+0 & 1 & \cdots & 0 & \cdots &0 \\
+\vdots \\
+0 & 0 & \cdots & \Delta_n & \cdots &0 \\
+\vdots\\
+0 & 0 & \cdots & 0 & \cdots &1
+\end{bmatrix}
+\begin{pmatrix}
+b\\
+s_{0}\\
+\vdots\\
+s_{n}\\
+\vdots\\
+s_{N-1}
+\end{pmatrix}
+\end{equation}
+" src=".images/72c392de152341415673a8b2b4c32e9a.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-python-slice-matrix" alt="latex">
+
+
 <!--
 In terms of Mathematics of Arrays (MoA,
 https://www.researchgate.net/publication/308893116_A_Mathematics_of_Arrays),
