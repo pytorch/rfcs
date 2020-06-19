@@ -426,16 +426,17 @@ array is a subset of the <img data-latex="$A$" src=".images/bb2243c9fce59491f043
 <img data-latex="
 \begin{equation}
 \label{eq-slice-1d-reduction}
-b' + \sum_{k'=0}^{N'-1} s'_{k'} j_{k'} = b + \sum_{k=0}^{N-1} s_{k} \iota_k(j_0, \ldots, j_{N'-1})
+b' + \sum_{k'=0}^{N'-1} j_{k'} s'_{k'}  = b + \sum_{k=0}^{N-1} \iota_k(j_0, \ldots, j_{N'-1})s_{k}
 \end{equation}
-" src=".images/50aef0f2925216c1e45f3f6a0c136ec6.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-slice-1d-reduction" alt="latex">
+" src=".images/7c25bdb3d14b8a965272d51d88a36c4f.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-slice-1d-reduction" alt="latex">
 
 We assume that <img data-latex="$\iota_k$" src=".images/9d25e3b123925b09ae0f25e86a2db0e4.svg"  valign="-2.582px" width="16.745px" height="9.995px" style="display:inline;" alt="latex"> are linear functions with respect to  all its arguments <img data-latex="$j_{k'}$" src=".images/0293fc5e92da599c143293fe09b9f4c4.svg"  valign="-3.347px" width="20.501px" height="14.634px" style="display:inline;" alt="latex">:
+
 <img data-latex="
 $$
-\iota_k(j_0, \ldots, j_{N'-1}) = c_k + \sum_{k'=0}^{N'-1} a_{kk'} j_{k'}
+\iota_k(j_0, \ldots, j_{N'-1}) = c_k + \sum_{k'=0}^{N'-1} a_{k,k'} j_{k'}
 $$
-" src=".images/66560f5d1eebaaf57b99ee6a11d73d16.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/83790619ad5ffa30cceee6d95284bfad.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 The [Eq. 2](#eq-slice-1d-reduction) must hold for all <img data-latex="$0\leqslant j_{k'}<d'_{k'}$" src=".images/041cfffd12bab7778c96c8d833a16748.svg"  valign="-5.496px" width="93.009px" height="18.385px" style="display:inline;" alt="latex">, so we have:
 
@@ -443,11 +444,11 @@ The [Eq. 2](#eq-slice-1d-reduction) must hold for all <img data-latex="$0\leqsla
 \begin{equation}
 \label{eq-slice-1d-reduction-solution}
 \begin{aligned}
-b' &= b + \sum_{k=0}^{N-1}s_k c_k\\
-s'_{k'} &= \sum_{k=0}^{N-1} s_k a_{kk'}
+b' &= b + \sum_{k=0}^{N-1}c_k s_k\\
+s'_{k'} &= \sum_{k=0}^{N-1} a_{k', k} s_k
 \end{aligned}
 \end{equation}
-" src=".images/299a7bc55ed4704920cbf82d3f6fecec.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-slice-1d-reduction-solution" alt="latex">
+" src=".images/1fa9a65a2447731aadd22d0bafbc7e71.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-slice-1d-reduction-solution" alt="latex">
 
 or
 
