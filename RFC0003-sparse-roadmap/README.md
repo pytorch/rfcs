@@ -497,12 +497,11 @@ $$
 <img data-latex="
 $$
 \begin{aligned}
-N' &= N\\
 b' &= b\\
 s'_{k'} &= s_{k'}[k \not= n][k \not= m] + s_{m}[k = n] + s_{n}[k = m]
 \end{aligned}
 $$
-" src=".images/5df0c398f77dcd003905d79c324025dd.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/3d2f57ee0650b6dac954566fe0858fdf.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 <img data-latex="
 \begin{equation}
@@ -515,7 +514,7 @@ s'_{n}\\
 \vdots\\
 s'_{m}\\
 \vdots\\
-s'_{N'-1}
+s'_{N-1}
 \end{pmatrix}=
 \begin{bmatrix}
 1 & 0 & \cdots & 0 &\cdots &0 & \cdots & 0\\
@@ -538,7 +537,7 @@ s_{m}\\
 s_{N-1}
 \end{pmatrix}
 \end{equation}
-" src=".images/ebcf375d220894d492569b93e979269a.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-swap-axes-matrix" alt="latex">
+" src=".images/bab2c416d692ad69ad60bd8b65881531.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-swap-axes-matrix" alt="latex">
 
 ##### Example: Python slice along one dimension
 
@@ -546,9 +545,9 @@ A Python slice along the <img data-latex="$n$" src=".images/15c6035d5801568a33a0
 
 <img data-latex="
 $$
-A_{b_n:e_n:\Delta_n}[i_0,\ldots, i, \ldots, i_{N-1}] = A[i_0,\ldots, b_n + i\Delta_n + d_n\delta_{\Delta_n < 0}, \ldots, i_{N-1}], \qquad 0\leqslant i < N'
+A_{b_n:e_n:\Delta_n}[i_0,\ldots, i, \ldots, i_{N-1}] = A[i_0,\ldots, b_n + i\Delta_n + d_n\delta_{\Delta_n < 0}, \ldots, i_{N-1}], \qquad 0\leqslant i < d'_n
 $$
-" src=".images/d6275b017414fcbef6d64f4d4155f29c.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/1ad86478d9f55f04a0c75cafb5625d48.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 where  <img data-latex="$b_n$" src=".images/51c3f4d22a352813a79c381706c6d127.svg"  valign="-2.582px" width="18.452px" height="14.537px" style="display:inline;" alt="latex">, <img data-latex="$e_n$" src=".images/3f2f81a029f6084d917469e23dba8e43.svg"  valign="-2.582px" width="19.098px" height="9.995px" style="display:inline;" alt="latex"> are reduced with respect to <img data-latex="$d_n$" src=".images/14450bd0ff5b1231cd38f92b6504f14a.svg"  valign="-2.582px" width="20.044px" height="14.537px" style="display:inline;" alt="latex">. We have
 
@@ -556,12 +555,12 @@ where  <img data-latex="$b_n$" src=".images/51c3f4d22a352813a79c381706c6d127.svg
 <img data-latex="
 $$
 \begin{aligned}
-N' &= \lfloor (e_n - b_n + \Delta_n - \mathrm{sign}{\Delta_n}) / \Delta_n\rfloor\\
+d'_n &= \lfloor (e_n - b_n + \Delta_n - \mathrm{sign}{\Delta_n}) / \Delta_n\rfloor\\
 b' &= b + s_{n}(b_n+d_n\delta_{\Delta_n < 0}) \\
 s'_{k'} &= s_{k'}[k' \not= n] + \Delta_n s_{n}[k' = n]
 \end{aligned}
 $$
-" src=".images/6982080c72d82d495da6b16f8d9692e3.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/ad648de5c3436c6cec6cebde9581d515.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 <img data-latex="
 \begin{equation}
@@ -572,7 +571,7 @@ s'_{0}\\
 \vdots\\
 s'_{k'}\\
 \vdots\\
-s'_{N'-1}
+s'_{N-1}
 \end{pmatrix}=
 \begin{bmatrix}
 1 & 0 & \cdots & b_n +d_n\delta_{\Delta_n < 0} & \cdots & 0\\
@@ -591,7 +590,7 @@ s_{n}\\
 s_{N-1}
 \end{pmatrix}
 \end{equation}
-" src=".images/72c392de152341415673a8b2b4c32e9a.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-python-slice-matrix" alt="latex">
+" src=".images/abfb8eddf95e32b984827b96b602ca81.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-python-slice-matrix" alt="latex">
 
 
 <!--
@@ -997,6 +996,131 @@ i_1 &= (a_1 - i_3) / d_3\\
 i_0 &= (a_0 - i_2d_4 - i_4)/(d_4d_2)
 \end{align*}
 " src=".images/12c7c4760c984fe4a9b75b8d0cf39f27.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+#### Compressed storage of two-dimensional arrays
+
+The CRS format specification of a two-dimensional array with shape <img data-latex="$(d_0, d_1)$" src=".images/922cdbbff9e1b3fc829054d1fea3fbf9.svg"  valign="-4.289px" width="54.263px" height="17.186px" style="display:inline;" alt="latex"> involves the following parameters:
+
+- a 1-D array of the cummulative count of specified elements in a row: <img data-latex="$P=(P_0,\ldots,P_{d_0-1}, S)$" src=".images/b9439c106ac6bf3c2916b4f5667e214f.svg"  valign="-4.885px" width="163.626px" height="17.781px" style="display:inline;" alt="latex">
+- a 1-D array of column indices: <img data-latex="$I=(I_0,\ldots,I_{S-1})$" src=".images/2b00795bbe9866cc098e3bd1e37a387c.svg"  valign="-4.289px" width="129.758px" height="17.186px" style="display:inline;" alt="latex"> where <img data-latex="$S$" src=".images/60c398af2b26cc49c65c1c4ef3fa5e13.svg"  width="15.667px" height="11.764px" style="display:inline;" alt="latex"> is the total number of specified elements
+- a 1-D array of element values: <img data-latex="$V=(V_0, \ldots, V_{S-1})$" src=".images/2c5d5e80b66399cde799a889f6d1436e.svg"  valign="-4.289px" width="139.328px" height="17.186px" style="display:inline;" alt="latex">
+
+and we have
+
+<img data-latex="
+$$
+A[i_0, i_1] = V[p]
+$$
+" src=".images/39d2095cdd940da474ff4065a328aa7f.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+where <img data-latex="$p$" src=".images/c96a405e602cf31e4679b144ca7b5d22.svg"  valign="-3.347px" width="12.758px" height="10.76px" style="display:inline;" alt="latex">
+is such that <img data-latex="$I[p] = i_1$" src=".images/381bbd0cb21295824453b9ab716e6c1b.svg"  valign="-4.289px" width="63.701px" height="17.186px" style="display:inline;" alt="latex"> and <img data-latex="$P[i_0]\leqslant p < P[i_0+1]$" src=".images/531bca9318cc1e90ba14da246d4e556d.svg"  valign="-4.289px" width="154.132px" height="17.186px" style="display:inline;" alt="latex">. When no such <img data-latex="$p$" src=".images/c96a405e602cf31e4679b144ca7b5d22.svg"  valign="-3.347px" width="12.758px" height="10.76px" style="display:inline;" alt="latex"> exists, the corresponding element is
+unspecified element.
+
+Let us consider a slice along the first dimension:
+
+<img data-latex="
+$$
+A_{b_0:e_0:\Delta_0}[i, i_1] = A[b_0+\Delta_0\delta_{\Delta_0<0}+i\Delta_0, i_1]
+$$
+" src=".images/550adc7c8e8fb5a60542e478127e20dd.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+For the sliced array we have:
+
+<img data-latex="
+\begin{equation}
+\begin{aligned}
+P' &= \mathrm{cumsum}(\mathrm{concat}([0], [p' - p, p\in (P_{::-1})_{b_0:e_0:\Delta_0}]))\\
+I' &= \mathrm{concat}([I_{p:p'}, p\in (P_{::-1})_{b_0:e_0:\Delta_0}])\\
+V' &= \mathrm{concat}([V_{p:p'}, p\in (P_{::-1})_{b_0:e_0:\Delta_0}])
+\end{aligned}
+\end{equation}
+" src=".images/30efeee5cbe33c368cbfc2e0cefde9e7.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+where <img data-latex="$p'=P_{\mathrm{index}(P, p)+1}$" src=".images/14fd2bc1c9dabcef2fc1f70e5d77cbd7.svg"  valign="-6.025px" width="118.064px" height="18.915px" style="display:inline;" alt="latex">.
+The corresponding algorithm reads:
+
+<img data-latex="
+\begin{algorithmic}
+\State\inlinemath{d'_0 := \lfloor (e_0 - b_0 + \Delta_0 - \mathrm{sign}{\Delta_0}) / \Delta_0\rfloor}
+\State\inlinemath{P':=\mathrm{reserve}(d'_0+1)}
+\State\inlinemath{I':=\mathrm{reserve}(S)}
+\State\inlinemath{V':=\mathrm{reserve}(S)}
+\State\inlinemath{p':=0, \quad P'_0:=0}
+\For{\inlinemath{i':=0,\ldots,d'_0-1}}
+    \State\inlinemath{i:=(b_0 + i'\Delta_0) \mod d'_0}
+    \State\inlinemath{P'_{i'+1}:=P'_{i'} + P_{i+1} - P_{i}}
+    \For{\inlinemath{p=P_i,\ldots,P_{i+1}-1}}
+        \State\inlinemath{I'_{p'} := I_p}
+        \State\inlinemath{V'_{p'} := V_p}
+        \State\inlinemath{p':= p'+1}
+    \EndFor
+\EndFor
+\State\inlinemath{S':=p'}
+\end{algorithmic}
+" src=".images/6c814da32c65526c903f0a6e79387f13.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+Now consider a slice along the second dimension:
+
+<img data-latex="
+$$
+A_{b_1:e_1:\Delta_1}[i_0, i] = A[i_0, b_1+\Delta_1\delta_{\Delta_1<0}+i\Delta_1]
+$$
+" src=".images/94ffc8ab107627574860bbd1536c1a5e.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+and we have:
+
+<img data-latex="
+\begin{algorithmic}
+\State\inlinemath{P':=\mathrm{reserve}(d_0+1)}
+\State\inlinemath{I':=\mathrm{reserve}(S)}
+\State\inlinemath{V':=\mathrm{reserve}(S)}
+\State\inlinemath{p':=0, \quad P'_{0} := 0}
+\For{\inlinemath{i:=0,\ldots,d_0-1}}
+    \For{\inlinemath{p=P_i,\ldots,P_{i+1}-1} if \inlinemath{\Delta_1>0}, otherwise reversed}
+        \State\inlinemath{j:=I_p}
+        \If{\inlinemath{(j - b_1)\mod \Delta_1 =0}}
+            \State\inlinemath{I'_{p'}:=(j-b_1-d_1\delta_{\Delta_1<0})/\Delta_1}
+            \State\inlinemath{V'_{p'}:=V_{p}}
+        \State\inlinemath{p' = p' + 1}
+        \EndIf
+    \EndFor
+    \State\inlinemath{P'_{i+1} = p'}
+\EndFor
+\end{algorithmic}
+" src=".images/f515513a3d217da9aecdb0cea4f04a7c.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+For swapping the axes, we have the following algorithm:
+
+<img data-latex="
+\begin{algorithmic}
+\State\inlinemath{P':=\mathrm{full}(d_1+1, 0)}
+\State\inlinemath{I':=\mathrm{reserve}(S)}
+\State\inlinemath{V':=\mathrm{reserve}(S)}
+\State{First, compute the compressed column indices:}
+\For{\inlinemath{j \in I}}
+    \For{\inlinemath{k:=j,\ldots,d_1-1}}
+        \State\inlinemath{P'_{k+1} := P'_{k+1} + 1}
+    \EndFor
+\EndFor
+\State{Next, copy the indices and values:}
+\State\inlinemath{T:=\mathrm{copy}(P')}
+\For{\inlinemath{i:=0,\ldots,d_0-1}}
+    \For{\inlinemath{p:=P_i,\ldots,P_{i+1}-1}}
+        \State\inlinemath{j:= I_p}
+        \State\inlinemath{p':=T_j}
+        \State\inlinemath{I'_{p'}:= i}
+        \State\inlinemath{V'_{p'} := V_p}
+        \State\inlinemath{T_j := T_j + 1}
+    \EndFor
+\EndFor
+\end{algorithmic}
+" src=".images/a1ba997d983e64aff25bcfc7cf3b2cb1.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+Notice that different from strided arrays, slicing of a sparse array
+always copies the values of array elements to the sliced sparse array.
+In addition, when the input column indices of the sparse array are
+sorted, then also the indices of the output array will be sorted.
 
 ## Operations with PyTorch tensors
 
