@@ -30,9 +30,8 @@ for further details.
 
 # Background of current PyTorch sparse matrix CUDA support
 
-Basics of PyTorch's sparse support can be found
-[here](https://github.com/Quansight-Labs/rfcs/tree/pearu/rfc0005/RFC0003-sparse-roadmap#pytorch-implementation-of-coo-sparse-format).
-COO is also the only supported sparse format for the CUDA backend. CuSPARSE is the
+COO is also the [only supported sparse format](https://github.com/Quansight-Labs/rfcs/tree/pearu/rfc0005/RFC0003-sparse-roadmap#pytorch-implementation-of-coo-sparse-format)
+for both the CPU and CUDA backend. CuSPARSE is the
 only 3rd party library used for sparse operations. The element-wise operations
 are implemented using
 [hand-implemented](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/sparse/cuda/SparseCUDATensorMath.cu#L343) kernels.
@@ -40,13 +39,12 @@ are implemented using
 ## PyTorch CUDA sparse data structures
 
 Both the CUDA and CPU variants of COO constructors utilize the same constructor
-(`sparse_coo_tensor` in SparseTensor.cpp). Upon calling an operator, the indices
-and nnz values are passed into the function, and interpreted by the CUDA kernel.
+(`sparse_coo_tensor` in SparseTensor.cpp). The main data of the COO tensor
+is stored in the `indices` and `values` objects.
 An example can be seen in
 [sparseElementwiseKernelScalar()](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/sparse/cuda/SparseCUDAApplyUtils.cuh#L76)
 function where the `TensorInfo` objects representing `indices` and `values`
-are directly passed into the CUDA kernel
-and data accessed within. Thus it can be seen that most of the functions are
+are passed into the CUDA kernel. Thus it can be seen that most of the functions are
 heavily tailored for the COO format and new functions must be written for new
 formats.
 
@@ -80,9 +78,7 @@ and [SparseCUDABlas.cu](https://github.com/pytorch/pytorch/blob/master/aten/src/
 
 In this section we will have a glimpse at 3rd party libraries that support sparse
 matrix or sparse tensor operations. We refer to a 'sparse matrix' as a
-rank-2 tensor and 'sparse tensor' as a rank-n tensor.
-
-Sparse matrix and tensor
+rank-2 tensor and 'sparse tensor' as a rank-n tensor. Sparse matrix and tensor
 implementations are being actively developed in libraries
 such as cuSPARSE, CUSP, MAGMA, Gingko and [ParTI!](https://github.com/hpcgarage/ParTI).
 
