@@ -484,7 +484,7 @@ memory because the operations can be performed on the stride values
 only. However, nonlinear slicing operations require creating a new
 array instance and copying array values to a new array one-by-one.
 
-##### Example: swapping axes
+##### Swapping axes
 
 For swapping axes, we have
 
@@ -539,28 +539,28 @@ s_{N-1}
 \end{equation}
 " src=".images/bab2c416d692ad69ad60bd8b65881531.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-swap-axes-matrix" alt="latex">
 
-##### Example: Python slice along one dimension
+##### Python slice along one dimension
 
 A Python slice along the <img data-latex="$n$" src=".images/15c6035d5801568a33a038eeff87cf78.svg"  width="14.36px" height="7.412px" style="display:inline;" alt="latex">-th axis is described by a triple <img data-latex="$(b_n, e_n, \Delta_n)$" src=".images/c527e49a2aafa31e724ed74995e7e64a.svg"  valign="-4.289px" width="82.323px" height="17.186px" style="display:inline;" alt="latex"> such that
 
 <img data-latex="
 $$
-A_{b_n:e_n:\Delta_n}[i_0,\ldots, i, \ldots, i_{N-1}] = A[i_0,\ldots, b_n + i\Delta_n + d_n\delta_{\Delta_n < 0}, \ldots, i_{N-1}], \qquad 0\leqslant i < d'_n
+A_{b_n:e_n:\Delta_n}[i_0,\ldots, i, \ldots, i_{N-1}] = A[i_0,\ldots, \tilde b_n + i\Delta_n, \ldots, i_{N-1}], \qquad 0\leqslant i < d'_n
 $$
-" src=".images/1ad86478d9f55f04a0c75cafb5625d48.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/c4bcbf7d7a515ed9962253ddb539cb29.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-where  <img data-latex="$b_n$" src=".images/51c3f4d22a352813a79c381706c6d127.svg"  valign="-2.582px" width="18.452px" height="14.537px" style="display:inline;" alt="latex">, <img data-latex="$e_n$" src=".images/3f2f81a029f6084d917469e23dba8e43.svg"  valign="-2.582px" width="19.098px" height="9.995px" style="display:inline;" alt="latex"> are reduced with respect to <img data-latex="$d_n$" src=".images/14450bd0ff5b1231cd38f92b6504f14a.svg"  valign="-2.582px" width="20.044px" height="14.537px" style="display:inline;" alt="latex">. We have
+where  <img data-latex="$b_n$" src=".images/51c3f4d22a352813a79c381706c6d127.svg"  valign="-2.582px" width="18.452px" height="14.537px" style="display:inline;" alt="latex">, <img data-latex="$e_n$" src=".images/3f2f81a029f6084d917469e23dba8e43.svg"  valign="-2.582px" width="19.098px" height="9.995px" style="display:inline;" alt="latex"> are [reduced](slice_tools.py) with respect to <img data-latex="$d_n$" src=".images/14450bd0ff5b1231cd38f92b6504f14a.svg"  valign="-2.582px" width="20.044px" height="14.537px" style="display:inline;" alt="latex"> and <img data-latex="$\tilde b_n = b_n \mod d_n$" src=".images/bfe7de06d0f3fc554407a4c304832a6b.svg"  valign="-2.582px" width="118.953px" height="18.419px" style="display:inline;" alt="latex">. We have
 
 
 <img data-latex="
 $$
 \begin{aligned}
 d'_n &= \lfloor (e_n - b_n + \Delta_n - \mathrm{sign}{\Delta_n}) / \Delta_n\rfloor\\
-b' &= b + s_{n}(b_n+d_n\delta_{\Delta_n < 0}) \\
+b' &= b + s_{n}\tilde b_n \\
 s'_{k'} &= s_{k'}[k' \not= n] + \Delta_n s_{n}[k' = n]
 \end{aligned}
 $$
-" src=".images/ad648de5c3436c6cec6cebde9581d515.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/e555b79e28cfb9afecaca081f31aa735.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 <img data-latex="
 \begin{equation}
@@ -574,7 +574,7 @@ s'_{k'}\\
 s'_{N-1}
 \end{pmatrix}=
 \begin{bmatrix}
-1 & 0 & \cdots & b_n +d_n\delta_{\Delta_n < 0} & \cdots & 0\\
+1 & 0 & \cdots & \tilde b_n & \cdots & 0\\
 0 & 1 & \cdots & 0 & \cdots &0 \\
 \vdots \\
 0 & 0 & \cdots & \Delta_n & \cdots &0 \\
@@ -590,7 +590,37 @@ s_{n}\\
 s_{N-1}
 \end{pmatrix}
 \end{equation}
-" src=".images/abfb8eddf95e32b984827b96b602ca81.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-python-slice-matrix" alt="latex">
+" src=".images/fbff73f2e2f5ac481ab00da27635e048.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-python-slice-matrix" alt="latex">
+
+##### Slicing in dimensionality reduction to 2-D
+
+Let us consider a Python slice <img data-latex="$(b_n, e_n, \Delta_n)$" src=".images/c527e49a2aafa31e724ed74995e7e64a.svg"  valign="-4.289px" width="82.323px" height="17.186px" style="display:inline;" alt="latex"> on an multidimensional array 
+
+<img data-latex="
+$$
+A_{b_n:e_n:\Delta_n}[i_0,\ldots, i, \ldots, i_{N-1}] = A[i_0,\ldots, \tilde b_n + i\Delta_n, \ldots, i_{N-1}], \qquad 0\leqslant i < d'_n
+$$
+" src=".images/c4bcbf7d7a515ed9962253ddb539cb29.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+that is represented by a two-dimensional array obtained via
+dimensionality reduction <img data-latex="$A[i_0,\ldots,i_{N-1}] = M[p_0, p1]$" src=".images/47ff5aeb97a016734f18d13705256243.svg"  valign="-4.289px" width="194.788px" height="17.186px" style="display:inline;" alt="latex"> using
+permutation pair <img data-latex="$(\pi, \rho)$" src=".images/4aaa97de8603c2a6b45d79856d96b413.svg"  valign="-4.289px" width="42.916px" height="17.186px" style="display:inline;" alt="latex">. If <img data-latex="$n < l$" src=".images/1e2ef4c5e72fc184fd846e95abb1f0c8.svg"  valign="-0.459px" width="42.434px" height="12.414px" style="display:inline;" alt="latex"> then
+
+<img data-latex="
+\begin{equation}
+\begin{aligned}
+p_0&=\sum_{k=0}^{l-1}[\pi^{-1}(k)\not=n]s'_k i_{\pi^{-1}(k)} + [\pi^{-1}(k)=n]s'_k(\tilde b_n+i\Delta_n)\\
+   &=s'_{\pi(n)}\tilde b_n + \sum_{k=0}^{l-1}s''_k i_{\pi^{-1}(k)}\\
+   s''_k &= [\pi^{-1}(k)\not=n] s_k + [\pi^{-1}(k)=n] \Delta_n s_k
+\end{aligned}
+\end{equation}
+" src=".images/8bfc2146d4996e47878c404e8299470e.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+
+
+
+
+
+
 
 
 <!--
@@ -1021,9 +1051,9 @@ Let us consider a slice along the first dimension:
 
 <img data-latex="
 $$
-A_{b_0:e_0:\Delta_0}[i, i_1] = A[b_0+\Delta_0\delta_{\Delta_0<0}+i\Delta_0, i_1]
+A_{b_0:e_0:\Delta_0}[i, i_1] = A[\tilde b_0+i\Delta_0, i_1]
 $$
-" src=".images/550adc7c8e8fb5a60542e478127e20dd.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/4847f4277099616e25e0398576340839.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 For the sliced array we have:
 
@@ -1064,9 +1094,9 @@ Now consider a slice along the second dimension:
 
 <img data-latex="
 $$
-A_{b_1:e_1:\Delta_1}[i_0, i] = A[i_0, b_1+\Delta_1\delta_{\Delta_1<0}+i\Delta_1]
+A_{b_1:e_1:\Delta_1}[i_0, i] = A[i_0, \tilde b_1+i\Delta_1]
 $$
-" src=".images/94ffc8ab107627574860bbd1536c1a5e.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/ec9ee572a9bbad27daa5ba2d6e60993b.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 and we have:
 
@@ -1080,7 +1110,7 @@ and we have:
     \For{\inlinemath{p=P_i,\ldots,P_{i+1}-1} if \inlinemath{\Delta_1>0}, otherwise reversed}
         \State\inlinemath{j:=I_p}
         \If{\inlinemath{(j - b_1)\mod \Delta_1 =0}}
-            \State\inlinemath{I'_{p'}:=(j-b_1-d_1\delta_{\Delta_1<0})/\Delta_1}
+            \State\inlinemath{I'_{p'}:=(j-\tilde b_1)/\Delta_1}
             \State\inlinemath{V'_{p'}:=V_{p}}
         \State\inlinemath{p' = p' + 1}
         \EndIf
@@ -1088,7 +1118,7 @@ and we have:
     \State\inlinemath{P'_{i+1} = p'}
 \EndFor
 \end{algorithmic}
-" src=".images/f515513a3d217da9aecdb0cea4f04a7c.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/0ba835f5bbb18d40994d1370c7d0f8be.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 For swapping the axes, we have the following algorithm:
 

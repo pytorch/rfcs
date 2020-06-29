@@ -5,13 +5,6 @@ Reduction of slice objects
 # Created: June 2020
 
 
-def _clip(i, size):
-    c = max(min(i, size), -size)
-    if c < 0:
-        c += size
-    return c
-
-
 def reduced(s, size):
     """Return reduced slice with respect to given size.
 
@@ -26,11 +19,38 @@ def reduced(s, size):
     if step is None:
         step = 1
     if step > 0:
-        start = _clip(start or 0, size)
-        stop = _clip(stop, size) if stop is not None else size
+        if start is None or start < -size:
+            start = 0
+        elif start < 0:
+            start += size
+        elif start > size:
+            start = size
+        if stop is None or stop > size:
+            stop = size
+        elif stop < -size:
+            stop = 0
+        elif stop < 0:
+            stop += size
+        if step > size:
+            step = size
     else:
-        start = -_clip(-start-1, size)-1 if start is not None else -1
-        stop = -_clip(-stop-1, size)-1 if stop is not None else -size - 1
+        if start is None or start >= size:
+            start = -1
+        elif start < -size:
+            start = -size - 1
+        elif start >= 0:
+            start -= size
+        if stop is None or stop < -size:
+            stop = -size - 1
+        elif stop >= size:
+            stop = -1
+        elif stop >= 0:
+            stop -= size
+        if step < -size:
+            step = -size
+    if (stop - start) * step <= 0:
+        start = stop = 0
+        step = 1
     return slice(start, stop, step)
 
 
@@ -48,8 +68,10 @@ def nitems(s, size):
 
     """
     s = reduced(s, size)
-    return max(0, ((s.stop - s.start)
-                   + s.step - (s.step // abs(s.step))) // s.step)
+    if s.stop == s.start:
+        return 0
+    return max(0, ((s.stop - s.start)+ s.step - (s.step // abs(s.step))) // s.step)
+
 
 def test():
     for d in range(1, 10):
@@ -65,9 +87,9 @@ def test():
                     r2 = list(range(d))[s2]
 
                     assert r == r2, (s, r, s2, r2, d)
-                    assert nitems(s, d) == len(r)
+                    assert nitems(s, d) == len(r), (s, s2, r, d)
 
-                    r3 = [(s2.start + i * s2.step) + d * (s2.step < 0)
+                    r3 = [(s2.start % d + i * s2.step)
                           for i in range(nitems(s2, d))]
                     assert r == r3, (s, r, r3, d)
 
@@ -76,6 +98,7 @@ def test():
                     else:
                         r4 = [d - i - 1 for i in range(d) if i >= -s2.start - 1 and i < -s2.stop - 1 and (i + s2.start + 1) % s2.step == 0]
                     assert r == r4, (r, r4, s2, d)
-                    
+
+
 if __name__ == '__main__':
     test()
