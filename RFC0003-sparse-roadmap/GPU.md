@@ -57,7 +57,7 @@ work with such data.
 
 Since the sparse matrix multiplication has been shown to be most optimal on a
 CSR format sparse matrix, PyTorch converts COO tensors into CSR tensors before
-calling such routines.
+calling such routines (see below).
 
 ## Usage of cuSPARSE in pytorch
 
@@ -80,7 +80,9 @@ In this section we will have a glimpse at 3rd party libraries that support spars
 matrix or sparse tensor operations. We refer to a 'sparse matrix' as a
 rank-2 tensor and 'sparse tensor' as a rank-n tensor. Sparse matrix and tensor
 implementations are being actively developed in libraries
-such as cuSPARSE, CUSP, MAGMA, Gingko and [ParTI!](https://github.com/hpcgarage/ParTI).
+such as [cuSPARSE](https://docs.nvidia.com/cuda/cusparse/index.html), 
+[CUSP](https://developer.nvidia.com/cusp), [MAGMA](https://icl.cs.utk.edu/magma/),
+[Gingko](https://ginkgo-project.github.io/) and [ParTI!](https://github.com/hpcgarage/ParTI).
 
 Most libraries support sparse matrix operations with ParTI! being the only library that
 has been built specifically for sparse tensor operations, with extensive support for
