@@ -1,3 +1,27 @@
+<!--watch-latex-md
+
+This document is processed by watch_latex_md.py program, see
+
+  https://github.com/Quansight/pearu-sandbox/latex_in_markdown/
+
+You can edit this document as you wish. You can also edit the LaTeX
+data in img elements, but only the content of `latex-data`:
+
+  1. To automatically update the LaTeX rendering in img element, edit
+     the file while watch_latex_md.py is running.
+
+  2. Never change the beginning (`<img latex-data="...`) and the end
+     (`...alt="latex">`) parts of the LaTeX img elements as these are
+     used by the watch_latex_md.py script.
+
+  3. Changes to other parts of the LaTeX img elements will be
+     overwritten.
+
+Enjoy LaTeXing!
+
+watch-latex-md:no-force-rerender
+-->
+
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-generate-toc again -->
 **Table of Contents**
 
@@ -147,3 +171,5 @@ can be converted into other formats required by these libraries fairly easily.
 Which format to use can be determined by empirical testing and checking for
 the fastest implementation of a given routine.
 
+
+<!--EOF-->
