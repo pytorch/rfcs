@@ -123,7 +123,8 @@ When representing data as an array in computer memory, a array storage
 format must be selected. The simplest and most general array storage
 format is the strided array format where the data values are stored
 continuously in memory so that the storage location any array element
-can be easily (<img data-latex="$O(1)$" src=".images/ef0cdc8ea95d866c1fb30b9f9724a739.svg"  valign="-4.289px" width="37.737px" height="17.186px" style="display:inline;" alt="latex">) determined from its index tuple and therefore
+can be easily (
+<img data-latex="$O(1)$" src=".images/ef0cdc8ea95d866c1fb30b9f9724a739.svg"  valign="-4.289px" width="37.737px" height="17.186px" style="display:inline;" alt="latex">) determined from its index tuple and therefore
 efficient concurrent algorithms can be designed that process data in
 the most efficient way.  However, when data poses certain
 characteristics that would lead to arrays where majority of array
@@ -228,14 +229,18 @@ in memory with no caps, that is, the span of memory for storing all
 values of a contiguous array has a lenght equal to the number of all
 array elements (multiplied by the storage size of a single element).
 
-Given the dimensionality <img data-latex="$N$" src=".images/eac9fa71715f08df45c75d17adab2305.svg"  width="19.594px" height="11.764px" style="display:inline;" alt="latex"> of a
-multidimensional array, there exists <img data-latex="$N!$" src=".images/7e71066fce4e8af212a9daa976c3af47.svg"  width="23.892px" height="11.955px" style="display:inline;" alt="latex"> ways to store
+Given the dimensionality 
+<img data-latex="$N$" src=".images/eac9fa71715f08df45c75d17adab2305.svg"  width="19.594px" height="11.764px" style="display:inline;" alt="latex"> of a
+multidimensional array, there exists 
+<img data-latex="$N!$" src=".images/7e71066fce4e8af212a9daa976c3af47.svg"  width="23.892px" height="11.955px" style="display:inline;" alt="latex"> ways to store
 the array contiguously. For instance, there are so-called C-contiguous
 (row-major storage order) and F-contiguous (column-major storage
 order) storage methods for two-dimensional arrays.
 
 Each way of contiguous storage corresponds to a certain permutation of
-array dimensions and is uniquely determined by the strides <img data-latex="$(s_0, \dots, s_{N-1})$" src=".images/2f051d6d7e70b6aae15a57f29d035f28.svg"  valign="-4.289px" width="102.752px" height="17.186px" style="display:inline;" alt="latex"> and shape of an array <img data-latex="$(d_0, \ldots, d_{N-1})$" src=".images/465cc0d9fb21403ec057aaaefceb38a9.svg"  valign="-4.289px" width="104.39px" height="17.186px" style="display:inline;" alt="latex">. We
+array dimensions and is uniquely determined by the strides 
+<img data-latex="$(s_0, \dots, s_{N-1})$" src=".images/2f051d6d7e70b6aae15a57f29d035f28.svg"  valign="-4.289px" width="102.752px" height="17.186px" style="display:inline;" alt="latex"> and shape of an array 
+<img data-latex="$(d_0, \ldots, d_{N-1})$" src=".images/465cc0d9fb21403ec057aaaefceb38a9.svg"  valign="-4.289px" width="104.39px" height="17.186px" style="display:inline;" alt="latex">. We
 use C-contiguous storage as a reference storage method that
 corresponds to the following strides values:
 
@@ -256,9 +261,12 @@ s_{0} &= d_1\cdots d_{N-1}
 which have notable property of being sorted (non-strickly) decreasing
 order.
 
-Given a contiguous array <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex">, there exists a
-permutation <img data-latex="$\sigma$" src=".images/c6c9705c4e8b8046a4d324da5bd0132e.svg"  width="14.496px" height="7.412px" style="display:inline;" alt="latex"> and a
-C-contiguous array <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> such that
+Given a contiguous array 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex">, there exists a
+permutation 
+<img data-latex="$\sigma$" src=".images/c6c9705c4e8b8046a4d324da5bd0132e.svg"  width="14.496px" height="7.412px" style="display:inline;" alt="latex"> and a
+C-contiguous array 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> such that
 
 <img data-latex="
 $$
@@ -274,13 +282,25 @@ A'[j_0,\ldots,j_{N-1}] = A[j_{\sigma^{-1}(0)},\ldots,j_{\sigma^{-1}(N-1)}]
 $$
 " src=".images/0f99f36aeda3fc17f4e6a1de47490945.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-for all <img data-latex="$i_k \in \{0,\ldots,d_{k}-1\} $" src=".images/7c3a3e4ca7666d6eaff92c6b2fc6d513.svg"  valign="-4.304px" width="145.629px" height="17.215px" style="display:inline;" alt="latex">, <img data-latex="$k\in\{0,\ldots,N-1\}$" src=".images/33fb17302867288586ad47f6adb82526.svg"  valign="-4.304px" width="141.785px" height="17.215px" style="display:inline;" alt="latex">.  The shape of <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> is <img data-latex="$(d_{\sigma(0)},\ldots,d_{\sigma(N-1)})$" src=".images/509bb43f5e7c50532b787b0e05370640.svg"  valign="-6.025px" width="136.764px" height="18.922px" style="display:inline;" alt="latex">. We can represent the permutation <img data-latex="$\sigma$" src=".images/c6c9705c4e8b8046a4d324da5bd0132e.svg"  width="14.496px" height="7.412px" style="display:inline;" alt="latex"> as a 1-D array
-of integers from <img data-latex="$\{0,\ldots,N-1\}$" src=".images/d37868c847a06905ef8d199ab089c5ca.svg"  valign="-4.304px" width="111.399px" height="17.215px" style="display:inline;" alt="latex"> so that <img data-latex="$\sigma[i] \equiv \sigma(i)$" src=".images/d1576f454bc01aa516c875898a3a7343.svg"  valign="-4.289px" width="79.939px" height="17.186px" style="display:inline;" alt="latex"> and <img data-latex="$\sigma[\sigma^{-1}[k]] \equiv k$" src=".images/6e13f39e56c17dad86747f56eb5774e7.svg"  valign="-4.289px" width="99.179px" height="18.241px" style="display:inline;" alt="latex">.
+for all 
+<img data-latex="$i_k \in \{0,\ldots,d_{k}-1\} $" src=".images/7c3a3e4ca7666d6eaff92c6b2fc6d513.svg"  valign="-4.304px" width="145.629px" height="17.215px" style="display:inline;" alt="latex">, 
+<img data-latex="$k\in\{0,\ldots,N-1\}$" src=".images/33fb17302867288586ad47f6adb82526.svg"  valign="-4.304px" width="141.785px" height="17.215px" style="display:inline;" alt="latex">.  The shape of 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> is 
+<img data-latex="$(d_{\sigma(0)},\ldots,d_{\sigma(N-1)})$" src=".images/509bb43f5e7c50532b787b0e05370640.svg"  valign="-6.025px" width="136.764px" height="18.922px" style="display:inline;" alt="latex">. We can represent the permutation 
+<img data-latex="$\sigma$" src=".images/c6c9705c4e8b8046a4d324da5bd0132e.svg"  width="14.496px" height="7.412px" style="display:inline;" alt="latex"> as a 1-D array
+of integers from 
+<img data-latex="$\{0,\ldots,N-1\}$" src=".images/d37868c847a06905ef8d199ab089c5ca.svg"  valign="-4.304px" width="111.399px" height="17.215px" style="display:inline;" alt="latex"> so that 
+<img data-latex="$\sigma[i] \equiv \sigma(i)$" src=".images/d1576f454bc01aa516c875898a3a7343.svg"  valign="-4.289px" width="79.939px" height="17.186px" style="display:inline;" alt="latex"> and 
+<img data-latex="$\sigma[\sigma^{-1}[k]] \equiv k$" src=".images/6e13f39e56c17dad86747f56eb5774e7.svg"  valign="-4.289px" width="99.179px" height="18.241px" style="display:inline;" alt="latex">.
 
-Given a strided array <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex">, a method for determining if `A` is contiguous is as follows:
-1. Let <img data-latex="$n = \prod_{k=0}^{N-1} d_k$" src=".images/2db2b709ed8bea88efd6ab2781c6e883.svg"  valign="-4.902px" width="96.965px" height="21.367px" style="display:inline;" alt="latex"> be the total number of <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> elements.
+Given a strided array 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex">, a method for determining if `A` is contiguous is as follows:
+1. Let 
+<img data-latex="$n = \prod_{k=0}^{N-1} d_k$" src=".images/2db2b709ed8bea88efd6ab2781c6e883.svg"  valign="-4.902px" width="96.965px" height="21.367px" style="display:inline;" alt="latex"> be the total number of 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> elements.
 
-2. Sort the pairs of <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> strides and
+2. Sort the pairs of 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> strides and
    dimension numbers in descending order as follows:
 
    <img data-latex="
@@ -290,11 +310,16 @@ $$
 " src=".images/c8b20be30a7e8b06ae46a1b00c37a2c5.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 
-   If <img data-latex="$s_{\sigma(N-1)}\not=1$" src=".images/6f1021918b4e8ba2ddb45b55e6f85d73.svg"  valign="-6.025px" width="84.549px" height="17.981px" style="display:inline;" alt="latex">, we conclude that <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is not a contiguous array.
+   If 
+<img data-latex="$s_{\sigma(N-1)}\not=1$" src=".images/6f1021918b4e8ba2ddb45b55e6f85d73.svg"  valign="-6.025px" width="84.549px" height="17.981px" style="display:inline;" alt="latex">, we conclude that 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is not a contiguous array.
 
-   Otherwise, the strides of <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> is <img data-latex="$(s_{\sigma(0)}, \ldots, s_{\sigma(N-1)})$" src=".images/ec80f06a1007615d120a7291222852ae.svg"  valign="-6.025px" width="135.127px" height="18.922px" style="display:inline;" alt="latex">.
+   Otherwise, the strides of 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> is 
+<img data-latex="$(s_{\sigma(0)}, \ldots, s_{\sigma(N-1)})$" src=".images/ec80f06a1007615d120a7291222852ae.svg"  valign="-6.025px" width="135.127px" height="18.922px" style="display:inline;" alt="latex">.
 
-3. Compute the shape of <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex">:
+3. Compute the shape of 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex">:
 
    <img data-latex="
 \begin{align*}
@@ -307,15 +332,21 @@ d_{\sigma(0)} &= n / s_{\sigma(0)}
 \end{align*}
 " src=".images/5a052599f821cd1bc3cf9cd355d2bb1f.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-   The array <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is a contiguous array iff <img data-latex="$\prod_{k=0}^{N-1} d_{\sigma(k)}$" src=".images/60fa0426b90fd24596bab80830a48004.svg"  valign="-6.025px" width="81.134px" height="22.491px" style="display:inline;" alt="latex"> is equal to the total number of all <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> elements `n`.
+   The array 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is a contiguous array iff 
+<img data-latex="$\prod_{k=0}^{N-1} d_{\sigma(k)}$" src=".images/60fa0426b90fd24596bab80830a48004.svg"  valign="-6.025px" width="81.134px" height="22.491px" style="display:inline;" alt="latex"> is equal to the total number of all 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> elements `n`.
 
 #### Dimensionality reduction
 
 Storing a multidimensional array linearly in memory is a special case
-of dimensionality reduction: the dimensionality <img data-latex="$N$" src=".images/eac9fa71715f08df45c75d17adab2305.svg"  width="19.594px" height="11.764px" style="display:inline;" alt="latex"> is reduced to
+of dimensionality reduction: the dimensionality 
+<img data-latex="$N$" src=".images/eac9fa71715f08df45c75d17adab2305.svg"  width="19.594px" height="11.764px" style="display:inline;" alt="latex"> is reduced to
 <img data-latex="$1$" src=".images/39a02353ea65bee09e817d2af7362f2b.svg"  width="12.193px" height="11.097px" style="display:inline;" alt="latex"> by relating the
-indices of a <img data-latex="$N$" src=".images/eac9fa71715f08df45c75d17adab2305.svg"  width="19.594px" height="11.764px" style="display:inline;" alt="latex">-dimensional
-array to a memory address of element storage location. Let use denote the linear array representing the memory by <img data-latex="$M$" src=".images/6e6f00098ba14a79c1d939d351e3410c.svg"  width="22.404px" height="11.764px" style="display:inline;" alt="latex">, then we have
+indices of a 
+<img data-latex="$N$" src=".images/eac9fa71715f08df45c75d17adab2305.svg"  width="19.594px" height="11.764px" style="display:inline;" alt="latex">-dimensional
+array to a memory address of element storage location. Let use denote the linear array representing the memory by 
+<img data-latex="$M$" src=".images/6e6f00098ba14a79c1d939d351e3410c.svg"  width="22.404px" height="11.764px" style="display:inline;" alt="latex">, then we have
 
 <img data-latex="
 $$
@@ -323,7 +354,9 @@ M[p] = A[i_0, \ldots, i_{N-1}]
 $$
 " src=".images/9f8fc245e624125d849b9c30785f60fd.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-for all <img data-latex="$0\leqslant i_k<d_k$" src=".images/916bf571f1bad0d3e9969946b44f5a68.svg"  valign="-2.582px" width="85.808px" height="14.537px" style="display:inline;" alt="latex">, <img data-latex="$0\leqslant k<N$" src=".images/2f10e35b9dbe88b831e2c8ead5e3641d.svg"  valign="-2.353px" width="82.463px" height="14.308px" style="display:inline;" alt="latex"> where
+for all 
+<img data-latex="$0\leqslant i_k<d_k$" src=".images/916bf571f1bad0d3e9969946b44f5a68.svg"  valign="-2.582px" width="85.808px" height="14.537px" style="display:inline;" alt="latex">, 
+<img data-latex="$0\leqslant k<N$" src=".images/2f10e35b9dbe88b831e2c8ead5e3641d.svg"  valign="-2.353px" width="82.463px" height="14.308px" style="display:inline;" alt="latex"> where
 
 <img data-latex="
 $$
@@ -331,7 +364,8 @@ p = \sum_{k=0}^{N-1} s_{k} i_{k} = s_0 i_0 + \cdots + s_{N-1} i_{N-1}
 $$
 " src=".images/52089c8b1dcf53c561a72da06cbbd4e4.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-If <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is a C-contiguous array then
+If 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is a C-contiguous array then
 
 <img data-latex="
 $$
@@ -347,7 +381,9 @@ A[i_0, \ldots, i_{N-1}] = M[p]
 $$
 " src=".images/ce07d814494502c8cda92370e275807a.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-for all <img data-latex="$0\leqslant p<m$" src=".images/e4eb71b7d13561f4e0bebba981437106.svg"  valign="-3.347px" width="81.026px" height="14.445px" style="display:inline;" alt="latex"> where <img data-latex="$m=\prod_{k=0}^{N-1}d_k$" src=".images/95d1291fb3f3bea03b00996543787c32.svg"  valign="-4.902px" width="101.648px" height="21.367px" style="display:inline;" alt="latex"> and
+for all 
+<img data-latex="$0\leqslant p<m$" src=".images/e4eb71b7d13561f4e0bebba981437106.svg"  valign="-3.347px" width="81.026px" height="14.445px" style="display:inline;" alt="latex"> where 
+<img data-latex="$m=\prod_{k=0}^{N-1}d_k$" src=".images/95d1291fb3f3bea03b00996543787c32.svg"  valign="-4.902px" width="101.648px" height="21.367px" style="display:inline;" alt="latex"> and
 
 <img data-latex="
 \begin{align*}
@@ -362,7 +398,11 @@ i_0 &= \ldots
 " src=".images/147916817ac0016ee054e3a00e0020c1.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 The above results can be generalized for contiguous arrays by
-determining the permutation function <img data-latex="$\sigma$" src=".images/c6c9705c4e8b8046a4d324da5bd0132e.svg"  width="14.496px" height="7.412px" style="display:inline;" alt="latex"> of <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> and relating the associated C-contiguous <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> to <img data-latex="$M$" src=".images/6e6f00098ba14a79c1d939d351e3410c.svg"  width="22.404px" height="11.764px" style="display:inline;" alt="latex">.
+determining the permutation function 
+<img data-latex="$\sigma$" src=".images/c6c9705c4e8b8046a4d324da5bd0132e.svg"  width="14.496px" height="7.412px" style="display:inline;" alt="latex"> of 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> and relating the associated C-contiguous 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> to 
+<img data-latex="$M$" src=".images/6e6f00098ba14a79c1d939d351e3410c.svg"  width="22.404px" height="11.764px" style="display:inline;" alt="latex">.
 
 The juice of the above becomes from the fact that the dimensionality
 <img data-latex="$N$" src=".images/eac9fa71715f08df45c75d17adab2305.svg"  width="19.594px" height="11.764px" style="display:inline;" alt="latex"> reduction to 1
@@ -371,7 +411,10 @@ dimensionality. In particular, we are interested in target
 dimensionality 2 because this is used as a basis for generalization of
 CRS/CSS format to multidimensional sparse arrays. For that, we need to first
 decide the distribution of the dimensions numbers to two
-non-intersecting ordered sets of sizes <img data-latex="$l$" src=".images/55ecd5c7d0ac6174d3b30b9c94c24cb5.svg"  width="9.697px" height="11.955px" style="display:inline;" alt="latex"> and <img data-latex="$N-l$" src=".images/7dda62af50616bb6c4cda32f54646d2e.svg"  valign="-1.435px" width="46.035px" height="13.39px" style="display:inline;" alt="latex">, <img data-latex="$1 < l < N-2$" src=".images/a36fbc5aa1afc741273c333dcc7717b7.svg"  valign="-1.435px" width="107.175px" height="13.39px" style="display:inline;" alt="latex">:
+non-intersecting ordered sets of sizes 
+<img data-latex="$l$" src=".images/55ecd5c7d0ac6174d3b30b9c94c24cb5.svg"  width="9.697px" height="11.955px" style="display:inline;" alt="latex"> and 
+<img data-latex="$N-l$" src=".images/7dda62af50616bb6c4cda32f54646d2e.svg"  valign="-1.435px" width="46.035px" height="13.39px" style="display:inline;" alt="latex">, 
+<img data-latex="$1 < l < N-2$" src=".images/a36fbc5aa1afc741273c333dcc7717b7.svg"  valign="-1.435px" width="107.175px" height="13.39px" style="display:inline;" alt="latex">:
 
 <img data-latex="
 $$
@@ -387,7 +430,9 @@ M[p_0, p_1] = A[i_0, \ldots, i_{N-1}]
 $$
 " src=".images/058f41cd2a153676fe23e4453fcc2083.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-for all <img data-latex="$0\leqslant i_k<d_k$" src=".images/916bf571f1bad0d3e9969946b44f5a68.svg"  valign="-2.582px" width="85.808px" height="14.537px" style="display:inline;" alt="latex"> and <img data-latex="$0\leqslant k<N$" src=".images/2f10e35b9dbe88b831e2c8ead5e3641d.svg"  valign="-2.353px" width="82.463px" height="14.308px" style="display:inline;" alt="latex"> where
+for all 
+<img data-latex="$0\leqslant i_k<d_k$" src=".images/916bf571f1bad0d3e9969946b44f5a68.svg"  valign="-2.582px" width="85.808px" height="14.537px" style="display:inline;" alt="latex"> and 
+<img data-latex="$0\leqslant k<N$" src=".images/2f10e35b9dbe88b831e2c8ead5e3641d.svg"  valign="-2.353px" width="82.463px" height="14.308px" style="display:inline;" alt="latex"> where
 
 <img data-latex="
 \begin{align*}
@@ -396,7 +441,8 @@ p_1 &= \sum_{k=l}^{N-1} s''_{k} i_{\rho^{-1}(k)},& s''_{k}&= s''_{k+1} d_{\rho^{
 \end{align*}
 " src=".images/3da5685dace883c635442c0b94396090.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-Clearly, there is also an inverse relation if <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is a contiguous array:
+Clearly, there is also an inverse relation if 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is a contiguous array:
 
 <img data-latex="
 $$
@@ -404,11 +450,16 @@ A[i_0, \ldots, i_{N-1}] = M[p_0, p_1]
 $$
 " src=".images/a03b7a2f413da5a9c94248cf8cf5f4f9.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-for all <img data-latex="$0\leqslant p_0<m_0$" src=".images/b46d280e9a531b8f52f6d3c803335836.svg"  valign="-3.347px" width="93.231px" height="14.445px" style="display:inline;" alt="latex"> and <img data-latex="$0\leqslant p_1<m_1$" src=".images/e46e22e98bcee3d1d6feaad6fe042461.svg"  valign="-3.347px" width="93.231px" height="14.445px" style="display:inline;" alt="latex"> where <img data-latex="$m_0=\prod_{k=0}^{l-1}d_{\pi^{-1}(k)}$" src=".images/b480383a8b10e59e032d441f2b13b902.svg"  valign="-6.933px" width="133.074px" height="23.531px" style="display:inline;" alt="latex"> and <img data-latex="$m_1=\prod_{k=l}^{N-1}d_{\rho^{-1}(k)}$" src=".images/3dc7fc92022e67b71d00ccda89a695d2.svg"  valign="-6.933px" width="136.369px" height="23.398px" style="display:inline;" alt="latex">.
+for all 
+<img data-latex="$0\leqslant p_0<m_0$" src=".images/b46d280e9a531b8f52f6d3c803335836.svg"  valign="-3.347px" width="93.231px" height="14.445px" style="display:inline;" alt="latex"> and 
+<img data-latex="$0\leqslant p_1<m_1$" src=".images/e46e22e98bcee3d1d6feaad6fe042461.svg"  valign="-3.347px" width="93.231px" height="14.445px" style="display:inline;" alt="latex"> where 
+<img data-latex="$m_0=\prod_{k=0}^{l-1}d_{\pi^{-1}(k)}$" src=".images/b480383a8b10e59e032d441f2b13b902.svg"  valign="-6.933px" width="133.074px" height="23.531px" style="display:inline;" alt="latex"> and 
+<img data-latex="$m_1=\prod_{k=l}^{N-1}d_{\rho^{-1}(k)}$" src=".images/3dc7fc92022e67b71d00ccda89a695d2.svg"  valign="-6.933px" width="136.369px" height="23.398px" style="display:inline;" alt="latex">.
 
 #### Slicing
 
-Slicing of an array <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is an operation
+Slicing of an array 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> is an operation
 that selects certain array elements from which a new array is
 constructed:
 
@@ -418,10 +469,14 @@ A'[j_0,\ldots,j_{N'-1}] = A[\iota_0(j_0,\ldots,j_{N'-1}),\ldots,\iota_{N-1}(j_0,
 $$
 " src=".images/9eeb37b4b7fb6548d135c27f3723a63f.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-where <img data-latex="$0\leqslant j_k <d'_k$" src=".images/bb4cf0f6382ec48b1d12846ae180b621.svg"  valign="-4.809px" width="87.032px" height="17.698px" style="display:inline;" alt="latex">, <img data-latex="$0\leqslant k<N'$" src=".images/6e28839942e6524f12508d2f8acd360c.svg"  valign="-2.353px" width="85.751px" height="15.242px" style="display:inline;" alt="latex">.
+where 
+<img data-latex="$0\leqslant j_k <d'_k$" src=".images/bb4cf0f6382ec48b1d12846ae180b621.svg"  valign="-4.809px" width="87.032px" height="17.698px" style="display:inline;" alt="latex">, 
+<img data-latex="$0\leqslant k<N'$" src=".images/6e28839942e6524f12508d2f8acd360c.svg"  valign="-2.353px" width="85.751px" height="15.242px" style="display:inline;" alt="latex">.
 
-Let's consider a case where the reduction of <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> to one-dimensional
-array is a subset of the <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> reduction to one-dimensional array:
+Let's consider a case where the reduction of 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> to one-dimensional
+array is a subset of the 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> reduction to one-dimensional array:
 
 <img data-latex="
 \begin{equation}
@@ -430,7 +485,9 @@ b' + \sum_{k'=0}^{N'-1} j_{k'} s'_{k'}  = b + \sum_{k=0}^{N-1} \iota_k(j_0, \ldo
 \end{equation}
 " src=".images/7c25bdb3d14b8a965272d51d88a36c4f.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" id="eq-slice-1d-reduction" alt="latex">
 
-We assume that <img data-latex="$\iota_k$" src=".images/9d25e3b123925b09ae0f25e86a2db0e4.svg"  valign="-2.582px" width="16.745px" height="9.995px" style="display:inline;" alt="latex"> are linear functions with respect to  all its arguments <img data-latex="$j_{k'}$" src=".images/0293fc5e92da599c143293fe09b9f4c4.svg"  valign="-3.347px" width="20.501px" height="14.634px" style="display:inline;" alt="latex">:
+We assume that 
+<img data-latex="$\iota_k$" src=".images/9d25e3b123925b09ae0f25e86a2db0e4.svg"  valign="-2.582px" width="16.745px" height="9.995px" style="display:inline;" alt="latex"> are linear functions with respect to  all its arguments 
+<img data-latex="$j_{k'}$" src=".images/0293fc5e92da599c143293fe09b9f4c4.svg"  valign="-3.347px" width="20.501px" height="14.634px" style="display:inline;" alt="latex">:
 
 <img data-latex="
 $$
@@ -438,7 +495,8 @@ $$
 $$
 " src=".images/83790619ad5ffa30cceee6d95284bfad.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-The [Eq. 2](#eq-slice-1d-reduction) must hold for all <img data-latex="$0\leqslant j_{k'}<d'_{k'}$" src=".images/041cfffd12bab7778c96c8d833a16748.svg"  valign="-5.496px" width="93.009px" height="18.385px" style="display:inline;" alt="latex">, so we have:
+The [Eq. 2](#eq-slice-1d-reduction) must hold for all 
+<img data-latex="$0\leqslant j_{k'}<d'_{k'}$" src=".images/041cfffd12bab7778c96c8d833a16748.svg"  valign="-5.496px" width="93.009px" height="18.385px" style="display:inline;" alt="latex">, so we have:
 
 <img data-latex="
 \begin{equation}
@@ -541,7 +599,9 @@ s_{N-1}
 
 ##### Python slice along one dimension
 
-A Python slice along the <img data-latex="$n$" src=".images/15c6035d5801568a33a038eeff87cf78.svg"  width="14.36px" height="7.412px" style="display:inline;" alt="latex">-th axis is described by a triple <img data-latex="$(b_n, e_n, \Delta_n)$" src=".images/c527e49a2aafa31e724ed74995e7e64a.svg"  valign="-4.289px" width="82.323px" height="17.186px" style="display:inline;" alt="latex"> such that
+A Python slice along the 
+<img data-latex="$n$" src=".images/15c6035d5801568a33a038eeff87cf78.svg"  width="14.36px" height="7.412px" style="display:inline;" alt="latex">-th axis is described by a triple 
+<img data-latex="$(b_n, e_n, \Delta_n)$" src=".images/c527e49a2aafa31e724ed74995e7e64a.svg"  valign="-4.289px" width="82.323px" height="17.186px" style="display:inline;" alt="latex"> such that
 
 <img data-latex="
 $$
@@ -549,7 +609,11 @@ A_{b_n:e_n:\Delta_n}[i_0,\ldots, i, \ldots, i_{N-1}] = A[i_0,\ldots, \tilde b_n 
 $$
 " src=".images/c4bcbf7d7a515ed9962253ddb539cb29.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-where  <img data-latex="$b_n$" src=".images/51c3f4d22a352813a79c381706c6d127.svg"  valign="-2.582px" width="18.452px" height="14.537px" style="display:inline;" alt="latex">, <img data-latex="$e_n$" src=".images/3f2f81a029f6084d917469e23dba8e43.svg"  valign="-2.582px" width="19.098px" height="9.995px" style="display:inline;" alt="latex"> are [reduced](slice_tools.py) with respect to <img data-latex="$d_n$" src=".images/14450bd0ff5b1231cd38f92b6504f14a.svg"  valign="-2.582px" width="20.044px" height="14.537px" style="display:inline;" alt="latex"> and <img data-latex="$\tilde b_n = b_n \mod d_n$" src=".images/bfe7de06d0f3fc554407a4c304832a6b.svg"  valign="-2.582px" width="118.953px" height="18.419px" style="display:inline;" alt="latex">. We have
+where  
+<img data-latex="$b_n$" src=".images/51c3f4d22a352813a79c381706c6d127.svg"  valign="-2.582px" width="18.452px" height="14.537px" style="display:inline;" alt="latex">, 
+<img data-latex="$e_n$" src=".images/3f2f81a029f6084d917469e23dba8e43.svg"  valign="-2.582px" width="19.098px" height="9.995px" style="display:inline;" alt="latex"> are [reduced](slice_tools.py) with respect to 
+<img data-latex="$d_n$" src=".images/14450bd0ff5b1231cd38f92b6504f14a.svg"  valign="-2.582px" width="20.044px" height="14.537px" style="display:inline;" alt="latex"> and 
+<img data-latex="$\tilde b_n = b_n \mod d_n$" src=".images/bfe7de06d0f3fc554407a4c304832a6b.svg"  valign="-2.582px" width="118.953px" height="18.419px" style="display:inline;" alt="latex">. We have
 
 
 <img data-latex="
@@ -594,7 +658,8 @@ s_{N-1}
 
 ##### Slicing in dimensionality reduction to 2-D
 
-Let us consider a Python slice <img data-latex="$(b_n, e_n, \Delta_n)$" src=".images/c527e49a2aafa31e724ed74995e7e64a.svg"  valign="-4.289px" width="82.323px" height="17.186px" style="display:inline;" alt="latex"> on an multidimensional array 
+Let us consider a Python slice 
+<img data-latex="$(b_n, e_n, \Delta_n)$" src=".images/c527e49a2aafa31e724ed74995e7e64a.svg"  valign="-4.289px" width="82.323px" height="17.186px" style="display:inline;" alt="latex"> on an multidimensional array 
 
 <img data-latex="
 $$
@@ -603,8 +668,11 @@ $$
 " src=".images/c4bcbf7d7a515ed9962253ddb539cb29.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
 that is represented by a two-dimensional array obtained via
-dimensionality reduction <img data-latex="$A[i_0,\ldots,i_{N-1}] = M[p_0, p1]$" src=".images/47ff5aeb97a016734f18d13705256243.svg"  valign="-4.289px" width="194.788px" height="17.186px" style="display:inline;" alt="latex"> using
-permutation pair <img data-latex="$(\pi, \rho)$" src=".images/4aaa97de8603c2a6b45d79856d96b413.svg"  valign="-4.289px" width="42.916px" height="17.186px" style="display:inline;" alt="latex">. If <img data-latex="$n < l$" src=".images/1e2ef4c5e72fc184fd846e95abb1f0c8.svg"  valign="-0.459px" width="42.434px" height="12.414px" style="display:inline;" alt="latex"> then
+dimensionality reduction 
+<img data-latex="$A[i_0,\ldots,i_{N-1}] = M[p_0, p1]$" src=".images/47ff5aeb97a016734f18d13705256243.svg"  valign="-4.289px" width="194.788px" height="17.186px" style="display:inline;" alt="latex"> using
+permutation pair 
+<img data-latex="$(\pi, \rho)$" src=".images/4aaa97de8603c2a6b45d79856d96b413.svg"  valign="-4.289px" width="42.916px" height="17.186px" style="display:inline;" alt="latex">. If 
+<img data-latex="$n < l$" src=".images/1e2ef4c5e72fc184fd846e95abb1f0c8.svg"  valign="-0.459px" width="42.434px" height="12.414px" style="display:inline;" alt="latex"> then
 
 <img data-latex="
 \begin{equation}
@@ -739,7 +807,8 @@ the interpretation of unspecified elements is none.
 #### Unspecified elements - fill-value
 
 Many mathematical operations map zero values to non-zero values, for
-instance, <img data-latex="$\cos 0=1$" src=".images/4f6d621c30d592e4da59090e5310bbc7.svg"  width="65.992px" height="11.097px" style="display:inline;" alt="latex">
+instance, 
+<img data-latex="$\cos 0=1$" src=".images/4f6d621c30d592e4da59090e5310bbc7.svg"  width="65.992px" height="11.097px" style="display:inline;" alt="latex">
 etc. With the aim of defining such
 nonhomogeneous operations on sparse arrays in a memory efficient way,
 we propose that > :large_blue_circle:<!--:proposal:--> Element-wise
@@ -988,8 +1057,13 @@ CRS/CSS sparse array storage format. The mapping of N-dimensional
 indexes to two-dimensional indices is choosen so that all the even/odd
 dimensions of N-D indices (dimensions are numbered starting from 0)
 contribute the row/column index of the 2-D indices. For example, a
-five-dimensional index <img data-latex="$(i_0, i_1, i_2, i_3, i_4)$" src=".images/c99132adb8a9296e6dda9a9bc1012cef.svg"  valign="-4.289px" width="107.206px" height="17.186px" style="display:inline;" alt="latex"> of an array <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> with the shape <img data-latex="$(d_0, d_1, d_2, d_3, d_4)$" src=".images/e7f47b0dbd3844274016bfb2d8212945.svg"  valign="-4.289px" width="122.248px" height="17.186px" style="display:inline;" alt="latex"> is mapped to two-dimensional
-index <img data-latex="$(a, b)$" src=".images/b1eae3c210005046a31e1777e9e3c513.svg"  valign="-4.289px" width="40.058px" height="17.186px" style="display:inline;" alt="latex"> of a sparse array <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> as follows:
+five-dimensional index 
+<img data-latex="$(i_0, i_1, i_2, i_3, i_4)$" src=".images/c99132adb8a9296e6dda9a9bc1012cef.svg"  valign="-4.289px" width="107.206px" height="17.186px" style="display:inline;" alt="latex"> of an array 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> with the shape 
+<img data-latex="$(d_0, d_1, d_2, d_3, d_4)$" src=".images/e7f47b0dbd3844274016bfb2d8212945.svg"  valign="-4.289px" width="122.248px" height="17.186px" style="display:inline;" alt="latex"> is mapped to two-dimensional
+index 
+<img data-latex="$(a, b)$" src=".images/b1eae3c210005046a31e1777e9e3c513.svg"  valign="-4.289px" width="40.058px" height="17.186px" style="display:inline;" alt="latex"> of a sparse array 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> as follows:
 
 <img data-latex="
 \begin{align*}
@@ -1006,7 +1080,9 @@ A[i_0, i_1, i_2, i_3, i_4] = A'[a_0, a_1]
 $$
 " src=".images/cc03110ccc3bff6e30efb8d391078c2a.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-where the two-dimensional array <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> has a shape <img data-latex="$(\delta_0, \delta_1)$" src=".images/2ddba22fae20976bf7ea71b0273dff8e.svg"  valign="-4.289px" width="51.676px" height="17.186px" style="display:inline;" alt="latex"> where
+where the two-dimensional array 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> has a shape 
+<img data-latex="$(\delta_0, \delta_1)$" src=".images/2ddba22fae20976bf7ea71b0273dff8e.svg"  valign="-4.289px" width="51.676px" height="17.186px" style="display:inline;" alt="latex"> where
 
 <img data-latex="
 \begin{align*}
@@ -1015,8 +1091,11 @@ where the two-dimensional array <img data-latex="$A'$" src=".images/b7b4c45be253
 \end{align*}
 " src=".images/88c0a42e30c3bcfb3e6e9dc3a1a7116e.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-and the array <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> will be stored using CRS format.
-To reconstruct <img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> from <img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex">, the following inverse mapping is used:
+and the array 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex"> will be stored using CRS format.
+To reconstruct 
+<img data-latex="$A$" src=".images/bb2243c9fce59491f0436432e1193900.svg"  width="16.934px" height="11.764px" style="display:inline;" alt="latex"> from 
+<img data-latex="$A'$" src=".images/b7b4c45be253388f29fe03e77b15ffba.svg"  width="20.222px" height="12.889px" style="display:inline;" alt="latex">, the following inverse mapping is used:
 
 <img data-latex="
 \begin{align*}
@@ -1030,11 +1109,16 @@ i_0 &= (a_0 - i_2d_4 - i_4)/(d_4d_2)
 
 #### Compressed storage of two-dimensional arrays
 
-The CRS format specification of a two-dimensional array with shape <img data-latex="$(d_0, d_1)$" src=".images/922cdbbff9e1b3fc829054d1fea3fbf9.svg"  valign="-4.289px" width="54.263px" height="17.186px" style="display:inline;" alt="latex"> involves the following parameters:
+The CRS format specification of a two-dimensional array with shape 
+<img data-latex="$(d_0, d_1)$" src=".images/922cdbbff9e1b3fc829054d1fea3fbf9.svg"  valign="-4.289px" width="54.263px" height="17.186px" style="display:inline;" alt="latex"> involves the following parameters:
 
-- a 1-D array of the cummulative count of specified elements in a row: <img data-latex="$P=(P_0,\ldots,P_{d_0-1}, S)$" src=".images/b9439c106ac6bf3c2916b4f5667e214f.svg"  valign="-4.885px" width="163.626px" height="17.781px" style="display:inline;" alt="latex">
-- a 1-D array of column indices: <img data-latex="$I=(I_0,\ldots,I_{S-1})$" src=".images/2b00795bbe9866cc098e3bd1e37a387c.svg"  valign="-4.289px" width="129.758px" height="17.186px" style="display:inline;" alt="latex"> where <img data-latex="$S$" src=".images/60c398af2b26cc49c65c1c4ef3fa5e13.svg"  width="15.667px" height="11.764px" style="display:inline;" alt="latex"> is the total number of specified elements
-- a 1-D array of element values: <img data-latex="$V=(V_0, \ldots, V_{S-1})$" src=".images/2c5d5e80b66399cde799a889f6d1436e.svg"  valign="-4.289px" width="139.328px" height="17.186px" style="display:inline;" alt="latex">
+- a 1-D array of the cummulative count of specified elements in a row: 
+<img data-latex="$P=(P_0,\ldots,P_{d_0-1}, S)$" src=".images/b9439c106ac6bf3c2916b4f5667e214f.svg"  valign="-4.885px" width="163.626px" height="17.781px" style="display:inline;" alt="latex">
+- a 1-D array of column indices: 
+<img data-latex="$I=(I_0,\ldots,I_{S-1})$" src=".images/2b00795bbe9866cc098e3bd1e37a387c.svg"  valign="-4.289px" width="129.758px" height="17.186px" style="display:inline;" alt="latex"> where 
+<img data-latex="$S$" src=".images/60c398af2b26cc49c65c1c4ef3fa5e13.svg"  width="15.667px" height="11.764px" style="display:inline;" alt="latex"> is the total number of specified elements
+- a 1-D array of element values: 
+<img data-latex="$V=(V_0, \ldots, V_{S-1})$" src=".images/2c5d5e80b66399cde799a889f6d1436e.svg"  valign="-4.289px" width="139.328px" height="17.186px" style="display:inline;" alt="latex">
 
 and we have
 
@@ -1044,8 +1128,12 @@ A[i_0, i_1] = V[p]
 $$
 " src=".images/39d2095cdd940da474ff4065a328aa7f.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-where <img data-latex="$p$" src=".images/c96a405e602cf31e4679b144ca7b5d22.svg"  valign="-3.347px" width="12.758px" height="10.76px" style="display:inline;" alt="latex">
-is such that <img data-latex="$I[p] = i_1$" src=".images/381bbd0cb21295824453b9ab716e6c1b.svg"  valign="-4.289px" width="63.701px" height="17.186px" style="display:inline;" alt="latex"> and <img data-latex="$P[i_0]\leqslant p < P[i_0+1]$" src=".images/531bca9318cc1e90ba14da246d4e556d.svg"  valign="-4.289px" width="154.132px" height="17.186px" style="display:inline;" alt="latex">. When no such <img data-latex="$p$" src=".images/c96a405e602cf31e4679b144ca7b5d22.svg"  valign="-3.347px" width="12.758px" height="10.76px" style="display:inline;" alt="latex"> exists, the corresponding element is
+where 
+<img data-latex="$p$" src=".images/c96a405e602cf31e4679b144ca7b5d22.svg"  valign="-3.347px" width="12.758px" height="10.76px" style="display:inline;" alt="latex">
+is such that 
+<img data-latex="$I[p] = i_1$" src=".images/381bbd0cb21295824453b9ab716e6c1b.svg"  valign="-4.289px" width="63.701px" height="17.186px" style="display:inline;" alt="latex"> and 
+<img data-latex="$P[i_0]\leqslant p < P[i_0+1]$" src=".images/531bca9318cc1e90ba14da246d4e556d.svg"  valign="-4.289px" width="154.132px" height="17.186px" style="display:inline;" alt="latex">. When no such 
+<img data-latex="$p$" src=".images/c96a405e602cf31e4679b144ca7b5d22.svg"  valign="-3.347px" width="12.758px" height="10.76px" style="display:inline;" alt="latex"> exists, the corresponding element is
 unspecified element.
 
 Let us consider a slice along the first dimension:
@@ -1068,7 +1156,8 @@ V' &= \mathrm{concat}([V_{p:p'}, p\in (P_{::-1})_{b_0:e_0:\Delta_0}])
 \end{equation}
 " src=".images/30efeee5cbe33c368cbfc2e0cefde9e7.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-where <img data-latex="$p'=P_{\mathrm{index}(P, p)+1}$" src=".images/14fd2bc1c9dabcef2fc1f70e5d77cbd7.svg"  valign="-6.025px" width="118.064px" height="18.915px" style="display:inline;" alt="latex">.
+where 
+<img data-latex="$p'=P_{\mathrm{index}(P, p)+1}$" src=".images/14fd2bc1c9dabcef2fc1f70e5d77cbd7.svg"  valign="-6.025px" width="118.064px" height="18.915px" style="display:inline;" alt="latex">.
 The corresponding algorithm reads:
 
 <img data-latex="
