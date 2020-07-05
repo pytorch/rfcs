@@ -574,9 +574,9 @@ there exists no such
 that 
 <img data-latex="${\boldsymbol b}+D{\boldsymbol i}' = {\boldsymbol i}$" src=".images/aaa7462a464d734ee3f32a74dff35003.svg"  valign="-1.093px" width="87.451px" height="15.054px" style="display:inline;" alt="latex">,
 and 
- <img data-latex="$0\leqslant i'_k<d'_k$" src=".images/a9dbedd047b01f90614210a5a45e26bd.svg"  valign="-4.809px" width="85.808px" height="17.698px" style="display:inline;" alt="latex">
+<img data-latex="$0\leqslant i'_k<d'_k$" src=".images/a9dbedd047b01f90614210a5a45e26bd.svg"  valign="-4.809px" width="85.808px" height="17.698px" style="display:inline;" alt="latex">
 hold, then the corresponding index 
- <img data-latex="${\boldsymbol i}\in I$" src=".images/56ce0d5a5aa6071fc1c041fb5f2d2ebf.svg"  valign="-0.673px" width="41.096px" height="12.608px" style="display:inline;" alt="latex">
+<img data-latex="${\boldsymbol i}\in I$" src=".images/56ce0d5a5aa6071fc1c041fb5f2d2ebf.svg"  valign="-0.673px" width="41.096px" height="12.608px" style="display:inline;" alt="latex">
 will be skipped.
 
 <!--EOF-->
