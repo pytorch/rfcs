@@ -324,14 +324,16 @@ reads
 
 <img data-latex="
 $$
-A'[{\boldsymbol i}'] = A[{\boldsymbol i}],
+\begin{aligned}
+A'[{\boldsymbol i}'] &= A[{\boldsymbol i}],\\
+{\boldsymbol i}'&=S{\boldsymbol i}
+\end{aligned}
 $$
-" src=".images/57fcf1d1e936852052a03e0b5f64f778.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/0b056e49c9e997001987e353312267d8.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-<img data-latex="${\boldsymbol i}'=S{\boldsymbol i}$" src=".images/5958701fc36589cffe40f8a6011570ca.svg"  width="55.347px" height="13.96px" style="display:inline;" alt="latex">
 where
 <img data-latex="$S$" src=".images/afb859031c2a86cafd54381d8a706e73.svg"  width="15.667px" height="11.764px" style="display:inline;" alt="latex">
-is
+is a
 <img data-latex="$M\times N$" src=".images/ab55e4fa03bec5add5b9b33c7c10f18e.svg"  valign="-1.435px" width="58.741px" height="13.198px" style="display:inline;" alt="latex">
 matrix of strides. 
 
