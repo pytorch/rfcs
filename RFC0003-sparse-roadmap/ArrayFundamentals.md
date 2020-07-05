@@ -340,23 +340,16 @@ There exists an inverse to this relation of indices that can be resolved using t
 
 <img data-latex="
 $$
-\begin{aligned}
-i_{\kappa(N_{j+1}-1)} &= i'_j \mod d_{\kappa(N_{j+1}-1)}\\
-&\vdots\\
-i_{\kappa(k)} &= \left.\left(i'_j - \sum_{k'=k+1}^{N_{j+1}-1} s_{j, k'} i_{\kappa(k')} \right)\right/d_{\kappa(k+1)} \mod d_{\kappa(k)}\\
-&\vdots\\
-i_{\kappa(N_{j})} &= \ldots
-\end{aligned}
+i_{\kappa(k)} = \left.i'_j\right/s_{j, k} \mod d_{\kappa(k)}
 $$
-" src=".images/2dbbd0dd871e69f29915c6e038084675.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
+" src=".images/4e405b6c5c8653df6f23591bbb85a6e3.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
-Note that this algorithm assumes that the stride values are
-ordered: 
-<img data-latex="$s_{j,k} \leqslant s_{j,k+1}$" src=".images/e5db6b392ed36b59ab1f83c09fcfa577.svg"  valign="-4.907px" width="87.8px" height="15.867px" style="display:inline;" alt="latex">
-for 
-<img data-latex="$N_{j}\leqslant k < N_{j+1}$" src=".images/cdc44213a9af8d1bc55043de28545b99.svg"  valign="-4.907px" width="112.755px" height="16.862px" style="display:inline;" alt="latex">.
-If these are not, the indices must be permuted to achieve the correct ordering before applying the algorithm.
+Note 1: This algorithm assumes that the stride values satisfy the relations 
+<img data-latex="$s_{j,k}=s_{j,k+1}d_{\kappa(k+1)}$" src=".images/5eec3928c9a496d469006ebc33a5b6d3.svg"  valign="-6.025px" width="133.35px" height="17.981px" style="display:inline;" alt="latex">
+from the dimension reduction setup. If not, the algorithm is not applicable in general.
 
+Note 2: The columns of a strides matrix contains exactly one non-zero element per column. So, the strides matrix can be stored as a row vector:
+<img data-latex="$s_k \equiv s_{j,k}$" src=".images/7aa1dd6d3ef7b29d7a17cfcbc8ac475d.svg"  valign="-4.907px" width="64.726px" height="12.89px" style="display:inline;" alt="latex">.
 
 ### Example: 3 -> 1
 
