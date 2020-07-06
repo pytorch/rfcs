@@ -182,7 +182,7 @@ A_{2,1,0}^{(20)} & A_{2,1,1}^{(21)} & A_{2,1,2}^{(22)} & A_{2,1,3}^{(23)}
 
 
 
-To better perceive the patterns of different reductions, let's
+To perceive the patterns of different reductions better, let's
 consider the 3-dimensional array with concrete values:
 
 <img data-latex="
@@ -234,6 +234,8 @@ consider the 3-dimensional array with concrete values:
 \end{tikzpicture}
 " src=".images/a443473cc52d07583a1289f78b6a1b64.svg"  style="display:block;margin-left:50px;margin-right:auto;padding:0px" alt="latex">
 
+Then there exists 24 combinations of dimension reductions, out of 18
+are non-trivial that are shown below:
 
 <img data-latex="
 \begin{equation}
