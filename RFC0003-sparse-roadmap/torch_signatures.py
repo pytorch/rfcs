@@ -151,6 +151,8 @@ def resolve_annotation(annot, orig_line, name):
         return typing.Union[int, typing.Tuple[int]]
     if annot == 'int or tuple':
         return typing.Union[int, typing.Tuple]
+    if annot == 'SparseTensor':
+        return torch.Tensor
     if '[' in annot and annot.endswith(']'):
         i = annot.index('[')
         t = annot[:i]
@@ -220,6 +222,8 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
                     args = args.replace('*size, out=', '*size, *, out=')
                 if args == 'arg0: Dict[str, IValue]':
                     args_lst = [args]
+                elif args == 'input:torch.Tensor, dim:int, dtype:Union[int, NoneType]=None':
+                    args_lst = ['input:torch.Tensor', 'dim:int', 'dtype:Union[int, None]=None']
                 else:
                     args_lst = args.split(',')
                 if first_arg:
@@ -525,9 +529,10 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
             if aname in ['threshold', 'value']:
                 parameters[index] = parameters[index].replace(annotation=float)
                 del parameters_without_annotations[aname]
-        elif name in ('softmin', 'softmax', 'log_softmax', 'log_softmin') and aname == '_stacklevel':
-            parameters[index] = parameters[index].replace(annotation=int)
-            del parameters_without_annotations[aname]
+        elif name in ('softmin', 'softmax', 'log_softmax', 'log_softmin'):
+            if aname == '_stacklevel':
+                parameters[index] = parameters[index].replace(annotation=int)
+                del parameters_without_annotations[aname]
         elif name == 'pairwise_distance':
             if aname in ('x1', 'x2'):
                 parameters[index] = parameters[index].replace(annotation=torch.Tensor)
@@ -716,6 +721,8 @@ def scan_module(module=torch, recursive=False, _cache=set()):
                     s += '-> object'
                 elif name == 'multi_head_attention_forward':
                     s += '-> (Tensor, Tensor)'
+                elif name in ['sum', 'addmm', 'mm']:
+                    s += '-> Tensor'
                 else:
                     #print(doc)
                     print(f'{name}: no return value')
@@ -734,6 +741,8 @@ def scan_module(module=torch, recursive=False, _cache=set()):
         if sig is None:
             print(f'{name}: failed to construct signature')
 
+        if member.__module__ is None:
+            member.__module__ = module.__name__
         yield member, sig
 
 if __name__ == '__main__':
