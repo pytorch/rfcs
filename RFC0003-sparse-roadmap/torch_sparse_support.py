@@ -99,15 +99,22 @@ def get_test_args(fname, sig, layout):
     if fname == 'addr': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2,), layout, rdist=rdist, dtype=dtype), make_tensor((2,), layout, rdist=rdist, dtype=dtype)), {}
     if fname in ['all', 'any']: return (make_tensor((2, 2), layout, dtype=bool, rdist=rdist),), {}
     if fname == 'baddbmm': return (make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype)), {}
-
-    if fname in ['bernoulli', 'cholesky']:
+    if fname in ['lu_unpack', 'lu_unpacktensor']:
+        t = make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype)
+        A_LU, pivots = t.lu()
+        return (A_LU, pivots), {}
+    if fname == 'mv': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2,), layout, rdist=rdist, dtype=dtype)), {}
+    if fname == 'batch_norm':
+        return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2, ), layout, rdist=rdist, dtype=dtype), make_tensor((2, ), layout, rdist=rdist, dtype=dtype)), {}
+    
+    if fname in ['bernoulli', 'cholesky', 'poisson']:
         rdist = 'uniform'
     if fname in ['cholesky']:
         rdist = 'posdefined'
     if fname in ['bincount', 'bitwise_and', 'bitwise_not', 'bitwise_or', 'bitwise_xor',
                  'int_repr']:
         dtype = int
-    if fname in ['bincount', 'combinations', 'dot', 'ger']:
+    if fname in ['bincount', 'combinations', 'dot', 'ger', 'vander']:
         size = (2,)
     if fname in ['bmm', 'conv1d', 'conv_transpose1d']:
         size = (2, 2, 2)
@@ -119,9 +126,14 @@ def get_test_args(fname, sig, layout):
         size = (3, 3)
     if fname in ['is_nonzero']:
         size = (1, )
-    if fname in ['imag']:
+    if fname in ['lobpcg']:
+        size = (9, 9)
+    if fname in ['lu_unpack']:
+        size = (3, 2, 2)
+    if fname in ['imag', 'real', 'view_as_real']:
         dtype = torch.cfloat
-    if fname in ['dequantize', 'int_repr']:
+    if fname in ['dequantize', 'int_repr', 'q_per_channel_axis', 'q_per_channel_scales', 'q_per_channel_zero_points',
+                 'q_scale', 'q_zero_point']:
         dtype = torch.qint32
     args = []
     for argname, params in sig.parameters.items():
@@ -175,6 +187,13 @@ def has_all_tensor_inputs(func, sig):
 
 
 def try_layout(func, sig, layout, must_pass=False):
+    allow_fail = [
+        'q_per_channel_axis',
+        'q_per_channel_scales',
+        'q_per_channel_zero_points',
+        'q_scale',
+        'q_zero_point',
+    ]
     try:
         test_args, test_kwargs = get_test_args(func.__name__, sig, layout)
         ok = True
@@ -196,7 +215,7 @@ def try_layout(func, sig, layout, must_pass=False):
                 status = f'{type(msg).__name__}: unsupported backend'
             else:
                 status = fail
-            if must_pass:
+            if must_pass and func.__name__ not in allow_fail:
                 print(func.__doc__)
                 print(f'{func.__name__}{test_args}')
                 #raise
