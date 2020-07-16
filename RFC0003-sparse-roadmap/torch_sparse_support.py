@@ -41,7 +41,7 @@ def make_tensor(shape, layout, dtype=float, rdist='randn'):
         if dtype in [bool]:
             return torch.randint(0, 1, shape, dtype=dtype)
         if dtype in [int]:
-            return torch.randint(0, 10, shape, dtype=dtype)
+            return torch.randint(0, 5, shape, dtype=dtype)
         if rdist == 'uniform':
             t = torch.empty(shape, dtype=dtype)
             t.uniform_()
@@ -67,6 +67,7 @@ def get_test_args(fname, sig, layout):
     rdist = 'randn'
     dtype = float
     size = (2, 2)
+    extra_kwargs = {}
     if fname == 'arange': return (10,), dict(layout=layout)
     if fname == 'range': return (0, 10), dict(layout=layout)
     if fname == 'bartlett_window': return (3,), dict(layout=layout)
@@ -106,8 +107,33 @@ def get_test_args(fname, sig, layout):
     if fname == 'mv': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2,), layout, rdist=rdist, dtype=dtype)), {}
     if fname == 'batch_norm':
         return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2, ), layout, rdist=rdist, dtype=dtype), make_tensor((2, ), layout, rdist=rdist, dtype=dtype)), {}
+    if fname == 'cross_entropy':
+        return (make_tensor((5, 5), layout, rdist=rdist, dtype=dtype), make_tensor((5,), layout, rdist=rdist, dtype=int),), {}
+    if fname == 'ctc_loss':
+        return (make_tensor((5, 5, 5), layout, rdist=rdist, dtype=dtype),
+                make_tensor((5, 5), layout, rdist=rdist, dtype=int),
+                make_tensor((5,), layout, rdist=rdist, dtype=int),
+                make_tensor((5,), layout, rdist=rdist, dtype=int),
+        ), {}
+    if fname == 'multilabel_margin_loss':
+        return (make_tensor((5, 5), layout, rdist=rdist, dtype=dtype),
+                make_tensor((5, 5), layout, rdist=rdist, dtype=int),
+        ), {}
+    if fname == 'nll_loss':
+        return (make_tensor((5, 5), layout, rdist=rdist, dtype=dtype),
+                make_tensor((5, ), layout, rdist=rdist, dtype=int),
+        ), {}
+    if fname == 'prelu':
+        return (make_tensor((5, 5), layout, rdist=rdist, dtype=dtype),
+                make_tensor((5, ), layout, rdist=rdist, dtype=dtype),
+        ), {}
+    if fname == 'addmm':
+        return (make_tensor((5, 5), torch.strided, rdist=rdist, dtype=dtype),
+                make_tensor((5, 5), layout, rdist=rdist, dtype=dtype),
+                make_tensor((5, 5), torch.strided, rdist=rdist, dtype=dtype),
+        ), {}
     
-    if fname in ['bernoulli', 'cholesky', 'poisson']:
+    if fname in ['bernoulli', 'cholesky', 'poisson', 'binary_cross_entropy']:
         rdist = 'uniform'
     if fname in ['cholesky']:
         rdist = 'posdefined'
@@ -116,9 +142,9 @@ def get_test_args(fname, sig, layout):
         dtype = int
     if fname in ['bincount', 'combinations', 'dot', 'ger', 'vander']:
         size = (2,)
-    if fname in ['bmm', 'conv1d', 'conv_transpose1d']:
+    if fname in ['bmm', 'conv1d', 'conv_transpose1d', 'bilinear']:
         size = (2, 2, 2)
-    if fname in ['conv2d', 'conv_transpose2d']:
+    if fname in ['conv2d', 'conv_transpose2d', 'grid_sample']:
         size = (2, 2, 2, 2)
     if fname in ['conv3d', 'conv_transpose3d']:
         size = (2, 2, 2, 2, 2)
@@ -135,6 +161,15 @@ def get_test_args(fname, sig, layout):
     if fname in ['dequantize', 'int_repr', 'q_per_channel_axis', 'q_per_channel_scales', 'q_per_channel_zero_points',
                  'q_scale', 'q_zero_point']:
         dtype = torch.qint32
+    if fname == 'interpolate':
+        size = (2, 2, 2)
+        extra_kwargs.update(size=1)
+    if fname in ['upsample']:
+        size = (2, 2, 2)
+        extra_kwargs.update(size=1)
+    if fname in ['upsample_bilinear', 'upsample_nearest']:
+        size = (2, 2, 2, 2)
+        extra_kwargs.update(size=1)
     args = []
     for argname, params in sig.parameters.items():
         if params.default is not inspect.Parameter.empty:
@@ -144,13 +179,13 @@ def get_test_args(fname, sig, layout):
             args.append(make_tensor(size, layout, dtype=dtype, rdist=rdist))
         else:
             raise NotImplementedError((fname, sig, layout))
-    return tuple(args), {}
+    return tuple(args), extra_kwargs
 
 
 def get_doclink(func):
     if func.__module__ == 'torch.sparse':
         return f'https://pytorch.org/docs/stable/sparse.html#torch.sparse.{func.__name__}'
-    if func.__module__ == 'nn.functional.html':
+    if func.__module__ == 'torch.nn.functional':
         return f'https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.{func.__name__}'
     if func.__name__ in ['conv1d', 'conv2d', 'conv3d', 'conv_transpose1d', 'conv_transpose2d', 'conv_transpose3d']:
         return f'https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.{func.__name__}'
@@ -187,19 +222,14 @@ def has_all_tensor_inputs(func, sig):
 
 
 def try_layout(func, sig, layout, must_pass=False):
-    allow_fail = [
-        'q_per_channel_axis',
-        'q_per_channel_scales',
-        'q_per_channel_zero_points',
-        'q_scale',
-        'q_zero_point',
-    ]
     try:
         test_args, test_kwargs = get_test_args(func.__name__, sig, layout)
         ok = True
     except Exception as msg:
         fail = str(msg).strip().splitlines()[0]
-        status = fail
+        if len(fail) > 40:
+            fail = fail[:38] + '...'
+        status = f'{type(msg).__name__}: {fail}'
         ok = False
     if ok:
         try:
@@ -214,13 +244,13 @@ def try_layout(func, sig, layout, must_pass=False):
             elif fail.startswith('Could not run') and 'with arguments from the' in fail:
                 status = f'{type(msg).__name__}: unsupported backend'
             else:
-                status = fail
-            if must_pass and func.__name__ not in allow_fail:
+                if len(fail) > 40:
+                    fail = fail[:38] + '...'
+                status = f'{type(msg).__name__}: {fail}'
+            if must_pass:
                 print(func.__doc__)
                 print(f'{func.__name__}{test_args}')
-                #raise
-    if len(status) > 80:
-        status = status[:78] + '...'
+                raise
     return status
 
 
@@ -251,9 +281,21 @@ def main(working_dir=None):
     lst = []
     for func, sig in all_functions(has_all_tensor_inputs):
         print(func.__module__, func.__name__, sig)
+
+        allow_fail = func.__name__ in [
+            'q_per_channel_axis',
+            'q_per_channel_scales',
+            'q_per_channel_zero_points',
+            'q_scale',
+            'q_zero_point',
+        ]
+        if func.__module__ == 'torch.sparse':
+            native_layout = torch.sparse_coo
+        else:
+            native_layout = torch.strided
         row = [get_docname(func, sig)]
         for layout in layouts:
-            row.append(try_layout(func, sig, layout, must_pass=layout==torch.strided))
+            row.append(try_layout(func, sig, layout, must_pass=(layout==native_layout and not allow_fail)))
         lst.append(row)
 
     text_utils.table(f, lst, list(range(len(headers))), headers)
