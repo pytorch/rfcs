@@ -1,4 +1,5 @@
 
+import io
 import os
 import sys
 import inspect
@@ -178,7 +179,8 @@ def get_test_args(fname, sig, layout):
         if annot is torch.Tensor:
             args.append(make_tensor(size, layout, dtype=dtype, rdist=rdist))
         else:
-            raise NotImplementedError((fname, sig, layout))
+            raise NotImplementedError(f'{fname}')
+            raise NotImplementedError(f'{fname}{sig}')
     return tuple(args), extra_kwargs
 
 
@@ -205,9 +207,39 @@ def all_functions(filter=lambda func, sig: True, _cache=[]):
         if filter(func, sig):
             yield func, sig
 
+def l_not(predicate):
+    def op(*args):
+        return not predicate(*args)
+    return op
+
+
+def l_and(*predicates):
+    def op(*args):
+        for predicate in predicates:
+            if not predicate(*args):
+                return False
+        return True
+    return op
+
+def l_or(*predicates):
+    def op(*args):
+        for predicate in predicates:
+            if predicate(*args):
+                return True
+        return False
+    return op
+
 
 def has_layout(func, sig):
+    if func.__name__.endswith('_'):
+        return False
     return 'layout' in sig.parameters
+
+
+def returns_tensor(func, sig):
+    if func.__name__.endswith('_'):
+        return False
+    return sig.return_annotation == torch.Tensor
 
 
 def has_all_tensor_inputs(func, sig):
@@ -219,6 +251,17 @@ def has_all_tensor_inputs(func, sig):
         if not (param.annotation == torch.Tensor):
             return False
     return True
+
+
+def has_tensor_input(func, sig):
+    if func.__name__.endswith('_'):
+        return False
+    for name, param in sig.parameters.items():
+        if param.default is not inspect.Parameter.empty:
+            break
+        if param.annotation == torch.Tensor:
+            return True
+    return False
 
 
 def try_layout(func, sig, layout, must_pass=False):
@@ -259,15 +302,19 @@ def main(working_dir=None):
     if working_dir is None:
         working_dir = os.path.dirname(__file__)
 
-    f = open(os.path.join(working_dir, 'SparseSupportState.md'), 'w')
+    predicates = []
 
+    f = io.StringIO('')
+    headers = ['Function'] + list(map(str, layouts))
+
+    f.write('# Tensor constructors\n\n')
+    
     f.write('## Functions with layout argument\n\n')
 
-    headers = ['Function'] + list(map(str, layouts))
-    
     lst = []
     failures = defaultdict(list)
-    for func, sig in all_functions(has_layout):
+    predicates.append(has_layout)
+    for func, sig in all_functions(predicates[-1]):
         row = [get_docname(func, sig)]
         for layout in layouts:
             row.append(try_layout(func, sig, layout))
@@ -279,7 +326,8 @@ def main(working_dir=None):
     f.write('## Functions with tensor inputs\n\n')
 
     lst = []
-    for func, sig in all_functions(has_all_tensor_inputs):
+    predicates.append(has_all_tensor_inputs)
+    for func, sig in all_functions(predicates[-1]):
         print(func.__module__, func.__name__, sig)
 
         allow_fail = func.__name__ in [
@@ -300,8 +348,20 @@ def main(working_dir=None):
 
     text_utils.table(f, lst, list(range(len(headers))), headers)
 
-    f.close()
+    f.write('# Functions not covered above\n\n')
 
+    lst = []
+    failures = defaultdict(list)
+    for func, sig in all_functions(l_not(l_or(*predicates))):
+        row = [get_docname(func, sig)]
+        lst.append(row)
+    text_utils.table(f, lst, list(range(1)), headers[:1])
+
+    f.write('\n\n')
+    s = f.getvalue()
+    f = open(os.path.join(working_dir, 'SparseSupportState.md'), 'w')
+    f.write(s)
+    f.close()
 
 if __name__ == '__main__':
     main()
