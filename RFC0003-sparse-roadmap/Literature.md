@@ -101,7 +101,21 @@ sparsity of the vector. Comparisons are done on K40, P100 and V100 GPUs.
 
 Link: https://arxiv.org/pdf/2006.10901.pdf
 
-This paper is a survey about various applications of sparse matrices in deep learning appliciations.
+This paper is about optimizing sparse matrix routines that appear in sparsified Deep Neural Networks.
+For this purpose, the authors optimize two sparse routines that widely appear in DNNs: sparse matrix-dense
+matrix multiplication and sampled dense-dense matrix multilication. The kernels are accelerated using
+a new technique that does not require acceptable levels of sparsity for achieving good performance
+on GPUs. Speedups of ~4x and ~2x are reported over cuSPARSE for SpMM and SDDMM respectively. They
+also demonstrate Transformer and MobileNet models that are faster and more memory efficient than
+their dense counter parts and yet preserve accuracy.
+
+A useful contribution is also a survey of the kind of data that is prevalent in Deep Learning
+workloads. Fig. 1 shows that they are in general less sparse, have longer rows and lesser
+variation in row length within a matrix than SuiteSparse.
+
+### The State of Sparsity in Deep Neural Networks
+
+Link: https://arxiv.org/abs/1902.09574
 
 ### High-Performance Sparse Matrix-Matrix Products on Intel KNL and Multicore Architectures
 
@@ -115,3 +129,4 @@ TODO:
 
 * https://ieeexplore.ieee.org/document/7092787
 * https://ieeexplore.ieee.org/abstract/document/7965199?casa_token=jFN4uanr7p4AAAAA:jD4CKEczgvpg6bZ09NHFRSrQivmw8CzmP7ak2owWzr1nSqnGh1MIJYzl1OtMj-LOXVBljRDwIwzf
+* https://ieeexplore.ieee.org/abstract/document/9136784
