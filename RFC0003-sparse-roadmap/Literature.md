@@ -28,6 +28,21 @@ Since sparse tensor usage in deep learning is a new topic, in this document
 we intend to collect various publications related to sparse tensor/matrix
 computational techniques and how they can possibly be used in PyTorch.
 
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-generate-toc again -->
+**Table of Contents**
+
+- [Literature](#literature)
+    - [Papers](#papers)
+        - [Ginkgo: A Modern Linear Operator Algebra Framework for HighPerformance Computing](#ginkgo-a-modern-linear-operator-algebra-framework-for-highperformance-computing)
+        - [Preparing Ginkgo for AMD GPUs –A Testimonial on Porting CUDA Code to HIP](#preparing-ginkgo-for-amd-gpus-a-testimonial-on-porting-cuda-code-to-hip)
+        - [Adaptive SpMV/SpMSpV on GPUs forInput Vectors of Varied Sparsity](#adaptive-spmvspmspv-on-gpus-forinput-vectors-of-varied-sparsity)
+        - [Sparse GPU Kernels for Deep Learning](#sparse-gpu-kernels-for-deep-learning)
+        - [High-Performance Sparse Matrix-Matrix Products on Intel KNL and Multicore Architectures](#high-performance-sparse-matrix-matrix-products-on-intel-knl-and-multicore-architectures)
+        - [Batched Sparse Matrix Multiplication for Accelerating Graph Convolutional Networks](#batched-sparse-matrix-multiplication-for-accelerating-graph-convolutional-networks)
+
+<!-- markdown-toc end -->
+
+
 ## Papers
 
 ### Ginkgo: A Modern Linear Operator Algebra Framework for HighPerformance Computing
@@ -88,6 +103,13 @@ Link: https://arxiv.org/pdf/2006.10901.pdf
 
 This paper is a survey about various applications of sparse matrices in deep learning appliciations.
 
+### High-Performance Sparse Matrix-Matrix Products on Intel KNL and Multicore Architectures
+
+Link: https://dl.acm.org/doi/abs/10.1145/3229710.3229720
+
+### Batched Sparse Matrix Multiplication for Accelerating Graph Convolutional Networks
+
+Link: https://arxiv.org/abs/1903.11409
 
 TODO:
 
