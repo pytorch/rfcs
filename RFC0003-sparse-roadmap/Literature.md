@@ -107,15 +107,38 @@ matrix multiplication and sampled dense-dense matrix multilication. The kernels 
 a new technique that does not require acceptable levels of sparsity for achieving good performance
 on GPUs. Speedups of ~4x and ~2x are reported over cuSPARSE for SpMM and SDDMM respectively. They
 also demonstrate Transformer and MobileNet models that are faster and more memory efficient than
-their dense counter parts and yet preserve accuracy.
+their dense counter parts and yet preserve accuracy. The dense matrices are stored in row major
+format and the sparse matrices in CSR.
 
 A useful contribution is also a survey of the kind of data that is prevalent in Deep Learning
 workloads. Fig. 1 shows that they are in general less sparse, have longer rows and lesser
-variation in row length within a matrix than SuiteSparse.
+variation in row length within a matrix than SuiteSparse. The datasets are those that are
+used for training the ResNet and Transformer models. It is interesting to note that the 
+SDDMM operation is useful in deep neural networks for a number of operations.
+
+It useful to note that the design of the SpMM is done considering real SpMM kernels that
+are found in models such as Transformer and EfficientNet. This major makes three major
+contributions to the SpMM algorithm: subwarp tiling for assigning the same warp to
+multiple rows, ROMA for better work distribution without zero padding and row swizzling
+for better load balance.
+
+Overall, a very good work for gaining insight into the actual workloads that exist
+for deep learning applications.
 
 ### The State of Sparsity in Deep Neural Networks
 
 Link: https://arxiv.org/abs/1902.09574
+
+This paper is a prelude to the previous one (same author), and features a large scale study of the
+the sparsity patterns and sparsity-accuracy tradeoffs that are achieved in training
+DNNs such as Transformer and ResNet-50. They show that previously proposed complex compression
+techniques achieve better accuracy when trading off for sparsity.
+
+They propose four techniques for inducing sparsity in neural networks.
+
+### Exploring Sparsity in Recurrent  Neural  Networks
+
+Link: https://arxiv.org/abs/1704.05119
 
 ### High-Performance Sparse Matrix-Matrix Products on Intel KNL and Multicore Architectures
 
@@ -124,6 +147,14 @@ Link: https://dl.acm.org/doi/abs/10.1145/3229710.3229720
 ### Batched Sparse Matrix Multiplication for Accelerating Graph Convolutional Networks
 
 Link: https://arxiv.org/abs/1903.11409
+
+### Solving Sparse Linear Systems Faster than Matrix Multiplication
+
+Link: https://arxiv.org/pdf/2007.10254.pdf
+
+### SPARSE LINEAR NETWORKS WITH A FIXED BUTTERFLY STRUCTURE: THEORY AND PRACTICE
+
+Link: https://arxiv.org/pdf/2007.08864.pdf
 
 TODO:
 
