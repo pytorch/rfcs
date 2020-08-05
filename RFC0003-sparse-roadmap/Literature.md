@@ -140,6 +140,23 @@ They propose four techniques for inducing sparsity in neural networks.
 
 Link: https://arxiv.org/abs/1704.05119
 
+This paper explores a technique for reducing the model size in RNNs by pruning weights
+during initial training of a network. The parameters of the network end up being sparse
+while the accuracy is still comparable to the original dense neural network. Pruning
+of the RNN thus yields a significant saving of memory and can also help in speed up
+of inference time using fast sparse matrix multiply.
+
+The models are trained on a speech recognition dataset of 2100 hours of English speech
+data and a validation set of 3.5 hours of multi-speaker data. They use the Deep Speech 2
+model for testing accuracy and sparsification of parameters. The pruning technique prunes
+the weights of each layer by dropping weights using a simple heuristic for dropping weights
+during the training phase and eventually achieves about 90% sparsity of the weight matrices.
+
+They currently use cuSPARSE for SpMV computation. They specifically comment that SpMV in cuSPARSE
+is suboptimal and that a better implementation that is capable of adapting to the sparse matrix
+found in this case should lead to better device utilization.
+
+
 ### High-Performance Sparse Matrix-Matrix Products on Intel KNL and Multicore Architectures
 
 Link: https://dl.acm.org/doi/abs/10.1145/3229710.3229720
@@ -155,6 +172,14 @@ Link: https://arxiv.org/pdf/2007.10254.pdf
 ### SPARSE LINEAR NETWORKS WITH A FIXED BUTTERFLY STRUCTURE: THEORY AND PRACTICE
 
 Link: https://arxiv.org/pdf/2007.08864.pdf
+
+### Efficient sparse matrix-vector multiplication on x86-based many-core processors
+
+Link: https://dl.acm.org/doi/10.1145/2464996.2465013
+
+### EXPLOITING SPARSENESS IN DEEP NEURAL NETWORKS FOR LARGE VOCABULARYSPEECH RECOGNITION
+
+Link: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/DNN-Sparse-ICASSP2012.pdf
 
 TODO:
 
