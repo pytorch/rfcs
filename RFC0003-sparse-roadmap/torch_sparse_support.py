@@ -3,11 +3,17 @@ import io
 import os
 import sys
 import inspect
+import itertools
 import torch
+import numpy
+import typing
+import configparser
+import torch_signatures
 from torch_signatures import scan_module
 import text_utils
-from collections import defaultdict
+from collections import defaultdict, abc
 
+modules = [torch, torch.nn.functional, torch.sparse]
 
 def get_layouts():
     """Return a list of public layouts.
@@ -65,6 +71,7 @@ def make_tensor(shape, layout, dtype=float, rdist='randn'):
 
 
 def get_test_args(fname, sig, layout):
+    default_int = 1
     rdist = 'randn'
     dtype = float
     size = (2, 2)
@@ -171,6 +178,11 @@ def get_test_args(fname, sig, layout):
     if fname in ['upsample_bilinear', 'upsample_nearest']:
         size = (2, 2, 2, 2)
         extra_kwargs.update(size=1)
+    if fname in ['channel_shuffle']:
+        size = (2, 2, 2)
+        default_int = 2
+    if fname == 'conv_tbc':
+        size = (2, 2, 2)
     args = []
     for argname, params in sig.parameters.items():
         if params.default is not inspect.Parameter.empty:
@@ -178,10 +190,19 @@ def get_test_args(fname, sig, layout):
         annot = params.annotation
         if annot is torch.Tensor:
             args.append(make_tensor(size, layout, dtype=dtype, rdist=rdist))
+        elif annot is int:
+            args.append(default_int)
         else:
-            raise NotImplementedError(f'{fname}')
-            raise NotImplementedError(f'{fname}{sig}')
+            raise NotImplementedError(f'{annot}')
     return tuple(args), extra_kwargs
+
+
+def get_seclink(section_title):
+    l = section_title.lower().replace('/', '').split()
+    return '#' + '-'.join(l)
+
+def get_secname(section_title):
+    return f'<a href="{get_seclink(section_title)}">{section_title}</a>'
 
 
 def get_doclink(func):
@@ -202,8 +223,8 @@ def get_docname(func, sig):
 
 def all_functions(filter=lambda func, sig: True, _cache=[]):
     if not _cache:
-        _cache.extend(scan_module(module=[torch, torch.nn.functional, torch.sparse]))
-    for func, sig in _cache:
+        _cache.extend(scan_module(module=modules))
+    for func, sig in set(_cache):
         if filter(func, sig):
             yield func, sig
 
@@ -221,11 +242,17 @@ def l_and(*predicates):
         return True
     return op
 
+
 def l_or(*predicates):
     def op(*args):
         for predicate in predicates:
-            if predicate(*args):
-                return True
+            if isinstance(predicate, (list, tuple)):
+                for p in predicate:
+                    if p(*args):
+                        return True
+            else:
+                if predicate(*args):
+                    return True
         return False
     return op
 
@@ -245,12 +272,14 @@ def returns_tensor(func, sig):
 def has_all_tensor_inputs(func, sig):
     if func.__name__.endswith('_'):
         return False
+    count = 0
     for name, param in sig.parameters.items():
         if param.default is not inspect.Parameter.empty:
             break
         if not (param.annotation == torch.Tensor):
             return False
-    return True
+        count += 1
+    return count > 0
 
 
 def has_tensor_input(func, sig):
@@ -297,15 +326,235 @@ def try_layout(func, sig, layout, must_pass=False):
     return status
 
 
-def main(working_dir=None):
+def get_required_atypes(sig):
+    lst = []
+    for aname, param in sig.parameters.items():
+        if param.default is not inspect.Parameter.empty:
+            break
+        lst.append(param)
+    return tuple(lst)
+        
+def variants(typ):
+    if typ in [torch.CompilationUnit, torch.ExtraFilesMap,
+                 torch.dtype, numpy.ndarray]:
+        yield typ
+        return
+    elif isinstance(typ, tuple):
+        for v in itertools.product(*(tuple(variants(a)) for a in typ)):
+            yield v
+        return
+    elif isinstance(typ, inspect.Parameter):
+        if typ.annotation is not typ.empty:
+            for v in variants(typ.annotation):
+                yield v
+        else:
+            yield typ
+        return
+    elif isinstance(typ, typing._Final):
+        if isinstance(typ, typing.TypeVar):
+            yield  typ
+        elif typ.__origin__ == typing.Union:
+            for t in typ.__args__:
+                for v in variants(t):
+                    yield v
+        elif typ.__origin__ == tuple:
+            if typ.__args__ is None:
+                yield typ
+            else:
+                for v in itertools.product(*(tuple(variants(a)) for a in typ.__args__)):
+                    yield typing.Tuple[v]
+        elif typ.__origin__ == list:
+            if typ.__args__ is None:
+                yield typ
+            else:
+                for v in itertools.product(*(tuple(variants(a)) for a in typ.__args__)):
+                    yield typing.List[v]
+        elif typ.__origin__ == abc.Sequence:
+            if typ.__args__ is None:
+                yield typ
+            else:
+                for v in itertools.product(*(tuple(variants(a)) for a in typ.__args__)):
+                    yield typing.Sequence[v]
+        elif typ.__origin__ == abc.Callable:
+            assert typ.__args__ == ()  # otherwise not implemented
+            yield typ
+        elif typ.__origin__ == type:
+            yield typ
+        else:
+            raise NotImplementedError((typ, type(typ), type(typ).__bases__))
+    elif typ is Ellipsis:
+        yield typ
+    elif isinstance(typ, type):
+        yield typ
+    elif isinstance(typ, torch_signatures.Name):
+        yield typ
+    else:
+        raise NotImplementedError((typ, type(typ), type(typ).__bases__))
+
+def has_tensor(typ):
+    if typ == torch.Tensor:
+        return True
+    elif isinstance(typ, typing._Final) and typ.__origin__ == typing.Union:
+        for t in typ.__args__:
+            if has_tensor(t):
+                return True
+    return False
+
+def has_int(typ):
+    if typ == int:
+        return True
+    elif isinstance(typ, typing._Final) and typ.__origin__ == typing.Union:
+        for t in typ.__args__:
+            if has_int(t):
+                return True
+    return False
+
+
+def make_test_value(typ):
+    if typ == torch.Tensor:
+        return f'make_{typ.__name__}(shape=(default_int, default_int), dtype=default_dtype, layout=default_layout, device=default_device)'
+    if isinstance(typ, type):
+        return f'default_{typ.__name__}'
+    if isinstance(typ, typing._Final):
+        if typ.__origin__ == tuple:
+            if typ.__args__ is None:
+                return 'default_tuple'
+            lst = []
+            for atyp in typ.__args__:
+                if atyp == Ellipsis:
+                    lst = lst + lst
+                    continue
+                lst.append(make_test_value(atyp))
+            return '('+', '.join(lst)+',)'
+        elif typ.__origin__ == list:
+            if typ.__args__ is None:
+                return 'default_list'
+            return '['+', '.join(map(make_test_value, typ.__args__))+',]'
+    if str(typ) == '*tensors':
+        return make_test_value(typing.Tuple[torch.Tensor, torch.Tensor])[1:-1]
+    if str(typ) == '*matrices':
+        return make_test_value(typing.Tuple[torch.Tensor, torch.Tensor])[1:-1]
+    if str(typ) == '*operands':
+        return make_test_value(typing.Tuple[torch.Tensor, torch.Tensor])[1:-1]
+    if str(typ) == '*size':
+        return make_test_value(typing.Tuple[int, int])[1:-1]
+    if str(typ) == '*args':
+        return '*tuple()'
+    if str(typ) == '**kwargs':
+        return '**dict()'
+    if typ == 'torch.dtype':
+        return 'default_dtype'
+    if typ == typing.Type[torch.Tensor]:
+        return 'default_Tensor_type'
+    if typ == typing.Callable:
+        return 'default_callable'
+    if isinstance(typ, inspect.Parameter):
+        return f'{typ}'
+    raise NotImplementedError((typ, type(typ), str(typ)))
+
+def ops2set(operations):
+    return set(w for w in operations.strip().split() if w)
+
+
+
+def make_classification_file(working_dir=None):   # OBSOLETE
+    """
+    Classifiers:
+    notensor - a function with no Tensor input nor output
+    constructor - a function that constructs new Tensor instances
+    inplace - a function that changes tensor inplace
+    unary - a function that represents an unary operation
+    binary - a function that represents a binary operation
+    reduction - a function that represents a reduction
+    elementwise - a function that is applied to tensor elementwise
+    array - a function that represents an array operation
+    """
+    
+    if working_dir is None:
+        working_dir = os.path.dirname(__file__)
+    classifier = Classifier.fromfile('pytorch_functions.ini', working_dir=working_dir)
+
+    count_classified = 0
+    count_unclassified = 0
+    lst = []
+    for func, sig in all_functions():
+        fullname = func.__module__ + '.' + func.__name__
+        sig_str = str(sig)
+        classifiers = classifier.get_classifiers(func, sig)
+        continue
+        section = classifier.get_section(func.__name__)
+        if section is not None:
+            classifiers.append(section)
+        
+        if 'Tensor' not in sig_str:
+            classifiers.append('notensor')
+        if 0:
+            if 'torch.layout' in sig_str:
+                classifiers.append('haslayout')
+            if 'torch.device' in sig_str:
+                classifiers.append('hasdevice')
+
+        if ('torch.layout' in sig_str or 'requires_grad' in sig_str or 'torch.device' in sig_str):
+            if sig.return_annotation == torch.Tensor:
+                classifiers.append('constructor')
+
+        if func.__name__.endswith('_'):
+            classifiers.append('inplace')
+
+        req_atypes = get_required_atypes(sig)
+
+        if (0 and len(req_atypes) == 1
+            and req_atypes[0].name == 'input'
+            and has_tensor(req_atypes[0].annotation)
+            and sig.return_annotation == torch.Tensor
+            and [param for name, param in sig.parameters.items() if name in ['dim', 'dims'] and has_int(param.annotation)]
+            and 'array' not in classifiers
+        ):
+            classifiers.append('reduction')
+        
+        if (0 and len(req_atypes) == 1
+            and req_atypes[0].name == 'input'
+            and has_tensor(req_atypes[0].annotation)
+            and sig.return_annotation == torch.Tensor
+            and 'reduction' not in classifiers
+            and 'array' not in classifiers
+        ):
+            classifiers.append('unary')
+        if (0 and len(req_atypes) == 2
+            and req_atypes[0].name == 'input'
+            and req_atypes[1].name == 'other'
+            and has_tensor(req_atypes[0].annotation)
+            and has_tensor(req_atypes[1].annotation)
+            and sig.return_annotation == torch.Tensor
+            and 'array' not in classifiers
+        ):
+            classifiers.append('binary')
+
+        if classifiers:
+            print(fullname, sig)
+            print('  classifiers:', ', '.join(classifiers))    
+            count_classified += 1
+            continue
+        count_unclassified += 1
+        print(fullname, sig)
+        #print('  classifiers:', ', '.join(classifiers))    
+        #for atypes in variants(req_atypes):
+        #    print('  sample:', ', '.join(map(make_test_value, atypes)))
+
+    print(f'unclassified/classified counts={count_unclassified}/{count_classified}')
+
+
+def main(working_dir=None):  # OBSOLETE
     layouts = get_layouts()
     if working_dir is None:
         working_dir = os.path.dirname(__file__)
 
+    func_cache = set()
+        
     predicates = []
 
     f = io.StringIO('')
-    headers = ['Function'] + list(map(str, layouts))
+    headers = ['Function'] + list(map(str, layouts)) + ['Signature']
 
     f.write('# Tensor constructors\n\n')
     
@@ -315,9 +564,12 @@ def main(working_dir=None):
     failures = defaultdict(list)
     predicates.append(has_layout)
     for func, sig in all_functions(predicates[-1]):
+        if func in func_cache: continue
+        func_cache.add(func)
         row = [get_docname(func, sig)]
         for layout in layouts:
             row.append(try_layout(func, sig, layout))
+        row.append(str(sig))
         lst.append(row)
     text_utils.table(f, lst, list(range(len(headers))), headers)
 
@@ -328,6 +580,8 @@ def main(working_dir=None):
     lst = []
     predicates.append(has_all_tensor_inputs)
     for func, sig in all_functions(predicates[-1]):
+        if func in func_cache: continue
+        func_cache.add(func)
         print(func.__module__, func.__name__, sig)
 
         allow_fail = func.__name__ in [
@@ -344,18 +598,51 @@ def main(working_dir=None):
         row = [get_docname(func, sig)]
         for layout in layouts:
             row.append(try_layout(func, sig, layout, must_pass=(layout==native_layout and not allow_fail)))
+        row.append(str(sig))
         lst.append(row)
 
     text_utils.table(f, lst, list(range(len(headers))), headers)
 
+    f.write('## Functions with tensor input\n\n')
+
+    lst = []
+    predicates.append(has_tensor_input)
+    for func, sig in all_functions(predicates[-1]):
+        if func in func_cache: continue
+        func_cache.add(func)
+        print(func.__module__, func.__name__, sig)
+
+        allow_fail = func.__name__ in [
+            'q_per_channel_axis',
+            'q_per_channel_scales',
+            'q_per_channel_zero_points',
+            'q_scale',
+            'q_zero_point',
+        ]
+        if func.__module__ == 'torch.sparse':
+            native_layout = torch.sparse_coo
+        else:
+            native_layout = torch.strided
+        row = [get_docname(func, sig)]
+        for layout in layouts:
+            row.append(try_layout(func, sig, layout, must_pass=(layout==native_layout and not allow_fail)))
+        row.append(str(sig))
+        lst.append(row)
+
+    text_utils.table(f, lst, list(range(len(headers))), headers)
+    
     f.write('# Functions not covered above\n\n')
 
     lst = []
     failures = defaultdict(list)
-    for func, sig in all_functions(l_not(l_or(*predicates))):
+    for func, sig in all_functions():
+        if func in func_cache: continue
+        func_cache.add(func)
         row = [get_docname(func, sig)]
+        row.append(str(sig))
         lst.append(row)
-    text_utils.table(f, lst, list(range(1)), headers[:1])
+
+    text_utils.table(f, lst, list(range(2)), headers[:1] + headers[-1:])
 
     f.write('\n\n')
     s = f.getvalue()
@@ -363,5 +650,208 @@ def main(working_dir=None):
     f.write(s)
     f.close()
 
+
+class Classifier:
+
+    @classmethod
+    def fromfile(cls, filename, working_dir=None):
+        if working_dir is None:
+            working_dir = os.path.dirname(__file__)
+        ini_file = os.path.join(working_dir, filename)
+        config = configparser.RawConfigParser()
+        config.read([ini_file])
+        return cls(config)
+
+    def __init__(self, config, working_dir=None):
+        if working_dir is None:
+            working_dir = os.path.dirname(__file__)
+        # replace names string content with a list
+        for section in config.sections():
+            if config.has_option(section, 'names'):
+                names = config.get(section, 'names')
+                names = list(sorted(w for w in names.strip().split() if w))
+                config.set(section, 'names', names)
+        #
+        self.working_dir = working_dir
+        self.config = config
+
+    def get_section(self, func, sig):
+        for section in self.config.sections():
+            if not self.config.has_option(section, 'names'):
+                continue
+            names = self.config.get(section, 'names')
+            if func.__name__ in names:
+                if not self.config.has_option(section, '_funcs'):
+                    self.config.set(section, '_funcs', [])
+                funcs = self.config.get(section, '_funcs')
+                funcs.append((func, sig))
+                return section
+
+    def __str__(self):
+        lines = []
+        for section in self.config.sections():
+            lines.append(f'[{section}]')
+            for option in self.config.options(section):
+                value = self.config.get(section, option)
+                if isinstance(value, list):
+                    value = ' '.join(map(str, value))
+                lines.append(f'{option}: {value}')
+        return '\n'.join(lines)
+
+    def get_classifiers(self, func, sig):
+        sig_str = str(sig)
+        
+        classifiers = []
+        section = self.get_section(func, sig)
+        if section is not None:
+            classifiers.append(section)
+
+        if 'Tensor' not in sig_str:
+            classifiers.append('notensor')
+
+        if func.__name__.endswith('_'):
+            classifiers.append('inplace')
+
+        if not classifiers:
+            print(f'no classifiers for {func.__name__}')
+
+        return classifiers
+
+    def make_sparse_support_state(self):
+        layouts = get_layouts()
+        lines = []
+        section_layout_ok_lst = defaultdict(lambda : defaultdict(int))
+        section_layout_skip_lst = defaultdict(lambda : defaultdict(int))
+        section_layout_fail_lst = defaultdict(lambda : defaultdict(int))
+        total_layout_ok_lst = defaultdict(int)
+        total_layout_skip_lst = defaultdict(int)
+        total_layout_fail_lst = defaultdict(int)
+        for section in self.config.sections():
+            funcs = []
+            if self.config.has_option(section, '_funcs'):
+                funcs = list(self.config.get(section, '_funcs'))
+            funcs1 = sorted((func.__name__, str(sig), i) for i, (func, sig) in enumerate(funcs))
+            funcs = list(funcs[i] for _, _, i in funcs1)
+                
+            print(f'section: {section}')
+            section_title = self.config.get(section, 'title')
+
+            skips = []
+            if self.config.has_option(section, 'skip_try_layout'):
+                skips = self.config.get(section, 'skip_try_layout')
+                skips = list(w for w in skips.strip().split() if w)
+
+            f = io.StringIO('')
+            headers = ['Function'] + list(map(str, layouts)) + ['Signature']
+            lst = []
+            for func, sig in funcs:
+                row = [get_docname(func, sig)]
+                for layout in layouts:
+                    #print(f'  try {layout}: {func.__name__}')
+                    if func.__name__ in skips:
+                        status = 'SKIP'
+                    else:
+                        status = try_layout(func, sig, layout)
+                    row.append(status)
+                    if status == 'OK':
+                        section_layout_ok_lst[section][layout] += 1
+                    elif status == 'SKIP':
+                        section_layout_skip_lst[section][layout] += 1
+                    else:
+                        section_layout_fail_lst[section][layout] += 1
+                row.append(str(sig))
+                lst.append(row)                
+
+
+            level = section.count('/') + 1
+            lines.append(f'\n\n{level * "#"} {section_title}\n')
+
+            if lst:
+                text_utils.table(f, lst, list(range(len(headers))), headers)
+                lines.append(f.getvalue())
+
+        f = io.StringIO('')
+        headers = ['Section'] + list(map(str, layouts))
+        lst = []
+        for section in self.config.sections():
+            section_title = self.config.get(section, 'title')
+            row = []
+            row.append(get_secname(section_title))
+            for layout in layouts:
+                l = []
+                v = section_layout_ok_lst[section][layout]
+                if v:
+                    total_layout_ok_lst[layout] += v
+                    l.append(f'{v} passed')
+                v = section_layout_fail_lst[section][layout]
+                if v:
+                    total_layout_fail_lst[layout] += v
+                    l.append(f'{v} failed')
+                v = section_layout_skip_lst[section][layout]
+                if v:
+                    total_layout_skip_lst[layout] += v
+                    l.append(f'{v} skipped')
+                row.append(', '.join(l))
+            lst.append(row)
+        row = ['Total']
+        for layout in layouts:
+            l = []
+            v = total_layout_ok_lst[layout]
+            if v:
+                l.append(f'{v} passed')
+            v = total_layout_fail_lst[layout]
+            if v:
+                l.append(f'{v} failed')
+            v = total_layout_skip_lst[layout]
+            if v:
+                l.append(f'{v} skipped')
+            row.append(', '.join(l))
+        lst.append(row)
+
+        text_utils.table(f, lst, list(range(len(headers))), headers)
+
+        namespaces = '\n'.join([f'- {m.__name__}' for m in modules])
+
+        lines_header = [
+            f'''
+This file is auto-generated, do not edit!
+
+# The state of PyTorch tensor layouts support
+
+The following table summarizes the state of PyTorch tensor layouts for
+different PyTorch functions from the following namespaces:
+{namespaces}
+
+The functions and possible failure messages are listed in the tables
+of subsequent sections.
+
+            ''',
+            f.getvalue(),
+            '''
+
+Notes:
+* TODO: all tests for strided layout should pass
+* TODO: enable tests for different devices: CPU, CUDA
+            '''
+        ]
+        lines = lines_header + lines
+
+        fn = os.path.join(self.working_dir, 'SparseSupportState.md')
+        print(f'Creating {fn}')
+        f = open(fn, 'w')
+        f.write('\n'.join(lines))
+        f.close()
+
+
+def main2(working_dir=None):
+    if working_dir is None:
+        working_dir = os.path.dirname(__file__)
+    classifier = Classifier.fromfile('pytorch_functions.ini', working_dir=working_dir)
+    for func, sig in all_functions():
+        classifiers = classifier.get_classifiers(func, sig)
+
+    classifier.make_sparse_support_state()
+
 if __name__ == '__main__':
-    main()
+    main2()
+    #make_classification_file()
