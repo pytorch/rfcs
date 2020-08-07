@@ -669,7 +669,7 @@ class Classifier:
         for section in config.sections():
             if config.has_option(section, 'names'):
                 names = config.get(section, 'names')
-                names = list(w for w in names.strip().split() if w)
+                names = list(sorted(w for w in names.strip().split() if w))
                 config.set(section, 'names', names)
         #
         self.working_dir = working_dir
