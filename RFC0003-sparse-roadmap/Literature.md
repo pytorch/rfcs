@@ -37,8 +37,14 @@ computational techniques and how they can possibly be used in PyTorch.
         - [Preparing Ginkgo for AMD GPUs –A Testimonial on Porting CUDA Code to HIP](#preparing-ginkgo-for-amd-gpus-a-testimonial-on-porting-cuda-code-to-hip)
         - [Adaptive SpMV/SpMSpV on GPUs forInput Vectors of Varied Sparsity](#adaptive-spmvspmspv-on-gpus-forinput-vectors-of-varied-sparsity)
         - [Sparse GPU Kernels for Deep Learning](#sparse-gpu-kernels-for-deep-learning)
-        - [High-Performance Sparse Matrix-Matrix Products on Intel KNL and Multicore Architectures](#high-performance-sparse-matrix-matrix-products-on-intel-knl-and-multicore-architectures)
+        - [The State of Sparsity in Deep Neural Networks](#the-state-of-sparsity-in-deep-neural-networks)
+        - [Exploring Sparsity in Recurrent  Neural  Networks](#exploring-sparsity-in-recurrent--neural--networks)
+        - [EXPLOITING SPARSENESS IN DEEP NEURAL NETWORKS FOR LARGE VOCABULARY SPEECH RECOGNITION](#exploiting-sparseness-in-deep-neural-networks-for-large-vocabulary-speech-recognition)
         - [Batched Sparse Matrix Multiplication for Accelerating Graph Convolutional Networks](#batched-sparse-matrix-multiplication-for-accelerating-graph-convolutional-networks)
+        - [Solving Sparse Linear Systems Faster than Matrix Multiplication](#solving-sparse-linear-systems-faster-than-matrix-multiplication)
+        - [SPARSE LINEAR NETWORKS WITH A FIXED BUTTERFLY STRUCTURE: THEORY AND PRACTICE](#sparse-linear-networks-with-a-fixed-butterfly-structure-theory-and-practice)
+        - [Efficient sparse matrix-vector multiplication on x86-based many-core processors](#efficient-sparse-matrix-vector-multiplication-on-x86-based-many-core-processors)
+        - [High-Performance Sparse Matrix-Matrix Products on Intel KNL and Multicore Architectures](#high-performance-sparse-matrix-matrix-products-on-intel-knl-and-multicore-architectures)
 
 <!-- markdown-toc end -->
 
