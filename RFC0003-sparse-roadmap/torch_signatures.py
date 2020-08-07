@@ -4,168 +4,151 @@ get the signatures of torch functions using their user-facing doc strings
 # Author: Pearu Peterson
 # Created: July 2020
 
+import os
 import re
 import inspect
 import types
 import typing
+import numpy
 import torch
 
-Value = typing.Union[int, float, complex, bool]
 
+class Importer:
+    def __init__(self, name):
+        self.name = name
+    def __repr__(self):
+        return f"__import__('{self.name}')"
+
+class Name(str):
+    def __repr__(self):
+        return str.__str__(self)
+
+
+Value = typing.Union[int, float]
+# Should Scalar be a Tensor with empty shape?
+Scalar = typing.Union[int, float]
+Sequence = typing.Union[list, tuple]
+ArrayLike = typing.Union[list, numpy.ndarray, torch.Tensor]
+IntSequence = typing.Union[typing.List[int]]
+TensorSequence = typing.Union[typing.List[torch.Tensor]]
+
+def decor_optional(func):
+    def wrapper(annot, orig_line, name):
+        optional = 'optional' in annot
+        if optional:
+            annot = annot.replace(', optional', '')
+            annot = annot.replace(',optional', '')
+        r = func(annot, orig_line, name)
+        if optional:
+            r = typing.Optional[r]
+        return r
+    return wrapper
+
+def _split_comma(line):
+    p = 0
+    new_line = ''
+    for c in line:
+        if c in '([{<':
+            p += 1
+        elif c in ')]}>':
+            p -= 1
+        elif c == ',' and p:
+            c = '@@COMMA@@'
+        new_line += c
+    return [w.replace('@@COMMA@@', ',') for w in new_line.split(',')]
+
+
+@decor_optional
 def resolve_annotation(annot, orig_line, name):
-    if 'optional' in annot:
-        annot = annot.replace(', optional', '')
-        annot = annot.replace(',optional', '')
-    if annot.startswith(':class:`'):
-        annot = annot[8:-1].strip()
-    if annot == 'None':
-        return None
-    if annot in ['object', 'Object']:
-        return object
-    if annot in ['``int``', 'int', 'Optional[int]', 'integer']:
-        return int
-    if annot in ['boolean', 'bool', '(bool)']:
-        return bool
-    if annot == 'tuple':
-        return tuple
-    if annot == 'list':
-        return list
-    if annot == 'dict':
-        return dict
-    if annot in ['string', 'str']:
-        return str
-    if annot == 'float':
-        return float
-    if annot == 'int...':
-        return typing.Sequence[int]
-    if annot == 'seq':
-        return typing.Sequence
-    if annot == 'array_like':
-        return typing.Sequence
-    if annot in ['tuple of ints', 'Tuple[int]']:
-        return typing.Tuple[int]
-    if annot == 'int or tuple of ints':
-        return typing.Union[int, typing.Tuple[int]]
-    if annot == 'tuple or ints':  # should be 'tuple of ints'
-        return typing.Tuple[int]
-    if annot == 'a list or tuple':
-        return typing.Union[typing.List, typing.Tuple]
-    if annot == 'List of Tensors':
-        return typing.List[torch.Tensor]
-    if annot == 'sequence of Tensors':
-        return typing.Sequence[torch.Tensor]
-    if annot == 'LongTensor or tuple of LongTensors':
-        return typing.Union[torch.LongTensor, typing.Tuple[torch.LongTensor]]
-    if annot == 'tuple of LongTensor':
-        return typing.Tuple[torch.LongTensor]
-    if annot in ['Tensor', 'Optional[torch.Tensor]', 'tensor', 'at::Tensor']:
-        return torch.Tensor
-    if annot == 'LongTensor':
-        return torch.LongTensor
-    if annot == 'IntTensor':
-        return torch.IntTensor
-    if annot == 'ByteTensor':
-        return torch.ByteTensor
-    if annot == 'BoolTensor':
-        return torch.BoolTensor
-    if annot == 'Generator':
-        return torch.Generator
-    if annot == 'dtype':
-        return torch.dtype
-    if annot in ('Tensor or float', 'float or tensor'):
-        return typing.Union[torch.Tensor, float]
-    if annot == 'Number':
-        return typing.Union[int, float, complex]
-    if annot == 'Value':
-        return Value
-    if annot == 'Tensor or Number':
-        return typing.Union[torch.Tensor, int, float, complex]
-    if annot == 'Tensor or int':
-        return typing.Union[torch.Tensor, int]
-    if annot == 'Tensor or Scalar':
-        return typing.Union[torch.Tensor, int, float, complex, bool]
-    if annot == '(Tensor, LongTensor)':
-        return typing.Tuple[torch.Tensor, torch.LongTensor]
-    if annot == '(Tensor, Tensor)':
-        return typing.Tuple[torch.Tensor, torch.Tensor]
-    if annot == '(Tensor, Tensor, Tensor)':
-        return typing.Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-    if annot == 'list, tuple, or :class:`torch.Size`':
-        return typing.Union[list, tuple, torch.Size]
-    if annot == 'list or :class:`torch.Size`':
-        return typing.Union[list, torch.Size]
-    if annot == 'c10::FunctionSchema':
-        return torch.FunctionSchema
-    if annot == 'torch::jit::Graph':
-        return torch.Graph
-    if annot == 'List[List[torch.autograd.ProfilerEvent]]':
-        return typing.List[typing.List[torch.autograd.ProfilerEvent]]
-    if annot == 'List[at::Tensor]':
-        return typing.List[torch.Tensor]
-    if annot == 'List[int]':
-        return typing.List[int]
-    if annot == 'List[List[int]]':
-        return typing.List[typing.List[int]]
-    if annot == 'List[bool]':
-        return typing.List[bool]
-    if annot == 'List[torch.distributed.ProcessGroup]':
-        return typing.List[torch.distributed.ProcessGroup]
-    if annot.startswith('torch.'):
-        return eval(annot, dict(torch=torch), {})
-    if annot.startswith('Device ordinal (Integer)'):
-        return int
-    if annot == 'callable':
-        return typing.Callable
-    if annot == 'type or string':
-        return typing.Union[type, str]
-    if annot == 'int or tuple of two lists of integers':
-        return typing.Union[int, typing.Tuple[typing.List[int]]]
-    if annot == '(Tensor, IntTensor, Optional[IntTensor])':
-        return typing.Tuple[torch.Tensor, torch.IntTensor, typing.Optional[torch.IntTensor]]
-    if annot == 'Sequence[Tensor]':
-        return typing.Sequence[torch.Tensor]
-    if annot == 'Tuple[Tensor]':
-        return typing.Tuple[torch.Tensor]
-    if annot == 'Module':
-        return types.ModuleType
-    if annot == 'function':
-        return types.FunctionType
+    if annot.startswith(':class:`'): annot = annot[8:-1].strip()
+    if annot == 'type' and name == 'set_default_tensor_type':
+        return typing.Type[torch.Tensor]
+    if annot in ['None', 'NoneType']: return None
+    if annot in ['object', 'Object']: return object  # should we use Any?
+    if annot in ['``int``', 'int', 'integer']: return int
+    if annot.startswith('Device ordinal (Integer)'): return int
+    if annot == 'tuple': return tuple
+    if annot in ['a list', 'list']: return list
+    if annot == 'dict': return dict
+    if annot in ['string', 'str']: return str
+    if annot == 'float': return float
+    if annot == 'int...': return typing.Tuple[int]  # Ellipses are supported starting from Python 3.8
+    if annot == 'seq': return IntSequence
+    if annot == 'array_like': return ArrayLike
+    if annot in ['boolean', 'bool', '(bool)']: return bool
+    if annot in ['tuple of ints',
+                 'tuple or ints']:  # `or` is a typo
+        return typing.Tuple[int, ...]
+    if annot == 'tuple of two lists of integers':
+        return typing.Tuple[typing.List[int], typing.List[int]]
+    if annot == 'List of Tensors': return typing.List[torch.Tensor]
+    if annot == 'sequence of Tensors': return TensorSequence
+    if annot.startswith('tuple of LongTensor'): return typing.Tuple[torch.LongTensor, ...]
+    if annot in ['Tensor', 'tensor', 'at::Tensor']: return torch.Tensor
+    if annot == 'LongTensor': return torch.LongTensor
+    if annot == 'IntTensor': return torch.IntTensor
+    if annot == 'ByteTensor': return torch.ByteTensor
+    if annot == 'BoolTensor': return torch.BoolTensor
+    if annot == 'SparseTensor': return torch.Tensor
+    if annot == 'Generator': return torch.Generator
+    if annot in ['torch.dtype', 'dtype']: return Name('torch.dtype')
+    if annot == 'Number': return torch.types.Number
+    if annot == 'Value': return Value
+    if annot == 'Scalar': return Scalar
+    if annot == 'c10::FunctionSchema': return torch.FunctionSchema
+    if annot == 'torch::jit::Graph': return torch.Graph
+    if annot == 'callable': return typing.Callable
+    if annot == 'Module': return types.ModuleType
+    if annot == 'function': return types.FunctionType
     if annot in ('IValue', 'handle', 'cpp_function'):
         print(f'{name}: returning annotation {annot!r} as it is')
         return annot
-    if annot == 'torch::jit::Module':
-        return torch.jit.Module
-    if annot == 'c10::Type':
-        return torch.Type
-    if annot == 'torch::jit::Gradient':
-        return torch.Gradient
-    if annot == 'Tuple[Callable[[torch._C.ScriptModule], None], Callable[[torch._C.ScriptFunction], None]]':
-        return typing.Tuple[typing.Callable[[torch.ScriptModule], None], typing.Callable[[torch.ScriptModule], None]]
-    if annot == 'torch::jit::Block':
-        return torch.Block
-    if annot == 'int or Tuple[int] or Tuple[int, int] or Tuple[int, int, int]':
-        return typing.Union[int, typing.Tuple[int]]
-    if annot == 'float or Tuple[float]':
-        return typing.Union[float, typing.Tuple[float]]
-    if annot in ['int or Tuple[int, int]', 'int or Tuple[int, int] or Tuple[int, int, int]']:
-        return typing.Union[int, typing.Tuple[int]]
-    if annot == 'int or tuple':
-        return typing.Union[int, typing.Tuple]
-    if annot == 'SparseTensor':
-        return torch.Tensor
+    if annot == 'torch::jit::Module': return torch.jit.Module
+    if annot == 'c10::Type': return torch.Type
+    if annot == 'torch::jit::Gradient': return torch.Gradient
+    if annot == 'torch::jit::Block': return torch.Block
+    if annot == '...': return Ellipsis
+    if annot.startswith('torch.'):
+        return eval(annot, dict(torch=torch), {})
+    if annot.startswith('os.'): return eval(annot, dict(os=os), {})
+    if annot[0] + annot[-1] == '()':
+        lst = []
+        for a in _split_comma(annot[1:-1]):
+            a = a.strip()
+            lst.append(resolve_annotation(a, orig_line, name))
+        return typing.Tuple[tuple(lst)]
+    if ' or ' in annot:
+        lst = []
+        if ', or ' in annot:
+            annot = ' or '.join(_split_comma(annot.replace(', or ', ', ')))
+        for a in annot.split(' or '):
+            a = a.strip()
+            lst.append(resolve_annotation(a, orig_line, name))
+        return typing.Union[tuple(lst)]
+
     if '[' in annot and annot.endswith(']'):
+        # TODO: Tuple[int] means a tuple of single int item but the
+        # docs may use it to mean a tuple of integers, then one should
+        # use Tuple[int, ...].
         i = annot.index('[')
         t = annot[:i]
         a = annot[i+1:-1].strip()
         if hasattr(typing, t):
             args = []
-            for a_ in a.split(','):
+            for a_ in _split_comma(a):
                 a_ = a_.strip()
                 if not a_:
                     continue
                 args.append(resolve_annotation(a_, orig_line, name))
+            if len(args) == 1:
+                return getattr(typing, t)[args[0]]
             return getattr(typing, t)[tuple(args)]
+
+    if hasattr(typing, annot):
+        return getattr(typing, annot)
+        
     raise NotImplementedError((annot, orig_line, name))
+
 
 def get_signature_from_doc(name, member, doc, first_arg=''):
     doc = doc.lstrip()
@@ -220,12 +203,7 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
                     args = args.replace('input *', 'input, *')
                 if name in ['empty', 'ones', 'rand', 'randn', 'zeros']:
                     args = args.replace('*size, out=', '*size, *, out=')
-                if args == 'arg0: Dict[str, IValue]':
-                    args_lst = [args]
-                elif args == 'input:torch.Tensor, dim:int, dtype:Union[int, NoneType]=None':
-                    args_lst = ['input:torch.Tensor', 'dim:int', 'dtype:Union[int, None]=None']
-                else:
-                    args_lst = args.split(',')
+                args_lst = _split_comma(args)
                 if first_arg:
                     args_lst.insert(0, first_arg)
                 for a in args_lst:
@@ -248,8 +226,7 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
                     elif '=' in a:
                         aname, default = a.split('=', 1)
                         if name in ['load', 'save'] and aname == 'pickle_module' and default.startswith("<module 'pickle'"):
-                            import pickle
-                            default = pickle
+                            default = Importer('pickle')
                             if ':' not in aname:
                                 aname += ':Module'
                         else:
@@ -347,7 +324,7 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
                         'fold', 'feature_alpha_dropout', 'elu',
                         'adaptive_max_pool1d_with_indices', 'adaptive_max_pool2d_with_indices', 'adaptive_max_pool3d_with_indices',
                         'bilinear', 'batch_norm', 'instance_norm',
-                        'lp_pool1d', 'lp_pool2d', 'lp_pool3d',
+                        'lp_pool1d', 'lp_pool2d', 'lp_pool3d', 'silu',
             ]:
                 parameters[index] = parameters[index].replace(annotation=torch.Tensor)
                 del parameters_without_annotations[aname]
@@ -363,7 +340,7 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
                 parameters[index] = parameters[index].replace(annotation=torch.Tensor)
                 del parameters_without_annotations[aname]
         elif aname == 'other':
-            if name in ['equal', 'bitwise_xor', 'bitwise_or', 'bitwise_and', 'sub']:
+            if name in ['equal', 'bitwise_xor', 'bitwise_or', 'bitwise_and', 'sub', 'gcd_', 'lcm_']:
                 parameters[index] = parameters[index].replace(annotation=torch.Tensor)
                 del parameters_without_annotations[aname]
         elif aname in ['tensor', 'tensor1']:
@@ -569,7 +546,7 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
                 del parameters_without_annotations[aname]
         elif name in ['has_torch_function', 'handle_torch_function']:
             if aname == 'relevant_args':
-                parameters[index] = parameters[index].replace(annotation=typing.Sequence)
+                parameters[index] = parameters[index].replace(annotation=Sequence)
                 del parameters_without_annotations[aname]
             elif aname == 'public_api':
                 parameters[index] = parameters[index].replace(annotation=typing.Callable)
@@ -588,10 +565,6 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
             elif aname in ('log_probs', 'targets', 'input_lengths', 'target_lengths'):
                 parameters[index] = parameters[index].replace(annotation=torch.Tensor)
                 del parameters_without_annotations[aname]
-    if parameters_without_annotations and 0:
-        print(doc)
-        print(name, parameters_without_annotations)
-
     if name in ['arange', 'randint', 'range']:
         print(f'{name}: remove default from {parameters[0]}')
         parameters[0] = parameters[0].replace(default=inspect.Parameter.empty)
@@ -604,6 +577,7 @@ def get_signature_from_doc(name, member, doc, first_arg=''):
         return
 
     return inspect.Signature(parameters=parameters, return_annotation=return_annotation)
+
 
 def scan_module(module=torch, recursive=False, _cache=set()):
     """
@@ -619,7 +593,9 @@ def scan_module(module=torch, recursive=False, _cache=set()):
         return
     _cache.add(module.__name__)
     for name, member in sorted(module.__dict__.items()):
-        if isinstance(member, (bool, str, type, dict, list, tuple, int, float, complex, typing._FinalTypingBase)):
+        if isinstance(member, (bool, str, type, dict, list, tuple, int, float, complex)):
+            continue
+        if hasattr(typing, name):
             continue
         if not callable(member):
             if name == 'classes':
@@ -630,6 +606,7 @@ def scan_module(module=torch, recursive=False, _cache=set()):
                 for r in scan_module(module=member, recursive=recursive):
                     yield r
             continue
+
         doc = getattr(member, '__doc__')
         first_arg = ''
 
@@ -714,6 +691,10 @@ def scan_module(module=torch, recursive=False, _cache=set()):
                               'fractional_max_pool2d', 'fractional_max_pool3d', 'max_pool1d',
                               '_max_pool2d', '_max_pool3d',
                               'fractional_max_pool1d_with_indices', 'fractional_max_pool2d_with_indices', 'fractional_max_pool3d_with_indices',
+                              'silu'  # ???
+                ]:
+                    s += '-> Tensor'
+                elif name in [
                               'boolean_dispatch', 'instance_norm'
                 ]:
                     s += '-> None'
@@ -747,5 +728,5 @@ def scan_module(module=torch, recursive=False, _cache=set()):
 
 if __name__ == '__main__':
     for func, sig in scan_module(module=[torch, torch.nn.functional]):
-        print(func.__name__, sig)
+        #print(func, sig)
         pass
