@@ -729,8 +729,10 @@ class Classifier:
         for section in self.config.sections():
             funcs = []
             if self.config.has_option(section, '_funcs'):
-                funcs = self.config.get(section, '_funcs')
-
+                funcs = list(self.config.get(section, '_funcs'))
+            funcs1 = sorted((func.__name__, str(sig), i) for i, (func, sig) in enumerate(funcs))
+            funcs = list(funcs[i] for _, _, i in funcs1)
+                
             print(f'section: {section}')
             section_title = self.config.get(section, 'title')
 
