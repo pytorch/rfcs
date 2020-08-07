@@ -41,7 +41,7 @@ watch-latex-md:no-force-rerender
   - not implemented - 9 cases
   - ASSERT FAILED - 8 cases
   - only supports strided layout - 7 cases
-  - varia - ca 65 cases, same are failures for strided format
+  - varia - ca 65 cases, some are failures for strided format
 
 ## What is needed?
 
