@@ -23,13 +23,6 @@ watch-latex-md:no-force-rerender
 -->
 
 
-
-
-Changing this meeting to be longer and focused on the plan for sparse
-tensor support. I'd like to get to a project plan with rough
-estimates, figuring out what are our priorities for the next 3-6
-months.
-
 # Intermediate plan for the sparse tensor support
 
 ## What we have?
