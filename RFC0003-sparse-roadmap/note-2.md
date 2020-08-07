@@ -51,6 +51,8 @@ watch-latex-md:no-force-rerender
   
   - Introduce (a procedure for) new sparse storage formats -> increased performance for domain-specific sparse applications
 
+  - Estimate when using a sparse storage can advantageous performance-wise. The estimate can be function and data dependent.
+
 ## Low-hanging and impactful actions
 
 - Introduce fill-value attribute to sparse tensors, enables supporting
