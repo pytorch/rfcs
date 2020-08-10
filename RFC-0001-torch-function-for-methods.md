@@ -35,7 +35,7 @@ of scope for this proposal and we propose to defer it to a later proposal.
 
 We propose to solve this problem with the following changes to PyTorch:
 
-1. Make methods and operators of `torch.Tensor` go through the
+1. Make methods, operators and properties of `torch.Tensor` go through the
    `__torch_function__` machinery.
 2. Add a `types` argument to `__torch_function__`, to make it match NumPy's
    `__array_function__`.
@@ -70,10 +70,10 @@ s3.a  # 1
 ```
 
 Additionally, it will provide subclass authors the ability to also modify the
-results of methods and operators in `__torch_function__`, along with regular
-function calls, and to modify the result to their specific use-case, perform
-logging, or otherwise change the result or the action of the method. For
-example:
+results of methods, operators and properties in `__torch_function__`, along with
+regular function calls, and to modify the result to their specific use-case,
+perform logging, or otherwise change the result or the action of the method.
+For example:
 
 ```python
 import logging
@@ -247,9 +247,9 @@ One can check for compatibility with supported classes in the following manner:
 
 ```python
 class MyTensor:
+    HANDLED_CLASSES = (MyTensor, Tensor, ...)
     @classmethod
     def __torch_function__(cls, func, types, args, kwargs):
-        HANDLED_CLASSES = (MyTensor, Tensor, ...)
         if not issubclass(t, HANDLED_CLASSES) for t in types:
             return NotImplemented
         # Do further processing here.
@@ -407,7 +407,114 @@ To implement this proposal requires three main steps:
    arguments that are instances of a type in `types` are processed.
 2. Making sure that all `Tensor` methods except `__new__` and `__init__` go
    through `__torch_function__`.
-3. Add `Tensor.as_subclass` and make `@torch_function_dispatch` public API. 
+3. Add `Tensor.as_subclass` and `@torch_function_dispatch` as public API.
+
+### Implementing only some methods but not others
+One can use the dictionary idiom to only implement some methods but not others.
+A code example follows:
+
+```python
+HANDLED_FUNCTIONS = {}
+
+def implements(func):
+    def inner(implementation):
+        HANDLED_FUNCTIONS[func] = implementation
+        return implementation
+
+@implements(torch.add)
+def my_add(self, other):
+    ...
+
+class TensorLike:
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
+        implementation = HANDLED_FUNCTIONS.get(func, None)
+        if implementation is None:
+            return NotImplemented
+        
+        return implementation(*args, **kwargs)
+```
+
+For subclasses, one can also choose to use the fallback implementation if
+a specialized implementation isn't available using `super`, as shown below.
+
+```python
+class SubTensor(torch.Tensor):
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
+        implementation = HANDLED_FUNCTIONS.get(func, None)
+        if implementation is None:
+            return super().__torch_function__(
+                func, types, args, kwargs
+            )
+        
+        return implementation(*args, **kwargs)
+```
+
+A call to `super().__torch_function__` can also be used to call the fallback
+implementation within any other function.
+
+The examples we have seen here actually specify what we anticipate will be two
+common patterns of using `__torch_function__`: `LoggingTensor` is an example
+of a global hook, and the two examples above show a way to achieve specialised
+implementations of particular functions.
+
+### Functions vs Methods vs Properties
+Both functions and methods/properties on `torch.Tensor` will be possible arguments to
+`__torch_function__`. These are different in subtle but important ways, and
+in some cases it is required to handle them differently. For instance,
+`torch.Tensor` methods/properties have the following properties:
+
+1. They can only accept `torch.Tensor` instances as the first argument.
+2. They *may or may not* have a `__module__` defined.
+
+Even classes implementing `__torch_function__` that aren't subclasses
+can have methods passed in. It is required to treat this case with care.
+Consider the following code:
+
+```python
+class TensorLike:
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
+        print(func.__name__)
+
+torch.tensor([5]) + TensorLike()  # prints "__add__"
+```
+If, in this case, we are using the default implementation, of `func`, and a
+`torch.Tensor` instance is not passed in, an error will be raised. To handle
+this case, we have provided a utility method,
+`torch.overrides.is_tensor_method_or_property`, to determine whether something
+is a `torch.Tensor` method/property.
+
+For properties, their `__get__` method is passed in. For example,for
+`torch.Tensor.grad`, `torch.Tensor.grad.__get__` is passed in as `func`.
+
+### Wrapping `torch.Tensor`
+Sometimes it's useful to wrap `torch.Tensor` rather than have a subclass.
+The following class shows how this is possible in practice:
+
+```python
+def wrap(f):
+    @functools.wraps(f)
+    def inner(self, *a, **kw):
+        # Call `f` with all-unwrapped args
+        # Possibly wrap back result before returning
+
+class WrappedTensor:
+    def __init__(self, towrap: Tensor):
+        self._wrapped = towrap
+
+    def __getattr__(self, name):
+        base = getattr(torch.Tensor, name)
+        if not callable(base):
+            return property(wrap(base.__get__))
+        
+        return wrap(base)
+    
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
+        return wrap(func)(*args, **kwargs)
+```
 
 ## Proposed alternatives
 One alternative that has been proposed is to automatically pass through
