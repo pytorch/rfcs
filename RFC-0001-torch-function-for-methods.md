@@ -459,36 +459,6 @@ common patterns of using `__torch_function__`: `LoggingTensor` is an example
 of a global hook, and the two examples above show a way to achieve specialised
 implementations of particular functions.
 
-### Functions vs Methods vs Properties
-Both functions and methods/properties on `torch.Tensor` will be possible arguments to
-`__torch_function__`. These are different in subtle but important ways, and
-in some cases it is required to handle them differently. For instance,
-`torch.Tensor` methods/properties have the following properties:
-
-1. They can only accept `torch.Tensor` instances as the first argument.
-2. They *may or may not* have a `__module__` defined.
-
-Even classes implementing `__torch_function__` that aren't subclasses
-can have methods passed in. It is required to treat this case with care.
-Consider the following code:
-
-```python
-class TensorLike:
-    @classmethod
-    def __torch_function__(cls, func, types, args, kwargs):
-        print(func.__name__)
-
-torch.tensor([5]) + TensorLike()  # prints "__add__"
-```
-If, in this case, we are using the default implementation, of `func`, and a
-`torch.Tensor` instance is not passed in, an error will be raised. To handle
-this case, we have provided a utility method,
-`torch.overrides.is_tensor_method_or_property`, to determine whether something
-is a `torch.Tensor` method/property.
-
-For properties, their `__get__` method is passed in. For example,for
-`torch.Tensor.grad`, `torch.Tensor.grad.__get__` is passed in as `func`.
-
 ### Wrapping `torch.Tensor`
 Sometimes it's useful to wrap `torch.Tensor` rather than have a subclass.
 The following class shows how this is possible in practice:
@@ -521,6 +491,36 @@ One alternative that has been proposed is to automatically pass through
 subclasses a-la NumPy and provide a `__torch_finalize__` method that allows for
 any post-processing of the result. While this would achieve most goals, it
 would miss out on the one to provide a hook for methods and operators.
+
+### Appendix: Special handling for `torch.Tensor` properties/methods
+Both functions and methods/properties on `torch.Tensor` will be possible arguments to
+`__torch_function__`. These are different in subtle but important ways, and
+in some cases it is required to handle them differently. For instance,
+`torch.Tensor` methods/properties have the following properties:
+
+1. They can only accept `torch.Tensor` instances as the first argument.
+2. They *may or may not* have a `__module__` defined.
+
+Even classes implementing `__torch_function__` that aren't subclasses
+can have methods passed in. It is required to treat this case with care.
+Consider the following code:
+
+```python
+class TensorLike:
+    @classmethod
+    def __torch_function__(cls, func, types, args, kwargs):
+        print(func.__name__)
+
+torch.tensor([5]) + TensorLike()  # prints "add"
+```
+If, in this case, we are using the default implementation, of `func`, and a
+`torch.Tensor` instance is not passed in, an error will be raised. To handle
+this case, we have provided a utility method,
+`torch.overrides.is_tensor_method_or_property`, to determine whether something
+is a `torch.Tensor` method/property.
+
+For properties, their `__get__` method is passed in. For example,for
+`torch.Tensor.grad`, `torch.Tensor.grad.__get__` is passed in as `func`.
 
 
 [1]: https://github.com/pytorch/pytorch/issues/22402 "GitHub Issue 22402 on pytorch/pytorch"
