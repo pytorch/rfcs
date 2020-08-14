@@ -446,6 +446,8 @@ def get_shape(data):
         if dims == 0:
             return (0,)
         return (dims, ) + get_shape(data[0])
+    elif isinstance(data, np.ndarray):
+        return data.shape
     return ()
 
 
@@ -541,13 +543,14 @@ def get_gcs_data(data, reduction=None, fill_value=None):
         dims1 = tuple(range(N//2))
         dims2 = tuple(range(N//2, N))
         reduction = dims1 + dims2 + (N//2,)
+        l = N // 2
     else:
         l = reduction[-1]
         dims1 = reduction[:l]
         dims2 = reduction[l:-1]
 
-    strides1 = make_strides(dims1)
-    strides2 = make_strides(dims2)
+    strides1 = make_strides(shape[:l])
+    strides2 = make_strides(shape[l-1:-1])
     print(f'{shape=} {strides1=} {strides2=} {dims1=} {dims2=}')
     # <row>: <list of (colindex, value)>
     col_value = defaultdict(list)
@@ -564,7 +567,7 @@ def get_gcs_data(data, reduction=None, fill_value=None):
     ro = [0]
     co = []
     values = []
-    for i in range(max(col_value)):
+    for i in range(max(col_value)+1):
         cv = col_value.get(i, [])
         ro.append(ro[-1] + len(cv))
         cv.sort()
@@ -591,6 +594,8 @@ def is_scalar(data):
         return data.ndims == 0
     if isinstance(data, (list, tuple)):
         return False
+    if isinstance(data, np.ndarray):
+        return False
     raise NotImplementedError(f'{type(data)=}')  # pragma: no cover
 
 
@@ -600,6 +605,8 @@ def is_sequence(data):
     if isinstance(data, NDArray):
         return data.ndims > 0
     if is_scalar(data):
+        return False
+    if isinstance(data, np.ndarray):
         return False
     raise NotImplementedError(f'{type(data)=}')  # pragma: no cover
 
