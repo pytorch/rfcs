@@ -1,37 +1,30 @@
 
 import io
 import os
-import sys
-import inspect
-import itertools
 import torch
 import numpy
-import typing
+import re
 import configparser
-import torch_signatures
 from torch_signatures import scan_module
 import text_utils
-from collections import defaultdict, abc
+from collections import defaultdict
 
 modules = [torch, torch.nn.functional, torch.sparse]
 
-def get_layouts():
-    """Return a list of public layouts.
-    """
-    return [a for n, a in torch.__dict__.items() if isinstance(a, torch.layout) and not n.startswith('_')]
 
-
-def random_coo(shape, dtype, sparsity=0.75, coalesce=True, rdist='random'):
+def random_coo(shape, dtype, sparsity=0.75, coalesce=True, rdist='random',
+               require_positive=False, device=None):
     total = 1
     for dim in shape:
         total *= dim
     nnz = int(total * (1 - sparsity))
     nnz = max(0, min(nnz, total))
-    i, j, d = [], [], set()
+    d = set()
     indices = [[] for dim in shape]
     for n in range(nnz):
         while 1:
-            _index = tuple(torch.randint(0, dim-1, ()) for dim in shape)
+            _index = tuple(
+                torch.randint(0, max(1, dim-1), ()) for dim in shape)
             if _index in d:
                 continue
             d.add(_index)
@@ -39,167 +32,67 @@ def random_coo(shape, dtype, sparsity=0.75, coalesce=True, rdist='random'):
     for _index in (sorted(d) if coalesce else d):
         for _i in range(len(shape)):
             indices[_i].append(_index[_i])
-    values = make_tensor((nnz,), torch.strided, dtype=dtype, rdist=rdist)
-    return torch.sparse_coo_tensor(indices, values, shape, dtype=dtype)
+    values = make_tensor(
+        (nnz,), dtype=dtype, rdist=rdist,
+        device=device, require_positive=require_positive)
+    if dtype in [complex, torch.complex128]:
+        values += 1j * make_tensor(
+            (nnz,), dtype=dtype, rdist=rdist,
+            device=device, require_positive=require_positive)
+        dtype = torch.complex128
+    return torch.sparse_coo_tensor(
+        indices, values, shape, dtype=dtype, device=device)
 
 
-def make_tensor(shape, layout, dtype=float, rdist='randn'):
+def make_tensor(shape_or_data, dtype=float, rdist='randn',
+                require_positive=False, **params):
+    if isinstance(shape_or_data, tuple):
+        data, shape = None, shape_or_data
+    else:
+        data, shape = shape_or_data, None
+    layout = params.get('layout', torch.strided)
+    device = params.get('device', None)
     if layout == torch.strided:
+        if data is not None:
+            return torch.tensor(data, dtype=dtype, device=device)
         if dtype in [bool]:
-            return torch.randint(0, 1, shape, dtype=dtype)
+            return torch.randint(0, 1, shape, dtype=dtype, device=device)
         if dtype in [int]:
-            return torch.randint(0, 5, shape, dtype=dtype)
+            return torch.randint(0, 5, shape, dtype=dtype, device=device)
         if rdist == 'uniform':
-            t = torch.empty(shape, dtype=dtype)
+            t = torch.empty(shape, dtype=dtype, device=device)
             t.uniform_()
         elif rdist == 'randn':
             if dtype in [torch.qint32]:
-                t = torch.randint(-10, 10, shape, dtype=torch.float32)
+                t = torch.randint(-10, 10, shape,
+                                  dtype=torch.float32, device=device)
                 t = torch.quantize_per_tensor(t, 1.0, 0, dtype=dtype)
+            elif dtype in [complex]:
+                t = torch.randn(shape, dtype=float, device=device)
+                t = t + 1j * torch.randn(shape, dtype=float, device=device)
             else:
-                t = torch.randn(shape, dtype=dtype)
+                t = torch.randn(shape, dtype=dtype, device=device)
+                if require_positive:
+                    t = t * t
         elif rdist == 'posdefined':
-            t = torch.randn(shape, dtype=dtype)
+            t = torch.randn(shape, dtype=dtype, device=device)
             for i in range(len(shape)):
                 t[(i,) * len(shape)] += 5
         else:
             raise NotImplementedError(rdist)
         return t
     if layout == torch.sparse_coo:
-        return random_coo(shape, dtype, rdist=rdist)
+        if data is not None:
+            return torch.tensor(data, dtype=dtype, device=device).to_sparse()
+        return random_coo(shape, dtype=dtype, rdist=rdist,
+                          require_positive=require_positive, device=device)
     raise NotImplementedError(layout)
 
 
-def get_test_args(fname, sig, layout):
-    default_int = 1
-    rdist = 'randn'
-    dtype = float
-    size = (2, 2)
-    extra_kwargs = {}
-    if fname == 'arange': return (10,), dict(layout=layout)
-    if fname == 'range': return (0, 10), dict(layout=layout)
-    if fname == 'bartlett_window': return (3,), dict(layout=layout)
-    if fname == 'blackman_window': return (3,), dict(layout=layout)
-    if fname == 'hamming_window': return (3,), dict(layout=layout)
-    if fname == 'hann_window': return (3,), dict(layout=layout)
-    if fname == 'empty': return (2, 2), dict(layout=layout)
-    if fname == 'empty_like': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype),), dict(layout=layout)
-    if fname == 'empty_strided': return ((2, 2), (2, 1)), dict(layout=layout)
-    if fname == 'ones': return (2, 2), dict(layout=layout)
-    if fname == 'ones_like': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype),), dict(layout=layout)
-    if fname == 'zeros': return (2, 2), dict(layout=layout)
-    if fname == 'zeros_like': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype),), dict(layout=layout)
-    if fname == 'eye': return (2,), dict(layout=layout)
-    if fname == 'full': return ((2, 2), 0), dict(layout=layout, dtype=float)
-    if fname == 'full_like': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), 0), dict(layout=layout)
-    if fname == 'linspace': return (0, 10), dict(layout=layout)
-    if fname == 'logspace': return (0, 10), dict(layout=layout)
-    if fname == 'rand': return (2, 2), dict(layout=layout)
-    if fname == 'randn': return (2, 2), dict(layout=layout)
-    if fname == 'rand_like': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype),), dict(layout=layout)
-    if fname == 'randn_like': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype),), dict(layout=layout)
-    if fname == 'randint': return (0, 10, (2, 2)), dict(layout=layout)
-    if fname == 'randint_like': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), 0, 10), dict(layout=layout)
-    if fname == 'randperm': return (2,), dict(layout=layout)
-    if fname == 'tril_indices': return (2, 2), dict(layout=layout)
-    if fname == 'triu_indices': return (2, 2), dict(layout=layout)
-    if fname == 'addbmm': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype)), {}
-    if fname == 'addmv': return (make_tensor((2,), layout, rdist=rdist, dtype=dtype), make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2,), layout, rdist=rdist, dtype=dtype)), {}
-    if fname == 'addr': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2,), layout, rdist=rdist, dtype=dtype), make_tensor((2,), layout, rdist=rdist, dtype=dtype)), {}
-    if fname in ['all', 'any']: return (make_tensor((2, 2), layout, dtype=bool, rdist=rdist),), {}
-    if fname == 'baddbmm': return (make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype)), {}
-    if fname in ['lu_unpack', 'lu_unpacktensor']:
-        t = make_tensor((3, 2, 2), layout, rdist=rdist, dtype=dtype)
-        A_LU, pivots = t.lu()
-        return (A_LU, pivots), {}
-    if fname == 'mv': return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2,), layout, rdist=rdist, dtype=dtype)), {}
-    if fname == 'batch_norm':
-        return (make_tensor((2, 2), layout, rdist=rdist, dtype=dtype), make_tensor((2, ), layout, rdist=rdist, dtype=dtype), make_tensor((2, ), layout, rdist=rdist, dtype=dtype)), {}
-    if fname == 'cross_entropy':
-        return (make_tensor((5, 5), layout, rdist=rdist, dtype=dtype), make_tensor((5,), layout, rdist=rdist, dtype=int),), {}
-    if fname == 'ctc_loss':
-        return (make_tensor((5, 5, 5), layout, rdist=rdist, dtype=dtype),
-                make_tensor((5, 5), layout, rdist=rdist, dtype=int),
-                make_tensor((5,), layout, rdist=rdist, dtype=int),
-                make_tensor((5,), layout, rdist=rdist, dtype=int),
-        ), {}
-    if fname == 'multilabel_margin_loss':
-        return (make_tensor((5, 5), layout, rdist=rdist, dtype=dtype),
-                make_tensor((5, 5), layout, rdist=rdist, dtype=int),
-        ), {}
-    if fname == 'nll_loss':
-        return (make_tensor((5, 5), layout, rdist=rdist, dtype=dtype),
-                make_tensor((5, ), layout, rdist=rdist, dtype=int),
-        ), {}
-    if fname == 'prelu':
-        return (make_tensor((5, 5), layout, rdist=rdist, dtype=dtype),
-                make_tensor((5, ), layout, rdist=rdist, dtype=dtype),
-        ), {}
-    if fname == 'addmm':
-        return (make_tensor((5, 5), torch.strided, rdist=rdist, dtype=dtype),
-                make_tensor((5, 5), layout, rdist=rdist, dtype=dtype),
-                make_tensor((5, 5), torch.strided, rdist=rdist, dtype=dtype),
-        ), {}
-    
-    if fname in ['bernoulli', 'cholesky', 'poisson', 'binary_cross_entropy']:
-        rdist = 'uniform'
-    if fname in ['cholesky']:
-        rdist = 'posdefined'
-    if fname in ['bincount', 'bitwise_and', 'bitwise_not', 'bitwise_or', 'bitwise_xor',
-                 'int_repr']:
-        dtype = int
-    if fname in ['bincount', 'combinations', 'dot', 'ger', 'vander']:
-        size = (2,)
-    if fname in ['bmm', 'conv1d', 'conv_transpose1d', 'bilinear']:
-        size = (2, 2, 2)
-    if fname in ['conv2d', 'conv_transpose2d', 'grid_sample']:
-        size = (2, 2, 2, 2)
-    if fname in ['conv3d', 'conv_transpose3d']:
-        size = (2, 2, 2, 2, 2)
-    if fname in ['cross']:
-        size = (3, 3)
-    if fname in ['is_nonzero']:
-        size = (1, )
-    if fname in ['lobpcg']:
-        size = (9, 9)
-    if fname in ['lu_unpack']:
-        size = (3, 2, 2)
-    if fname in ['imag', 'real', 'view_as_real']:
-        dtype = torch.cfloat
-    if fname in ['dequantize', 'int_repr', 'q_per_channel_axis', 'q_per_channel_scales', 'q_per_channel_zero_points',
-                 'q_scale', 'q_zero_point']:
-        dtype = torch.qint32
-    if fname == 'interpolate':
-        size = (2, 2, 2)
-        extra_kwargs.update(size=1)
-    if fname in ['upsample']:
-        size = (2, 2, 2)
-        extra_kwargs.update(size=1)
-    if fname in ['upsample_bilinear', 'upsample_nearest']:
-        size = (2, 2, 2, 2)
-        extra_kwargs.update(size=1)
-    if fname in ['channel_shuffle']:
-        size = (2, 2, 2)
-        default_int = 2
-    if fname == 'conv_tbc':
-        size = (2, 2, 2)
-    args = []
-    for argname, params in sig.parameters.items():
-        if params.default is not inspect.Parameter.empty:
-            break
-        annot = params.annotation
-        if annot is torch.Tensor:
-            args.append(make_tensor(size, layout, dtype=dtype, rdist=rdist))
-        elif annot is int:
-            args.append(default_int)
-        else:
-            raise NotImplementedError(f'{annot}')
-    return tuple(args), extra_kwargs
-
-
 def get_seclink(section_title):
-    l = section_title.lower().replace('/', '').split()
-    return '#' + '-'.join(l)
+    lst = section_title.lower().replace('/', '').split()
+    return '#' + '-'.join(lst)
+
 
 def get_secname(section_title):
     return f'<a href="{get_seclink(section_title)}">{section_title}</a>'
@@ -207,18 +100,23 @@ def get_secname(section_title):
 
 def get_doclink(func):
     if func.__module__ == 'torch.sparse':
-        return f'https://pytorch.org/docs/stable/sparse.html#torch.sparse.{func.__name__}'
+        return (f'https://pytorch.org/docs/stable/sparse.html'
+                f'#torch.sparse.{func.__name__}')
     if func.__module__ == 'torch.nn.functional':
-        return f'https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.{func.__name__}'
-    if func.__name__ in ['conv1d', 'conv2d', 'conv3d', 'conv_transpose1d', 'conv_transpose2d', 'conv_transpose3d']:
-        return f'https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.{func.__name__}'
-    return f'https://pytorch.org/docs/master/generated/{func.__module__}.{func.__name__}.html'
+        return (f'https://pytorch.org/docs/stable/nn.functional.html'
+                f'#torch.nn.functional.{func.__name__}')
+    if func.__name__ in [
+            'conv1d', 'conv2d', 'conv3d', 'conv_transpose1d',
+            'conv_transpose2d', 'conv_transpose3d']:
+        return (f'https://pytorch.org/docs/stable/nn.functional.html'
+                f'#torch.nn.functional.{func.__name__}')
+    return (f'https://pytorch.org/docs/master/generated/'
+            f'{func.__module__}.{func.__name__}.html')
 
 
 def get_docname(func, sig):
-    #return f'{func.__module__}.{func.__name__}'
-    return f'<a href="{get_doclink(func)}">{func.__module__}.{func.__name__}</a>'
-    return f'<a href="{get_doclink(func)}" title="{func.__name__}{sig}">{func.__module__}.{func.__name__}</a>'
+    return (f'<a href="{get_doclink(func)}">'
+            f'{func.__module__}.{func.__name__}</a>')
 
 
 def all_functions(filter=lambda func, sig: True, _cache=[]):
@@ -227,428 +125,6 @@ def all_functions(filter=lambda func, sig: True, _cache=[]):
     for func, sig in set(_cache):
         if filter(func, sig):
             yield func, sig
-
-def l_not(predicate):
-    def op(*args):
-        return not predicate(*args)
-    return op
-
-
-def l_and(*predicates):
-    def op(*args):
-        for predicate in predicates:
-            if not predicate(*args):
-                return False
-        return True
-    return op
-
-
-def l_or(*predicates):
-    def op(*args):
-        for predicate in predicates:
-            if isinstance(predicate, (list, tuple)):
-                for p in predicate:
-                    if p(*args):
-                        return True
-            else:
-                if predicate(*args):
-                    return True
-        return False
-    return op
-
-
-def has_layout(func, sig):
-    if func.__name__.endswith('_'):
-        return False
-    return 'layout' in sig.parameters
-
-
-def returns_tensor(func, sig):
-    if func.__name__.endswith('_'):
-        return False
-    return sig.return_annotation == torch.Tensor
-
-
-def has_all_tensor_inputs(func, sig):
-    if func.__name__.endswith('_'):
-        return False
-    count = 0
-    for name, param in sig.parameters.items():
-        if param.default is not inspect.Parameter.empty:
-            break
-        if not (param.annotation == torch.Tensor):
-            return False
-        count += 1
-    return count > 0
-
-
-def has_tensor_input(func, sig):
-    if func.__name__.endswith('_'):
-        return False
-    for name, param in sig.parameters.items():
-        if param.default is not inspect.Parameter.empty:
-            break
-        if param.annotation == torch.Tensor:
-            return True
-    return False
-
-
-def try_layout(func, sig, layout, must_pass=False):
-    try:
-        test_args, test_kwargs = get_test_args(func.__name__, sig, layout)
-        ok = True
-    except Exception as msg:
-        fail = str(msg).strip().splitlines()[0]
-        if len(fail) > 40:
-            fail = fail[:38] + '...'
-        status = f'{type(msg).__name__}: {fail}'
-        ok = False
-    if ok:
-        try:
-            test_result = func(*test_args, **test_kwargs)
-            status = 'OK'
-        except Exception as msg:
-            fail = str(msg).strip().splitlines()[0]
-            if 'is not implemented for' in fail:
-                status = f'{type(msg).__name__}: not implemented'
-            elif fail.startswith('unsupported tensor layout'):
-                status = f'{type(msg).__name__}: unsupported layout'
-            elif fail.startswith('Could not run') and 'with arguments from the' in fail:
-                status = f'{type(msg).__name__}: unsupported backend'
-            else:
-                if len(fail) > 40:
-                    fail = fail[:38] + '...'
-                status = f'{type(msg).__name__}: {fail}'
-            if must_pass:
-                print(func.__doc__)
-                print(f'{func.__name__}{test_args}')
-                raise
-    return status
-
-
-def get_required_atypes(sig):
-    lst = []
-    for aname, param in sig.parameters.items():
-        if param.default is not inspect.Parameter.empty:
-            break
-        lst.append(param)
-    return tuple(lst)
-        
-def variants(typ):
-    if typ in [torch.CompilationUnit, torch.ExtraFilesMap,
-                 torch.dtype, numpy.ndarray]:
-        yield typ
-        return
-    elif isinstance(typ, tuple):
-        for v in itertools.product(*(tuple(variants(a)) for a in typ)):
-            yield v
-        return
-    elif isinstance(typ, inspect.Parameter):
-        if typ.annotation is not typ.empty:
-            for v in variants(typ.annotation):
-                yield v
-        else:
-            yield typ
-        return
-    elif isinstance(typ, typing._Final):
-        if isinstance(typ, typing.TypeVar):
-            yield  typ
-        elif typ.__origin__ == typing.Union:
-            for t in typ.__args__:
-                for v in variants(t):
-                    yield v
-        elif typ.__origin__ == tuple:
-            if typ.__args__ is None:
-                yield typ
-            else:
-                for v in itertools.product(*(tuple(variants(a)) for a in typ.__args__)):
-                    yield typing.Tuple[v]
-        elif typ.__origin__ == list:
-            if typ.__args__ is None:
-                yield typ
-            else:
-                for v in itertools.product(*(tuple(variants(a)) for a in typ.__args__)):
-                    yield typing.List[v]
-        elif typ.__origin__ == abc.Sequence:
-            if typ.__args__ is None:
-                yield typ
-            else:
-                for v in itertools.product(*(tuple(variants(a)) for a in typ.__args__)):
-                    yield typing.Sequence[v]
-        elif typ.__origin__ == abc.Callable:
-            assert typ.__args__ == ()  # otherwise not implemented
-            yield typ
-        elif typ.__origin__ == type:
-            yield typ
-        else:
-            raise NotImplementedError((typ, type(typ), type(typ).__bases__))
-    elif typ is Ellipsis:
-        yield typ
-    elif isinstance(typ, type):
-        yield typ
-    elif isinstance(typ, torch_signatures.Name):
-        yield typ
-    else:
-        raise NotImplementedError((typ, type(typ), type(typ).__bases__))
-
-def has_tensor(typ):
-    if typ == torch.Tensor:
-        return True
-    elif isinstance(typ, typing._Final) and typ.__origin__ == typing.Union:
-        for t in typ.__args__:
-            if has_tensor(t):
-                return True
-    return False
-
-def has_int(typ):
-    if typ == int:
-        return True
-    elif isinstance(typ, typing._Final) and typ.__origin__ == typing.Union:
-        for t in typ.__args__:
-            if has_int(t):
-                return True
-    return False
-
-
-def make_test_value(typ):
-    if typ == torch.Tensor:
-        return f'make_{typ.__name__}(shape=(default_int, default_int), dtype=default_dtype, layout=default_layout, device=default_device)'
-    if isinstance(typ, type):
-        return f'default_{typ.__name__}'
-    if isinstance(typ, typing._Final):
-        if typ.__origin__ == tuple:
-            if typ.__args__ is None:
-                return 'default_tuple'
-            lst = []
-            for atyp in typ.__args__:
-                if atyp == Ellipsis:
-                    lst = lst + lst
-                    continue
-                lst.append(make_test_value(atyp))
-            return '('+', '.join(lst)+',)'
-        elif typ.__origin__ == list:
-            if typ.__args__ is None:
-                return 'default_list'
-            return '['+', '.join(map(make_test_value, typ.__args__))+',]'
-    if str(typ) == '*tensors':
-        return make_test_value(typing.Tuple[torch.Tensor, torch.Tensor])[1:-1]
-    if str(typ) == '*matrices':
-        return make_test_value(typing.Tuple[torch.Tensor, torch.Tensor])[1:-1]
-    if str(typ) == '*operands':
-        return make_test_value(typing.Tuple[torch.Tensor, torch.Tensor])[1:-1]
-    if str(typ) == '*size':
-        return make_test_value(typing.Tuple[int, int])[1:-1]
-    if str(typ) == '*args':
-        return '*tuple()'
-    if str(typ) == '**kwargs':
-        return '**dict()'
-    if typ == 'torch.dtype':
-        return 'default_dtype'
-    if typ == typing.Type[torch.Tensor]:
-        return 'default_Tensor_type'
-    if typ == typing.Callable:
-        return 'default_callable'
-    if isinstance(typ, inspect.Parameter):
-        return f'{typ}'
-    raise NotImplementedError((typ, type(typ), str(typ)))
-
-def ops2set(operations):
-    return set(w for w in operations.strip().split() if w)
-
-
-
-def make_classification_file(working_dir=None):   # OBSOLETE
-    """
-    Classifiers:
-    notensor - a function with no Tensor input nor output
-    constructor - a function that constructs new Tensor instances
-    inplace - a function that changes tensor inplace
-    unary - a function that represents an unary operation
-    binary - a function that represents a binary operation
-    reduction - a function that represents a reduction
-    elementwise - a function that is applied to tensor elementwise
-    array - a function that represents an array operation
-    """
-    
-    if working_dir is None:
-        working_dir = os.path.dirname(__file__)
-    classifier = Classifier.fromfile('pytorch_functions.ini', working_dir=working_dir)
-
-    count_classified = 0
-    count_unclassified = 0
-    lst = []
-    for func, sig in all_functions():
-        fullname = func.__module__ + '.' + func.__name__
-        sig_str = str(sig)
-        classifiers = classifier.get_classifiers(func, sig)
-        continue
-        section = classifier.get_section(func.__name__)
-        if section is not None:
-            classifiers.append(section)
-        
-        if 'Tensor' not in sig_str:
-            classifiers.append('notensor')
-        if 0:
-            if 'torch.layout' in sig_str:
-                classifiers.append('haslayout')
-            if 'torch.device' in sig_str:
-                classifiers.append('hasdevice')
-
-        if ('torch.layout' in sig_str or 'requires_grad' in sig_str or 'torch.device' in sig_str):
-            if sig.return_annotation == torch.Tensor:
-                classifiers.append('constructor')
-
-        if func.__name__.endswith('_'):
-            classifiers.append('inplace')
-
-        req_atypes = get_required_atypes(sig)
-
-        if (0 and len(req_atypes) == 1
-            and req_atypes[0].name == 'input'
-            and has_tensor(req_atypes[0].annotation)
-            and sig.return_annotation == torch.Tensor
-            and [param for name, param in sig.parameters.items() if name in ['dim', 'dims'] and has_int(param.annotation)]
-            and 'array' not in classifiers
-        ):
-            classifiers.append('reduction')
-        
-        if (0 and len(req_atypes) == 1
-            and req_atypes[0].name == 'input'
-            and has_tensor(req_atypes[0].annotation)
-            and sig.return_annotation == torch.Tensor
-            and 'reduction' not in classifiers
-            and 'array' not in classifiers
-        ):
-            classifiers.append('unary')
-        if (0 and len(req_atypes) == 2
-            and req_atypes[0].name == 'input'
-            and req_atypes[1].name == 'other'
-            and has_tensor(req_atypes[0].annotation)
-            and has_tensor(req_atypes[1].annotation)
-            and sig.return_annotation == torch.Tensor
-            and 'array' not in classifiers
-        ):
-            classifiers.append('binary')
-
-        if classifiers:
-            print(fullname, sig)
-            print('  classifiers:', ', '.join(classifiers))    
-            count_classified += 1
-            continue
-        count_unclassified += 1
-        print(fullname, sig)
-        #print('  classifiers:', ', '.join(classifiers))    
-        #for atypes in variants(req_atypes):
-        #    print('  sample:', ', '.join(map(make_test_value, atypes)))
-
-    print(f'unclassified/classified counts={count_unclassified}/{count_classified}')
-
-
-def main(working_dir=None):  # OBSOLETE
-    layouts = get_layouts()
-    if working_dir is None:
-        working_dir = os.path.dirname(__file__)
-
-    func_cache = set()
-        
-    predicates = []
-
-    f = io.StringIO('')
-    headers = ['Function'] + list(map(str, layouts)) + ['Signature']
-
-    f.write('# Tensor constructors\n\n')
-    
-    f.write('## Functions with layout argument\n\n')
-
-    lst = []
-    failures = defaultdict(list)
-    predicates.append(has_layout)
-    for func, sig in all_functions(predicates[-1]):
-        if func in func_cache: continue
-        func_cache.add(func)
-        row = [get_docname(func, sig)]
-        for layout in layouts:
-            row.append(try_layout(func, sig, layout))
-        row.append(str(sig))
-        lst.append(row)
-    text_utils.table(f, lst, list(range(len(headers))), headers)
-
-    f.write('\n\n')
-
-    f.write('## Functions with tensor inputs\n\n')
-
-    lst = []
-    predicates.append(has_all_tensor_inputs)
-    for func, sig in all_functions(predicates[-1]):
-        if func in func_cache: continue
-        func_cache.add(func)
-        print(func.__module__, func.__name__, sig)
-
-        allow_fail = func.__name__ in [
-            'q_per_channel_axis',
-            'q_per_channel_scales',
-            'q_per_channel_zero_points',
-            'q_scale',
-            'q_zero_point',
-        ]
-        if func.__module__ == 'torch.sparse':
-            native_layout = torch.sparse_coo
-        else:
-            native_layout = torch.strided
-        row = [get_docname(func, sig)]
-        for layout in layouts:
-            row.append(try_layout(func, sig, layout, must_pass=(layout==native_layout and not allow_fail)))
-        row.append(str(sig))
-        lst.append(row)
-
-    text_utils.table(f, lst, list(range(len(headers))), headers)
-
-    f.write('## Functions with tensor input\n\n')
-
-    lst = []
-    predicates.append(has_tensor_input)
-    for func, sig in all_functions(predicates[-1]):
-        if func in func_cache: continue
-        func_cache.add(func)
-        print(func.__module__, func.__name__, sig)
-
-        allow_fail = func.__name__ in [
-            'q_per_channel_axis',
-            'q_per_channel_scales',
-            'q_per_channel_zero_points',
-            'q_scale',
-            'q_zero_point',
-        ]
-        if func.__module__ == 'torch.sparse':
-            native_layout = torch.sparse_coo
-        else:
-            native_layout = torch.strided
-        row = [get_docname(func, sig)]
-        for layout in layouts:
-            row.append(try_layout(func, sig, layout, must_pass=(layout==native_layout and not allow_fail)))
-        row.append(str(sig))
-        lst.append(row)
-
-    text_utils.table(f, lst, list(range(len(headers))), headers)
-    
-    f.write('# Functions not covered above\n\n')
-
-    lst = []
-    failures = defaultdict(list)
-    for func, sig in all_functions():
-        if func in func_cache: continue
-        func_cache.add(func)
-        row = [get_docname(func, sig)]
-        row.append(str(sig))
-        lst.append(row)
-
-    text_utils.table(f, lst, list(range(2)), headers[:1] + headers[-1:])
-
-    f.write('\n\n')
-    s = f.getvalue()
-    f = open(os.path.join(working_dir, 'SparseSupportState.md'), 'w')
-    f.write(s)
-    f.close()
 
 
 class Classifier:
@@ -662,21 +138,45 @@ class Classifier:
         config.read([ini_file])
         return cls(config)
 
-    def __init__(self, config, working_dir=None):
+    def __init__(self, config, working_dir=None, verbose=True):
+        self.verbose = verbose
         if working_dir is None:
             working_dir = os.path.dirname(__file__)
         # replace names string content with a list
+        self.attrs = {}
         for section in config.sections():
+            if section == 'ATTRIBUTES':
+                continue
             if config.has_option(section, 'names'):
-                names = config.get(section, 'names')
-                names = list(sorted(w for w in names.strip().split() if w))
+                names = []
+                for name in config.get(section, 'names').split():
+                    name = name.strip()
+                    if not name:
+                        continue
+                    if name.endswith('!'):
+                        i = name.index('!')
+                        name, attr = name[:i], name[i:]
+                        self.attrs[name] = attr
+                    elif '|' in name:
+                        name, attr = name.split('|', 1)
+                        self.attrs[name] = attr
+                    names.append(name)
                 config.set(section, 'names', names)
         #
         self.working_dir = working_dir
         self.config = config
 
-    def get_section(self, func, sig):
+    def iter_sections(self):
         for section in self.config.sections():
+            if section == 'ATTRIBUTES':
+                continue
+            yield section
+
+    def attach(self, func, sig):
+        """Attach function and its signature to classifier. Return section
+        when defined.
+        """
+        for section in self.iter_sections():
             if not self.config.has_option(section, 'names'):
                 continue
             names = self.config.get(section, 'names')
@@ -698,42 +198,666 @@ class Classifier:
                 lines.append(f'{option}: {value}')
         return '\n'.join(lines)
 
-    def get_classifiers(self, func, sig):
-        sig_str = str(sig)
-        
-        classifiers = []
-        section = self.get_section(func, sig)
-        if section is not None:
-            classifiers.append(section)
+    def get_layouts(self):
+        return [a for n, a in torch.__dict__.items()
+                if isinstance(a, torch.layout) and not n.startswith('_')]
 
-        if 'Tensor' not in sig_str:
-            classifiers.append('notensor')
+    def get_devices(self):
+        devices = ['cpu']
+        if torch.cuda.is_available():
+            count = torch.cuda.device_count()
+            if count > 0:
+                devices.append(f'cuda:{count-1}')
+        return devices
 
-        if func.__name__.endswith('_'):
-            classifiers.append('inplace')
+    def iter_tensor_parameters(self):
+        """A iterator of parameters that determine the tensor kind, such
+        as tensors with various layouts (strided, sparse_coo, etc) and
+        storage locations (cpu, cuda, etc)
+        """
+        layouts = self.get_layouts()
+        devices = self.get_devices()
 
-        if not classifiers:
-            print(f'no classifiers for {func.__name__}')
+        for layout in layouts:
+            for device in devices:
+                title = f'{str(layout).split(".")[-1]}@{device}'
+                yield dict(layout=layout, device=device), title
 
-        return classifiers
+    def iter_func_args(self, func, sig, tensor_parameters):
+        layout_device_kwargs = dict(layout=tensor_parameters.get('layout'),
+                                    device=tensor_parameters.get('device'))
+        device_kwargs = dict(device=tensor_parameters.get('device'))
+        if func.__name__ in ['arange', 'range']:
+            if func.__name__ == 'arange':
+                yield (5, ), layout_device_kwargs
+            yield (1, 5), layout_device_kwargs
+            yield (1, 5, 0.5), layout_device_kwargs
+        elif func.__name__ in ['randint']:
+            yield (1, 5, (2, 2)), layout_device_kwargs
+        elif func.__name__ in [
+                'randperm', 'bartlett_window', 'blackman_window',
+                'hamming_window', 'hann_window']:
+            yield (5, ), layout_device_kwargs
+        elif func.__name__ in ['randint_like']:
+            yield ((make_tensor((2, 2), **tensor_parameters), 1, 5),
+                   layout_device_kwargs)
+        elif func.__name__ == 'as_strided':
+            yield (make_tensor((3, 3), **tensor_parameters),
+                   (2, 2), (1, 2)), {}
+            yield (make_tensor((3, 3), **tensor_parameters),
+                   (2, 2), (1, 2), 1), {}
+        elif func.__name__ == 'as_tensor':
+            yield ([[1, 2], [3, 4]],), device_kwargs
+            yield (make_tensor((3, 3), **tensor_parameters), ), {}
+            if tensor_parameters.get('device', 'cpu') != 'cpu':
+                yield ((make_tensor((3, 3), **tensor_parameters), ),
+                       dict(device='cpu'))
+        elif func.__name__ in [
+                'dequantize', 'quantize_per_channel', 'quantize_per_tensor',
+                'get_rng_state', 'initial_seed', 'manual_seed', 'normal',
+                'seed', 'set_rng_state', 'multi_head_attention_forward',
+                'can_cast', 'compiled_with_cxx11_abi', 'get_default_dtype',
+                'get_num_interop_threads', 'get_num_threads', 'load', 'seek',
+                'promote_types', 'save', 'set_default_dtype',
+                'set_default_tensor_type', 'set_flush_denormal',
+                'set_num_interop_threads', 'set_num_threads',
+                'set_printoptions']:
+            pass
+        elif func.__name__ in [
+                'empty', 'ones', 'zeros', 'tril_indices', 'triu_indices',
+                'rand', 'randn']:
+            yield (2, 2), layout_device_kwargs
+        elif func.__name__ in [
+                'empty_like', 'ones_like', 'zeros_like', 'rand_like',
+                'randn_like']:
+            yield ((make_tensor((2, 2), **tensor_parameters),),
+                   layout_device_kwargs)
+        elif func.__name__ == 'empty_strided':
+            yield ((3, 3), (2, 2)), layout_device_kwargs
+        elif func.__name__ == 'eye':
+            yield (2,), layout_device_kwargs
+            yield (2, 3), layout_device_kwargs
+        elif func.__name__ == 'from_numpy':
+            if (tensor_parameters.get('device', 'cpu') == 'cpu'
+                and tensor_parameters.get(
+                    'layout', torch.strided) == torch.strided):
+                yield (numpy.array([1, 2]),), {}
+        elif func.__name__ == 'full':
+            yield ((2, 2), 1.5), layout_device_kwargs
+            yield ((2, 2), 0), dict(dtype=int, **layout_device_kwargs)
+        elif func.__name__ == 'full_like':
+            yield ((make_tensor((2, 2), **tensor_parameters), 1.5),
+                   layout_device_kwargs)
+            yield ((make_tensor((2, 2), **tensor_parameters), 0),
+                   layout_device_kwargs)
+        elif func.__name__ in ['linspace', 'logspace']:
+            yield (1, 5), layout_device_kwargs
+            yield (1, 5), dict(steps=10, **layout_device_kwargs)
+        elif func.__name__ == 'sparse_coo_tensor':
+            indices = make_tensor([[0, 1, 1], [2, 0, 2]],
+                                  **layout_device_kwargs)
+            values = make_tensor([0.1, 0.2, 0.3], **layout_device_kwargs)
+            yield (indices, values, (2, 4)), device_kwargs
+        elif func.__name__ == 'tensor':
+            yield ([[1, 2], [3, 4]],), device_kwargs
+            for tp, _ in self.iter_tensor_parameters():
+                data = make_tensor((2, 2), **tp)
+                yield (data,), device_kwargs
+        elif func.__name__ in [
+                'abs', 'absolute', 'acos', 'acosh',
+                'angle', 'asin', 'asinh', 'atan', 'atanh', 'cos',
+                'cosh', 'deg2rad', 'digamma', 'erf', 'erfc', 'erfinv',
+                'exp', 'expm1', 'hardsigmoid', 'lgamma', 'log',
+                'log10', 'log1p', 'log2', 'logit', 'rad2deg', 'rsqrt',
+                'sigmoid', 'sin', 'sinh', 'sqrt', 'square', 'tan',
+                'tanh', 'ceil', 'floor', 'frac', 'neg', 'reciprocal',
+                'round', 'sign', 'trunc', 'det', 'geqrf', 'inverse',
+                'logdet', 'lu', 'pinverse', 'qr', 'slogdet', 't',
+                'trace', 'matrix_rank', 'tril', 'triu', 'clone',
+                'detach', 'flatten', 'fliplr', 'flipud', 'numel',
+                'unbind', 'argmax', 'argmin', 'mean', 'median',
+                'mode', 'norm', 'std', 'std_mean', 'sum', 'unique',
+                'unique_consecutive', 'var', 'var_mean', 'normalize',
+                'count_nonzero', 'histc', 'isfinite', 'isinf',
+                'isnan', 'max', 'min', 'nonzero', 'sort', 'pdist',
+                'celu', 'elu', 'gelu', 'glu', 'gumbel_softmax',
+                'hardshrink', 'hardswish', 'hardtanh', 'leaky_relu',
+                'log_sigmoid', 'relu', 'relu6', 'rrelu', 'selu',
+                'silu', 'softplus', 'softshrink', 'softsign',
+                'tanhshrink', 'alpha_dropout', 'dropout', 'dropout2d',
+                'feature_alpha_dropout', 'get_device', 'is_complex',
+                'is_floating_point', 'is_signed', 'view_as_complex']:
+            # unary operations
+            yield (make_tensor((2, 2), **tensor_parameters),), {}
+        elif func.__name__ in ['imag', 'conj', 'real', 'view_as_real']:
+            yield (make_tensor((2, 2), dtype=complex,
+                               **tensor_parameters),), {}
+        elif func.__name__ in [
+                'atan2', 'logaddexp', 'logaddexp2',
+                'mul', 'pow', 'cdist', 'dist', 'allclose', 'eq',
+                'equal', 'ge', 'gt', 'le', 'lt', 'isclose', 'ne',
+                'cosine_similarity', 'pairwise_distance',
+                'binary_cross_entropy_with_logits', 'result_type']:
+            # binary operations
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['gcd', 'lcm', 'true_divide']:
+            yield (make_tensor((2, 2), dtype=int, **tensor_parameters),
+                   make_tensor((2, 2), dtype=int, **tensor_parameters)), {}
+        elif func.__name__ in ['mvlgamma']:
+            yield ((make_tensor((2, 2), require_positive=True,
+                                **tensor_parameters), 1), {})
+        elif func.__name__ in ['polygamma']:
+            yield (1, make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['rot90']:
+            yield (make_tensor((2, 2), **tensor_parameters), 1, [0, 1]), {}
+        elif func.__name__ in ['add', 'sub']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), dict(alpha=1.5)
+        elif func.__name__ in ['addcdiv', 'addcmul']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),), {}
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), dict(value=1.5)
+        elif func.__name__ in ['clamp']:
+            yield ((make_tensor((2, 2), **tensor_parameters),),
+                   dict(min=-1, max=1))
+        elif func.__name__ in ['div', 'floor_divide', 'fmod', 'remainder']:
+            yield (make_tensor((2, 2), **tensor_parameters), 1.5), {}
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['bilinear']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2), require_positive=True,
+                               **tensor_parameters)), {}
+        elif func.__name__ in ['linear']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), require_positive=True,
+                               **tensor_parameters)), {}
+        elif func.__name__ in ['cholesky', 'cholesky_inverse']:
+            yield (make_tensor((2, 2), rdist='posdefined',
+                               **tensor_parameters),), {}
+        elif func.__name__ in ['cholesky_solve', 'solve']:
+            yield (make_tensor((2, 2), rdist='posdefined',
+                               **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['triangular_solve']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), rdist='posdefined',
+                               **tensor_parameters)), {}
+        elif func.__name__ in ['eig', 'symeig']:
+            yield (make_tensor((2, 2), **tensor_parameters),), {}
+            yield ((make_tensor((2, 2), **tensor_parameters),),
+                   dict(eigenvectors=True))
+        elif func.__name__ in ['lobpcg', 'pca_lowrank', 'svd',
+                               'svd_lowrank']:
+            yield (make_tensor((6, 6), **tensor_parameters),), {}
+        elif func.__name__ in ['ger']:
+            yield (make_tensor((2,), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['lerp']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), require_positive=True,
+                               **tensor_parameters)), {}
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   0.75), dict()
+        elif func.__name__ in ['lstsq']:
+            yield (make_tensor((5, 2), **tensor_parameters),
+                   make_tensor((5, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['lu_solve']:
+            A = make_tensor((2, 3, 3))
+            b = make_tensor((2, 3, 1), **tensor_parameters)
+            A_LU = torch.lu(A)
+            A_LU = tuple(make_tensor(t, dtype=t.dtype, **tensor_parameters)
+                         for t in A_LU)
+            yield (b, ) + A_LU, {}
+        elif func.__name__ in ['lu_unpack']:
+            A = make_tensor((2, 3, 3))
+            b = make_tensor((2, 3, 1), **tensor_parameters)
+            A_LU = torch.lu(A)
+            A_LU = tuple(make_tensor(t, dtype=t.dtype, **tensor_parameters)
+                         for t in A_LU)
+            yield A_LU, {}
+        elif func.__name__ in ['orgqr']:
+            output = torch.geqrf(make_tensor((2, 2)))
+            output = tuple(make_tensor(t, dtype=t.dtype, **tensor_parameters)
+                           for t in output)
+            yield output, {}
+        elif func.__name__ in ['ormqr']:
+            output = torch.geqrf(make_tensor((2, 2)))
+            output = tuple(make_tensor(t, dtype=t.dtype, **tensor_parameters)
+                           for t in output)
+            yield output + (make_tensor((2, 2), **tensor_parameters),), {}
+        elif func.__name__ in ['trapz']:
+            y = make_tensor((2, 3), **tensor_parameters)
+            x = make_tensor([[1, 3, 4], [1, 2, 3]], **tensor_parameters)
+            yield (y, x), {}
+        elif func.__name__ in ['conv1d', 'conv_transpose1d']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2), require_positive=True,
+                               **tensor_parameters)), {}
+        elif func.__name__ in ['conv2d', 'conv_transpose2d']:
+            yield (make_tensor((2, 2, 2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2, 2), require_positive=True,
+                               **tensor_parameters)), {}
+        elif func.__name__ in ['conv3d', 'conv_transpose3d']:
+            yield (make_tensor((2, 2, 2, 2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2, 2, 2), require_positive=True,
+                               **tensor_parameters)), {}
+        elif func.__name__ in ['conv_tbc']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2), require_positive=True,
+                               **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['fold']:
+            yield ((make_tensor((2, 2, 1), **tensor_parameters),),
+                   dict(output_size=1, kernel_size=1))
+        elif func.__name__ in ['unfold']:
+            yield ((make_tensor((2, 2, 2, 2), **tensor_parameters),),
+                   dict(kernel_size=1))
+        elif func.__name__ in ['addbmm', 'baddbmm']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['addmm', 'chain_matmul']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['addmv']:
+            yield (make_tensor((2,), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['addr']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['bmm']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['cross']:
+            yield (make_tensor((2, 3), **tensor_parameters),
+                   make_tensor((2, 3), **tensor_parameters)), {}
+        elif func.__name__ in ['dot', 'cartesian_prod']:
+            yield (make_tensor((2,), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['matmul', 'mm', 'tensordot', 'block_diag',
+                               'broadcast_tensors']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['matmul', 'mv']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['matrix_power']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   2), {}
+        elif func.__name__ in ['vander', 'squeeze']:
+            yield (make_tensor((2, ), **tensor_parameters),), {}
+        elif func.__name__ in ['cat', 'meshgrid']:
+            yield ((make_tensor((2,), **tensor_parameters),
+                    make_tensor((2,), **tensor_parameters)),), {}
+        elif func.__name__ in ['chunk']:
+            yield (make_tensor((2, 2), **tensor_parameters), 2), {}
+        elif func.__name__ in ['combinations', 'bincount']:
+            yield (make_tensor((2, ), dtype=int, **tensor_parameters),), {}
+        elif func.__name__ in ['diag', 'diag_embed', 'diagflat', 'diagonal']:
+            yield (make_tensor((2, 2), **tensor_parameters),), {}
+            yield (make_tensor((2, 2), **tensor_parameters), 1), {}
+        elif func.__name__ in ['flip']:
+            yield (make_tensor((2, 2), **tensor_parameters), [0, 1]), {}
+        elif func.__name__ in ['gather']:
+            yield (make_tensor((2, 2), **tensor_parameters), 1,
+                   make_tensor([[0, 0], [1, 0]], dtype=int,
+                               **tensor_parameters)), {}
+        elif func.__name__ in ['index_add', 'index_copy']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0,
+                   make_tensor([0, 0], dtype=int, **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['index_fill']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0,
+                   make_tensor([0, 0], dtype=int,
+                               **tensor_parameters), 1.5), {}
+        elif func.__name__ in ['index_put']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   (make_tensor([0, 0], dtype=int, **tensor_parameters), ),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['index_select']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0,
+                   make_tensor([0, 0], dtype=int, **tensor_parameters)), {}
+        elif func.__name__ in ['masked_fill']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), dtype=bool,
+                               **tensor_parameters), 1.5), {}
+        elif func.__name__ in ['masked_scatter']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), dtype=bool, **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['masked_select']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), dtype=bool, **tensor_parameters)), {}
+        elif func.__name__ in ['narrow']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0, 0, 2), {}
+        elif func.__name__ in ['repeat_interleave']:
+            yield (make_tensor((2, 2), **tensor_parameters), 2), {}
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor([2], dtype=int, **tensor_parameters)), {}
+        elif func.__name__ in ['reshape']:
+            yield (make_tensor((2, 2), **tensor_parameters), (2, 2)), {}
+            yield (make_tensor((2, 2), **tensor_parameters), (4, )), {}
+        elif func.__name__ in ['roll', 'select']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0, 1), {}
+        elif func.__name__ in ['scatter', 'scatter_add']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0,
+                   make_tensor([[0], [0]], dtype=int, **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['split', 'unsqueeze', 'cummax', 'cummin',
+                               'cumprod', 'cumsum', 'logcumsumexp',
+                               'logsumexp', 'prod', 'argsort',
+                               'kthvalue', 'topk',
+                               'softmax', 'softmin']:
+            yield (make_tensor((2, 2), **tensor_parameters), 1), {}
+        elif func.__name__ in ['stack']:
+            yield ([make_tensor((2, 2), **tensor_parameters),
+                    make_tensor((2, 2), **tensor_parameters)], ), {}
+        elif func.__name__ in ['take']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor([0, 2], dtype=int, **tensor_parameters), ), {}
+        elif func.__name__ in ['transpose']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0, 1), {}
+        elif func.__name__ in ['where']:
+            x = make_tensor((2, 2), **tensor_parameters)
+            y = make_tensor((2, 2), **tensor_parameters)
+            yield (make_tensor([[True, False], [False, True]], dtype=bool,
+                               **tensor_parameters), x, y), {}
+        elif func.__name__ in ['einsum']:
+            yield ('i,j->ji', make_tensor((2,), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['batch_norm', 'instance_norm']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['group_norm']:
+            yield (make_tensor((2, 2), **tensor_parameters), 1), {}
+        elif func.__name__ in ['layer_norm']:
+            yield (make_tensor((2, 2), **tensor_parameters), (2,)), {}
+        elif func.__name__ in ['local_response_norm']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters), 1), {}
+        elif func.__name__ in ['renorm']:
+            yield (make_tensor((2, 2), **tensor_parameters), 1, 0, 5), {}
+        elif func.__name__ in ['all', 'any', 'bitwise_not', 'logical_not']:
+            yield (make_tensor((2, 2), dtype=bool, **tensor_parameters), ), {}
+        elif func.__name__ in ['bitwise_and', 'bitwise_or', 'bitwise_xor',
+                               'logical_and', 'logical_or', 'logical_xor']:
+            yield (make_tensor((2, 2), dtype=bool, **tensor_parameters),
+                   make_tensor((2, 2), dtype=bool, **tensor_parameters)), {}
+        elif func.__name__ in ['bucketize']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['is_nonzero']:
+            yield (make_tensor((1, ), **tensor_parameters)), {}
+        elif func.__name__ in ['searchsorted']:
+            sorted_sequence = make_tensor([[1, 3, 5, 7, 9], [2, 4, 6, 8, 10]],
+                                          **tensor_parameters)
+            values = make_tensor([[3, 6, 9], [3, 6, 9]], **tensor_parameters)
+            yield (sorted_sequence, values,), {}
+        elif func.__name__ in ['bernoulli']:
+            yield (make_tensor((2, 2), rdist='uniform',
+                               **tensor_parameters),), {}
+        elif func.__name__ in ['multinomial']:
+            yield (make_tensor((2, 2), rdist='uniform',
+                               **tensor_parameters), 1), {}
+        elif func.__name__ in ['poisson']:
+            yield (make_tensor((2, 2), require_positive=True,
+                               **tensor_parameters),), {}
+        elif func.__name__ in ['fft', 'ifft', 'irfft', 'rfft', 'log_softmax']:
+            yield (make_tensor((2, 2), **tensor_parameters), 1), {}
+        elif func.__name__ in ['istft']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters), 2, 1), {}
+        elif func.__name__ in ['stft']:
+            yield (make_tensor((2, ), **tensor_parameters), 2, 1), {}
+        elif func.__name__ in ['binary_cross_entropy']:
+            yield (make_tensor((2, 2), rdist='uniform', **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),), {}
+        elif func.__name__ in ['cross_entropy']:
+            yield (make_tensor((2, 2), rdist='uniform', **tensor_parameters),
+                   make_tensor([1, 1], dtype=int, **tensor_parameters),), {}
+        elif func.__name__ in ['cosine_embedding_loss', 'margin_ranking_loss',
+                               'triplet_margin_loss']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['ctc_loss']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters),
+                   make_tensor([2, 2], dtype=int, **tensor_parameters),
+                   make_tensor([2, 2], dtype=int, **tensor_parameters)), {}
+        elif func.__name__ in ['hinge_embedding_loss', 'kl_div', 'l1_loss',
+                               'mse_loss', 'multilabel_soft_margin_loss',
+                               'poisson_nll_loss', 'smooth_l1_loss',
+                               'soft_margin_loss']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['prelu']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)), {}
+        elif func.__name__ in ['multi_margin_loss', 'nll_loss']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor([1, 1], dtype=int, **tensor_parameters)), {}
+        elif func.__name__ in ['multilabel_margin_loss']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor([[0, 0], [0, 0]],
+                               dtype=int, **tensor_parameters)), {}
+        elif func.__name__ in ['_pad', '_pad_circular']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters),
+                   (2, 2)), {}
+        elif func.__name__ in ['affine_grid']:
+            yield (make_tensor((2, 2, 3), **tensor_parameters),
+                   (2, 2, 2, 2)), {}
+        elif func.__name__ in ['channel_shuffle']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters), 1), {}
+        elif func.__name__ in ['grid_sample']:
+            yield (make_tensor((2, 2, 2, 2), **tensor_parameters),
+                   make_tensor((2, 2, 2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['interpolate', 'pixel_shuffle', 'upsample',
+                               'upsample_bilinear', 'upsample_nearest']:
+            yield (make_tensor((2, 2, 2, 2), **tensor_parameters), 1), {}
+        elif func.__name__ in ['threshold']:
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   0.75, 0.5), {}
+        elif func.__name__ in ['_adaptive_max_pool1d', 'adaptive_avg_pool1d',
+                               'adaptive_max_pool1d',
+                               'adaptive_max_pool1d_with_indices']:
+            yield ((make_tensor((2, 2, 2), **tensor_parameters),),
+                   dict(output_size=(2,)))
+        elif func.__name__ in ['_adaptive_max_pool2d',
+                               'adaptive_avg_pool2d',
+                               'adaptive_max_pool2d',
+                               'adaptive_max_pool2d_with_indices']:
+            yield ((make_tensor((2, 2, 2, 2), **tensor_parameters),),
+                   dict(output_size=(2, 2)))
+        elif func.__name__ in ['_adaptive_max_pool3d', 'adaptive_avg_pool3d',
+                               'adaptive_max_pool3d',
+                               'adaptive_max_pool3d_with_indices']:
+            yield ((make_tensor((2, 2, 2, 2), **tensor_parameters),),
+                   dict(output_size=(2, 2, 2)))
+        elif func.__name__ in ['_fractional_max_pool2d',
+                               'fractional_max_pool2d',
+                               'fractional_max_pool2d_with_indices']:
+            yield ((make_tensor((2, 2, 2, 2), **tensor_parameters),),
+                   dict(output_size=(2, 2), kernel_size=(1, 1)))
+        elif func.__name__ in ['_fractional_max_pool3d',
+                               'fractional_max_pool3d',
+                               'fractional_max_pool3d_with_indices']:
+            yield ((make_tensor((3, 3, 3, 3, 3), **tensor_parameters),),
+                   dict(output_size=(2, 2, 2), kernel_size=(1, 1, 1)))
+        elif func.__name__ in ['_max_pool1d', 'max_pool1d',
+                               'max_pool1d_with_indices', 'avg_pool1d']:
+            yield ((make_tensor((2, 2, 2), **tensor_parameters),),
+                   dict(kernel_size=(1,)))
+        elif func.__name__ in ['_max_pool2d', 'max_pool2d',
+                               'max_pool2d_with_indices', 'avg_pool2d']:
+            yield ((make_tensor((2, 2, 2, 2), **tensor_parameters),),
+                   dict(kernel_size=(1, 1)))
+        elif func.__name__ in ['_max_pool3d', 'max_pool3d',
+                               'max_pool3d_with_indices', 'avg_pool3d']:
+            yield ((make_tensor((2, 2, 2, 2, 2), **tensor_parameters),),
+                   dict(kernel_size=(1, 1, 1)))
+        elif func.__name__ in ['lp_pool1d']:
+            yield ((make_tensor((2, 2, 2), **tensor_parameters), 0.75),
+                   dict(kernel_size=1))
+        elif func.__name__ in ['lp_pool2d']:
+            yield ((make_tensor((2, 2, 2, 2), **tensor_parameters), 0.75),
+                   dict(kernel_size=(1, 1)))
+        elif func.__name__ in ['lp_pool3d']:
+            yield ((make_tensor((2, 2, 2, 2, 2), **tensor_parameters), 0.75),
+                   dict(kernel_size=(1, 1, 1)))
+        elif func.__name__ in ['max_unpool1d']:
+            output = torch.max_pool1d_with_indices(
+                make_tensor((2, 2, 2)), kernel_size=(1,))
+            output = tuple(make_tensor(t, dtype=t.dtype, **tensor_parameters)
+                           for t in output)
+            yield output, dict(kernel_size=(1,))
+        elif func.__name__ in ['max_unpool2d']:
+            output = torch.nn.functional.max_pool2d_with_indices(
+                make_tensor((2, 2, 2, 2)), kernel_size=(1, 1))
+            output = tuple(make_tensor(t, dtype=t.dtype, **tensor_parameters)
+                           for t in output)
+            yield output, dict(kernel_size=(1, 1))
+        elif func.__name__ in ['max_unpool3d']:
+            output = torch.nn.functional.max_pool3d_with_indices(
+                make_tensor((2, 2, 2, 2, 2)), kernel_size=(1, 1, 1))
+            output = tuple(make_tensor(t, dtype=t.dtype,
+                                       **tensor_parameters) for t in output)
+            yield output, dict(kernel_size=(1, 1, 1))
+        elif func.__name__ in ['dropout3d']:
+            yield (make_tensor((2, 2, 2), **tensor_parameters),), {}
+        elif func.__name__ in ['embedding', 'embedding_bag']:
+            yield (make_tensor([[0, 0], [0, 0]], dtype=int,
+                               **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['one_hot']:
+            yield (make_tensor((2, 2), dtype=int, **tensor_parameters),), {}
+        elif func.__name__ in ['int_repr']:
+            # cannot create quantized sparse tensor
+            if tensor_parameters.get('layout', torch.strided) == torch.strided:
+                yield (make_tensor((2, 2), dtype=torch.qint32,
+                                   **tensor_parameters),), {}
+        elif func.__name__ in ['q_per_channel_axis',
+                               'q_per_channel_scales',
+                               'q_per_channel_zero_points', 'q_scale',
+                               'q_zero_point']:
+            pass
+        else:
+            print(func.__name__, sig)
+            print(func.__doc__)
+            yield NotImplemented, None
+
+    def get_status(self, func, sig, tensor_parameters):
+        """Return the support (status, state, fail_details) tuple of a
+        function for given tensor parameters.
+        """
+        success_count = 0
+        fail_count = 0
+        fail_details = []
+        notests = True
+        for args, kwargs in self.iter_func_args(func, sig, tensor_parameters):
+            notests = False
+            if args is NotImplemented:
+                return 'NOTIMPL', 'not impl', []
+                break
+            try:
+                func(*args, **kwargs)
+                success_count += 1
+            except RuntimeError as msg:
+                fail_count += 1
+                detail = str(msg).splitlines()[0]
+                if re.match('.+? is only available for these backends:',
+                            detail):
+                    detail = 'RuntimeError: backend not supported'
+                elif re.match('.+? is not implemented for .+? layout',
+                              detail):
+                    detail = 'RuntimeError: not implemented for layout'
+                elif re.match('unsupported tensor layout: .+', detail):
+                    detail = 'RuntimeError: unsupported layout'
+                elif re.match(r'expected \w+ to be a .+?, but got \w+ of'
+                              r' layout \w+', detail):
+                    detail = 'RuntimeError: unexpected layout'
+                elif re.match(r'\w+ tensors do not have strides', detail):
+                    detail = 'RuntimeError: no strides'
+                elif re.match('sparse tensors do not have is_contiguous',
+                              detail):
+                    detail = 'RuntimeError: no is_contiguous'
+                elif re.match('.+? must be dense', detail):
+                    detail = 'RuntimeError: operand must be dense'
+                elif func.__name__ in ['div', 'floor_divide', 'true_divide']:
+                    detail = f'RuntimeError: {detail}'
+                elif re.match('memory format option is only supported'
+                              ' by strided tensors', detail):
+                    detail = 'RuntimeError: memory format option not supported'
+                elif re.match("Could not run.*?memory_format['] is only"
+                              " available for these backends.*", detail):
+                    detail = 'RuntimeError: memory format unavailable'
+                elif re.match(r'\w+ tensors do not have storage', detail):
+                    detail = 'RuntimeError: no storage'
+                elif re.match(r'reshape is not implemented for \w+ tensors',
+                              detail):
+                    detail = 'RuntimeError: unimplemented reshape'
+                elif re.match(r'unsupported memory format option \w+', detail):
+                    detail = 'RuntimeError: unsupported memory format option'
+                elif (re.match(r'.+? only supports strided layout.*', detail)
+                      or re.match(
+                          r'.*?expected .+? to have torch[.]strided layout.*',
+                          detail)):
+                    detail = 'RuntimeError: requires strided layout'
+
+                fail_details.append(detail)
+            except Exception as msg:
+                fail_count += 1
+                detail = str(msg).splitlines()[0]
+                fail_details.append(f'{type(msg).__name__}: {detail}')
+
+        if notests:
+            return 'SKIPPED', 'skipped', []
+        count = fail_count + success_count
+        status, state = '?', ''
+        if count == 0:
+            fail_details.append('untested')
+            status, state = 'UNTESTED', 'untested'
+        elif fail_count == 0:
+            status, state = 'PASSED', 'passed'
+        elif success_count == 0:
+            status, state = 'FAILED', 'failed'
+        else:
+            status, state = 'PARTIAL', f'{success_count}/{count} passed'
+        if fail_details:
+            nl = '\n  '
+            print(f'{func.__name__}:{nl}{nl.join(fail_details)}')
+        return status, state, fail_details
 
     def make_sparse_support_state(self):
-        layouts = get_layouts()
+        tensor_parameters_list, titles = zip(*self.iter_tensor_parameters())
         lines = []
-        section_layout_ok_lst = defaultdict(lambda : defaultdict(int))
-        section_layout_skip_lst = defaultdict(lambda : defaultdict(int))
-        section_layout_fail_lst = defaultdict(lambda : defaultdict(int))
-        total_layout_ok_lst = defaultdict(int)
-        total_layout_skip_lst = defaultdict(int)
-        total_layout_fail_lst = defaultdict(int)
-        for section in self.config.sections():
+        section_title_status = defaultdict(
+            lambda: defaultdict(lambda: defaultdict(int)))
+        title_status = defaultdict(lambda: defaultdict(int))
+        detail_title = defaultdict(lambda: defaultdict(int))
+        detail_total = defaultdict(int)
+        for section_id, section in enumerate(self.iter_sections()):
             funcs = []
             if self.config.has_option(section, '_funcs'):
                 funcs = list(self.config.get(section, '_funcs'))
-            funcs1 = sorted((func.__name__, str(sig), i) for i, (func, sig) in enumerate(funcs))
+            funcs1 = sorted((func.__name__, str(sig), i)
+                            for i, (func, sig) in enumerate(funcs))
             funcs = list(funcs[i] for _, _, i in funcs1)
-                
-            print(f'section: {section}')
+
+            if self.verbose:
+                print(f'section: {section}')
             section_title = self.config.get(section, 'title')
 
             skips = []
@@ -742,26 +866,25 @@ class Classifier:
                 skips = list(w for w in skips.strip().split() if w)
 
             f = io.StringIO('')
-            headers = ['Function'] + list(map(str, layouts)) + ['Signature']
+            headers = ['Function'] + list(titles)
             lst = []
             for func, sig in funcs:
-                row = [get_docname(func, sig)]
-                for layout in layouts:
-                    #print(f'  try {layout}: {func.__name__}')
-                    if func.__name__ in skips:
-                        status = 'SKIP'
-                    else:
-                        status = try_layout(func, sig, layout)
-                    row.append(status)
-                    if status == 'OK':
-                        section_layout_ok_lst[section][layout] += 1
-                    elif status == 'SKIP':
-                        section_layout_skip_lst[section][layout] += 1
-                    else:
-                        section_layout_fail_lst[section][layout] += 1
-                row.append(str(sig))
-                lst.append(row)                
-
+                dname = get_docname(func, sig)
+                attr = self.attrs.get(func.__name__)
+                if attr is not None:
+                    dname += ' ' + attr
+                row = [dname]
+                for tensor_parameters, title in zip(
+                        tensor_parameters_list, titles):
+                    status, state, fail_details \
+                        = self.get_status(func, sig, tensor_parameters)
+                    fail_details = list(set(fail_details))
+                    detail = ';'.join(fail_details) or status
+                    row.append(detail)
+                    section_title_status[section][title][status] += 1
+                    detail_title[detail][title] += 1
+                    detail_total[detail] += 1
+                lst.append(row)
 
             level = section.count('/') + 1
             lines.append(f'\n\n{level * "#"} {section_title}\n')
@@ -771,45 +894,30 @@ class Classifier:
                 lines.append(f.getvalue())
 
         f = io.StringIO('')
-        headers = ['Section'] + list(map(str, layouts))
+        headers = ['Section'] + list(titles)
         lst = []
-        for section in self.config.sections():
+        for section in self.iter_sections():
             section_title = self.config.get(section, 'title')
             row = []
             row.append(get_secname(section_title))
-            for layout in layouts:
-                l = []
-                v = section_layout_ok_lst[section][layout]
-                if v:
-                    total_layout_ok_lst[layout] += v
-                    l.append(f'{v} passed')
-                v = section_layout_fail_lst[section][layout]
-                if v:
-                    total_layout_fail_lst[layout] += v
-                    l.append(f'{v} failed')
-                v = section_layout_skip_lst[section][layout]
-                if v:
-                    total_layout_skip_lst[layout] += v
-                    l.append(f'{v} skipped')
-                row.append(', '.join(l))
+            for title in titles:
+                l1 = []
+                for status, count in (section_title_status[section][title]
+                                      .items()):
+                    if count:
+                        l1.append(f'{status}: {count}')
+                        title_status[title][status] += count
+                row.append(', '.join(sorted(l1)))
             lst.append(row)
         row = ['Total']
-        for layout in layouts:
-            l = []
-            v = total_layout_ok_lst[layout]
-            if v:
-                l.append(f'{v} passed')
-            v = total_layout_fail_lst[layout]
-            if v:
-                l.append(f'{v} failed')
-            v = total_layout_skip_lst[layout]
-            if v:
-                l.append(f'{v} skipped')
-            row.append(', '.join(l))
+        for title in titles:
+            l1 = []
+            for status, count in title_status[title].items():
+                if count:
+                    l1.append(f'{status}: {count}')
+            row.append(', '.join(sorted(l1)))
         lst.append(row)
-
         text_utils.table(f, lst, list(range(len(headers))), headers)
-
         namespaces = '\n'.join([f'- {m.__name__}' for m in modules])
 
         lines_header = [
@@ -820,20 +928,36 @@ This file is auto-generated, do not edit!
 
 The following table summarizes the state of PyTorch tensor layouts for
 different PyTorch functions from the following namespaces:
-{namespaces}
-
+{namespaces}\n''',
+            f.getvalue(),
+            '''
 The functions and possible failure messages are listed in the tables
 of subsequent sections.
 
-            ''',
-            f.getvalue(),
-            '''
+## Ranking of failures
 
-Notes:
-* TODO: all tests for strided layout should pass
-* TODO: enable tests for different devices: CPU, CUDA
-            '''
+The following table lists the ranking of failure messages:\n''',
         ]
+
+        f = io.StringIO('')
+        headers = ['Status detail'] + list(titles)
+        lst = []
+
+        for total, detail in reversed(
+                sorted((v, k) for k, v in detail_total.items())):
+            if detail == 'SKIPPED':
+                continue
+            if total <= 1:
+                # don't show single failures
+                break
+            row = [detail]
+            for title in titles:
+                row.append(str(detail_title[detail][title]))
+            lst.append(row)
+        text_utils.table(f, lst, list(range(len(headers))), headers)
+        lines_header.append(f.getvalue())
+
+        #
         lines = lines_header + lines
 
         fn = os.path.join(self.working_dir, 'SparseSupportState.md')
@@ -843,15 +967,18 @@ Notes:
         f.close()
 
 
-def main2(working_dir=None):
+def main(working_dir=None):
     if working_dir is None:
         working_dir = os.path.dirname(__file__)
-    classifier = Classifier.fromfile('pytorch_functions.ini', working_dir=working_dir)
+    classifier = Classifier.fromfile('pytorch_functions.ini',
+                                     working_dir=working_dir)
     for func, sig in all_functions():
-        classifiers = classifier.get_classifiers(func, sig)
-
+        section = classifier.attach(func, sig)
+        if section is None:
+            print(f'TODO: add {func.__name__} to'
+                  f' {working_dir or "."}/pytorch_functions.ini')
     classifier.make_sparse_support_state()
 
+
 if __name__ == '__main__':
-    main2()
-    #make_classification_file()
+    main()
