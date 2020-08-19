@@ -153,8 +153,8 @@ class Classifier:
                     name = name.strip()
                     if not name:
                         continue
-                    if name.endswith('!'):
-                        i = name.index('!')
+                    if name.endswith('!') or name.endswith('?'):
+                        i = name.index(name[-1])
                         name, attr = name[:i], name[i:]
                         self.attrs[name] = attr
                     elif '|' in name:
@@ -859,11 +859,6 @@ class Classifier:
             if self.verbose:
                 print(f'section: {section}')
             section_title = self.config.get(section, 'title')
-
-            skips = []
-            if self.config.has_option(section, 'skip_try_layout'):
-                skips = self.config.get(section, 'skip_try_layout')
-                skips = list(w for w in skips.strip().split() if w)
 
             f = io.StringIO('')
             headers = ['Function'] + list(titles)
