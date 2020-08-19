@@ -5,14 +5,53 @@ import torch
 import numpy
 import re
 import configparser
-from torch_signatures import scan_module
+import types
+import typing
 import text_utils
 from collections import defaultdict
 
 modules = [torch, torch.nn.functional, torch.sparse]
 
 
+def all_functions(module=modules, recursive=False, _cache=set()):
+    """Iterator of functions from a module or modules.
+    """
+    if isinstance(module, (list, tuple)):
+        for m in module:
+            for r in all_functions(m, recursive=recursive):
+                yield r
+        return
+
+    if module.__name__ in _cache:
+        return
+    _cache.add(module.__name__)
+    for name, member in sorted(module.__dict__.items()):
+        if isinstance(member, (bool, str, type, dict, list, tuple, int,
+                               float, complex)):
+            continue
+        if isinstance(member, typing._Final):
+            continue
+        if not callable(member):
+            if name == 'classes':
+                continue
+            if isinstance(member, types.ModuleType) and recursive:
+                if not member.__name__.startswith('torch.'):
+                    continue
+                for r in all_functions(module=member, recursive=recursive):
+                    yield r
+            continue
+        if not getattr(member, '__doc__', None):
+            continue
+        if ((member.__name__.startswith('_')
+             and not member.__name__.startswith('__'))):
+            continue
+        if member.__module__ is None:
+            member.__module__ = module.__name__
+        yield member
+
+
 def random_coo(shape, dtype, sparsity=0.75, coalesce=True, rdist='random',
+               requires_grad=False,
                require_positive=False, device=None):
     total = 1
     for dim in shape:
@@ -41,10 +80,12 @@ def random_coo(shape, dtype, sparsity=0.75, coalesce=True, rdist='random',
             device=device, require_positive=require_positive)
         dtype = torch.complex128
     return torch.sparse_coo_tensor(
-        indices, values, shape, dtype=dtype, device=device)
+        indices, values, shape, dtype=dtype, device=device,
+        requires_grad=requires_grad)
 
 
 def make_tensor(shape_or_data, dtype=float, rdist='randn',
+                requires_grad=False,
                 require_positive=False, **params):
     if isinstance(shape_or_data, tuple):
         data, shape = None, shape_or_data
@@ -54,13 +95,17 @@ def make_tensor(shape_or_data, dtype=float, rdist='randn',
     device = params.get('device', None)
     if layout == torch.strided:
         if data is not None:
-            return torch.tensor(data, dtype=dtype, device=device)
+            return torch.tensor(data, dtype=dtype, device=device,
+                                requires_grad=requires_grad)
         if dtype in [bool]:
-            return torch.randint(0, 1, shape, dtype=dtype, device=device)
+            return torch.randint(0, 1, shape, dtype=dtype, device=device,
+                                 requires_grad=requires_grad)
         if dtype in [int]:
-            return torch.randint(0, 5, shape, dtype=dtype, device=device)
+            return torch.randint(0, 5, shape, dtype=dtype, device=device,
+                                 requires_grad=requires_grad)
         if rdist == 'uniform':
-            t = torch.empty(shape, dtype=dtype, device=device)
+            t = torch.empty(shape, dtype=dtype, device=device,
+                            requires_grad=requires_grad)
             t.uniform_()
         elif rdist == 'randn':
             if dtype in [torch.qint32]:
@@ -68,14 +113,18 @@ def make_tensor(shape_or_data, dtype=float, rdist='randn',
                                   dtype=torch.float32, device=device)
                 t = torch.quantize_per_tensor(t, 1.0, 0, dtype=dtype)
             elif dtype in [complex]:
-                t = torch.randn(shape, dtype=float, device=device)
-                t = t + 1j * torch.randn(shape, dtype=float, device=device)
+                t = torch.randn(shape, dtype=float, device=device,
+                                requires_grad=requires_grad)
+                t = t + 1j * torch.randn(shape, dtype=float, device=device,
+                                         requires_grad=requires_grad)
             else:
-                t = torch.randn(shape, dtype=dtype, device=device)
+                t = torch.randn(shape, dtype=dtype, device=device,
+                                requires_grad=requires_grad)
                 if require_positive:
                     t = t * t
         elif rdist == 'posdefined':
-            t = torch.randn(shape, dtype=dtype, device=device)
+            t = torch.randn(shape, dtype=dtype, device=device,
+                            requires_grad=requires_grad)
             for i in range(len(shape)):
                 t[(i,) * len(shape)] += 5
         else:
@@ -83,8 +132,13 @@ def make_tensor(shape_or_data, dtype=float, rdist='randn',
         return t
     if layout == torch.sparse_coo:
         if data is not None:
-            return torch.tensor(data, dtype=dtype, device=device).to_sparse()
+            t = torch.tensor(
+                data, dtype=dtype, device=device).to_sparse().coalesce()
+            return torch.sparse_coo_tensor(
+                t.indices(), t.values(), t.size(),
+                dtype=t.dtype, device=device, requires_grad=requires_grad)
         return random_coo(shape, dtype=dtype, rdist=rdist,
+                          requires_grad=requires_grad,
                           require_positive=require_positive, device=device)
     raise NotImplementedError(layout)
 
@@ -117,14 +171,6 @@ def get_doclink(func):
 def get_docname(func, sig):
     return (f'<a href="{get_doclink(func)}">'
             f'{func.__module__}.{func.__name__}</a>')
-
-
-def all_functions(filter=lambda func, sig: True, _cache=[]):
-    if not _cache:
-        _cache.extend(scan_module(module=modules))
-    for func, sig in set(_cache):
-        if filter(func, sig):
-            yield func, sig
 
 
 class Classifier:
@@ -223,11 +269,24 @@ class Classifier:
                 title = f'{str(layout).split(".")[-1]}@{device}'
                 yield dict(layout=layout, device=device), title
 
+    def _skip(self, func, sig, tensor_parameters):
+        attr = self.attrs.get(func.__name__)
+        if attr == 'I':
+            return True
+        if tensor_parameters.get('layout') == torch.strided and attr == 'S':
+            return True
+        if tensor_parameters.get('layout') != torch.strided and attr == 'D':
+            return True
+
     def iter_func_args(self, func, sig, tensor_parameters):
-        layout_device_kwargs = dict(layout=tensor_parameters.get('layout'),
-                                    device=tensor_parameters.get('device'))
+        layout_device_kwargs = dict(
+            layout=tensor_parameters.get('layout'),
+            device=tensor_parameters.get('device'),
+            requires_grad=tensor_parameters.get('requires_grad', False))
         device_kwargs = dict(device=tensor_parameters.get('device'))
-        if func.__name__ in ['arange', 'range']:
+        if self._skip(func, sig, tensor_parameters):
+            pass
+        elif func.__name__ in ['arange', 'range']:
             if func.__name__ == 'arange':
                 yield (5, ), layout_device_kwargs
             yield (1, 5), layout_device_kwargs
@@ -326,10 +385,16 @@ class Classifier:
                 'silu', 'softplus', 'softshrink', 'softsign',
                 'tanhshrink', 'alpha_dropout', 'dropout', 'dropout2d',
                 'feature_alpha_dropout', 'get_device', 'is_complex',
-                'is_floating_point', 'is_signed', 'view_as_complex']:
+                'is_floating_point', 'is_signed', 'view_as_complex',
+                'is_tensor',
+                'selu_', 'rrelu_', 'relu_', 'leaky_relu_', 'hardtanh_',
+                'elu_', 'celu_', 'isposinf', 'isneginf', 'nansum',
+                'matrix_exp', 'atleast_1d', 'atleast_2d', 'atleast_3d',
+                'signbit', 'arccosh']:
             # unary operations
             yield (make_tensor((2, 2), **tensor_parameters),), {}
-        elif func.__name__ in ['imag', 'conj', 'real', 'view_as_real']:
+        elif func.__name__ in [
+                'imag', 'conj', 'real', 'view_as_real', 'isreal']:
             yield (make_tensor((2, 2), dtype=complex,
                                **tensor_parameters),), {}
         elif func.__name__ in [
@@ -337,7 +402,8 @@ class Classifier:
                 'mul', 'pow', 'cdist', 'dist', 'allclose', 'eq',
                 'equal', 'ge', 'gt', 'le', 'lt', 'isclose', 'ne',
                 'cosine_similarity', 'pairwise_distance',
-                'binary_cross_entropy_with_logits', 'result_type']:
+                'binary_cross_entropy_with_logits', 'result_type',
+                'polar', 'hypot', 'complex', 'nextafter']:
             # binary operations
             yield (make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters)), {}
@@ -363,9 +429,11 @@ class Classifier:
             yield (make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters)), dict(value=1.5)
-        elif func.__name__ in ['clamp']:
+        elif func.__name__ in ['clamp', 'clip']:
             yield ((make_tensor((2, 2), **tensor_parameters),),
                    dict(min=-1, max=1))
+        elif func.__name__ in ['quantile']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0.75), {}
         elif func.__name__ in ['div', 'floor_divide', 'fmod', 'remainder']:
             yield (make_tensor((2, 2), **tensor_parameters), 1.5), {}
             yield (make_tensor((2, 2), **tensor_parameters),
@@ -397,7 +465,7 @@ class Classifier:
         elif func.__name__ in ['lobpcg', 'pca_lowrank', 'svd',
                                'svd_lowrank']:
             yield (make_tensor((6, 6), **tensor_parameters),), {}
-        elif func.__name__ in ['ger']:
+        elif func.__name__ in ['ger', 'outer']:
             yield (make_tensor((2,), **tensor_parameters),
                    make_tensor((2,), **tensor_parameters)), {}
         elif func.__name__ in ['lerp']:
@@ -502,8 +570,10 @@ class Classifier:
         elif func.__name__ in ['cat', 'meshgrid']:
             yield ((make_tensor((2,), **tensor_parameters),
                     make_tensor((2,), **tensor_parameters)),), {}
-        elif func.__name__ in ['chunk']:
+        elif func.__name__ in ['chunk', 'unsafe_chunk']:
             yield (make_tensor((2, 2), **tensor_parameters), 2), {}
+        elif func.__name__ in ['movedim']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0, 1), {}
         elif func.__name__ in ['combinations', 'bincount']:
             yield (make_tensor((2, ), dtype=int, **tensor_parameters),), {}
         elif func.__name__ in ['diag', 'diag_embed', 'diagflat', 'diagonal']:
@@ -560,9 +630,9 @@ class Classifier:
                                'cumprod', 'cumsum', 'logcumsumexp',
                                'logsumexp', 'prod', 'argsort',
                                'kthvalue', 'topk',
-                               'softmax', 'softmin']:
+                               'softmax', 'softmin', 'unsafe_split']:
             yield (make_tensor((2, 2), **tensor_parameters), 1), {}
-        elif func.__name__ in ['stack']:
+        elif func.__name__ in ['stack', 'vstack', 'hstack', 'dstack']:
             yield ([make_tensor((2, 2), **tensor_parameters),
                     make_tensor((2, 2), **tensor_parameters)], ), {}
         elif func.__name__ in ['take']:
@@ -667,7 +737,7 @@ class Classifier:
         elif func.__name__ in ['interpolate', 'pixel_shuffle', 'upsample',
                                'upsample_bilinear', 'upsample_nearest']:
             yield (make_tensor((2, 2, 2, 2), **tensor_parameters), 1), {}
-        elif func.__name__ in ['threshold']:
+        elif func.__name__ in ['threshold', 'threshold_']:
             yield (make_tensor((2, 2), **tensor_parameters),
                    0.75, 0.5), {}
         elif func.__name__ in ['_adaptive_max_pool1d', 'adaptive_avg_pool1d',
@@ -751,10 +821,12 @@ class Classifier:
         elif func.__name__ in ['q_per_channel_axis',
                                'q_per_channel_scales',
                                'q_per_channel_zero_points', 'q_scale',
-                               'q_zero_point']:
+                               'q_zero_point',
+                               'quantized_lstm', 'quantized_gru']:
             pass
         else:
-            print(func.__name__, sig)
+            print('-'*80)
+            print(func.__name__)
             print(func.__doc__)
             yield NotImplemented, None
 
@@ -772,7 +844,10 @@ class Classifier:
                 return 'NOTIMPL', 'not impl', []
                 break
             try:
-                func(*args, **kwargs)
+                if tensor_parameters.get('requires_grad'):
+                    func(*args, **kwargs)
+                else:
+                    func(*args, **kwargs)
                 success_count += 1
             except RuntimeError as msg:
                 fail_count += 1
@@ -837,7 +912,8 @@ class Classifier:
             status, state = 'PARTIAL', f'{success_count}/{count} passed'
         if fail_details:
             nl = '\n  '
-            print(f'{func.__name__}:{nl}{nl.join(fail_details)}')
+            print(f'{func.__module__}.{func.__name__}:'
+                  f'{nl}{nl.join(fail_details)}')
         return status, state, fail_details
 
     def make_sparse_support_state(self):
@@ -967,10 +1043,13 @@ def main(working_dir=None):
         working_dir = os.path.dirname(__file__)
     classifier = Classifier.fromfile('pytorch_functions.ini',
                                      working_dir=working_dir)
-    for func, sig in all_functions():
-        section = classifier.attach(func, sig)
+    functions = list(set(all_functions()))
+    for _, i in sorted([(func.__name__, i)
+                        for i, func in enumerate(functions)]):
+        func = functions[i]
+        section = classifier.attach(func, None)
         if section is None:
-            print(f'TODO: add {func.__name__} to'
+            print(f'TODO: add {func.__name__} from {func.__module__} to'
                   f' {working_dir or "."}/pytorch_functions.ini')
     classifier.make_sparse_support_state()
 
