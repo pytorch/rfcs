@@ -40,11 +40,16 @@ def all_functions(module=modules, recursive=False, _cache=set()):
                 for r in all_functions(module=member, recursive=recursive):
                     yield r
             continue
-        if not getattr(member, '__doc__', None):
+        if (((member.__name__.startswith('_')
+              and not member.__name__.startswith('__'))
+             or name.startswith('_'))):
+            # skip private functions
             continue
-        if ((member.__name__.startswith('_')
-             and not member.__name__.startswith('__'))):
-            continue
+        if not (getattr(member, '__doc__', None)
+                or member.__name__.endswith('_')) and 0:
+            print(f'{module.__name__}.{name} = {member.__name__}'
+                  ' does not have docstring')
+
         if member.__module__ is None:
             member.__module__ = module.__name__
         yield member
@@ -189,9 +194,9 @@ class Classifier:
         if working_dir is None:
             working_dir = os.path.dirname(__file__)
         # replace names string content with a list
-        self.attrs = {}
+        self.flags = {}
         for section in config.sections():
-            if section == 'ATTRIBUTES':
+            if section == 'FLAGS':
                 continue
             if config.has_option(section, 'names'):
                 names = []
@@ -201,11 +206,11 @@ class Classifier:
                         continue
                     if name.endswith('!') or name.endswith('?'):
                         i = name.index(name[-1])
-                        name, attr = name[:i], name[i:]
-                        self.attrs[name] = attr
+                        name, flag = name[:i], name[i:]
+                        self.flags[name] = flag
                     elif '|' in name:
-                        name, attr = name.split('|', 1)
-                        self.attrs[name] = attr
+                        name, flag = name.split('|', 1)
+                        self.flags[name] = flag.upper()
                     names.append(name)
                 config.set(section, 'names', names)
         #
@@ -214,19 +219,31 @@ class Classifier:
 
     def iter_sections(self):
         for section in self.config.sections():
-            if section == 'ATTRIBUTES':
+            if section in ['FLAGS', 'UNCLASSIFIED']:
                 continue
             yield section
+        section = 'UNCLASSIFIED'
+        if not self.config.has_section(section):
+            self.config.add_section(section)
+            self.config.set(section, 'names', [])
+            self.config.set(section, 'title', 'Unclassified functions')
+        yield section
 
     def attach(self, func, sig):
         """Attach function and its signature to classifier. Return section
         when defined.
         """
+        name = func.__name__
+        if name.endswith('_') and not name.endswith('__'):
+            # normalize the name of inplace function
+            name = name[:-1]
         for section in self.iter_sections():
             if not self.config.has_option(section, 'names'):
                 continue
             names = self.config.get(section, 'names')
-            if func.__name__ in names:
+            if ((name in names
+                 or func.__name__ in names
+                 or section == 'UNCLASSIFIED')):
                 if not self.config.has_option(section, '_funcs'):
                     self.config.set(section, '_funcs', [])
                 funcs = self.config.get(section, '_funcs')
@@ -270,12 +287,12 @@ class Classifier:
                 yield dict(layout=layout, device=device), title
 
     def _skip(self, func, sig, tensor_parameters):
-        attr = self.attrs.get(func.__name__)
-        if attr == 'I':
+        flag = self.flags.get(func.__name__)
+        if flag == 'I':
             return True
-        if tensor_parameters.get('layout') == torch.strided and attr == 'S':
+        if tensor_parameters.get('layout') == torch.strided and flag == 'S':
             return True
-        if tensor_parameters.get('layout') != torch.strided and attr == 'D':
+        if tensor_parameters.get('layout') != torch.strided and flag == 'D':
             return True
 
     def iter_func_args(self, func, sig, tensor_parameters):
@@ -285,7 +302,9 @@ class Classifier:
             requires_grad=tensor_parameters.get('requires_grad', False))
         device_kwargs = dict(device=tensor_parameters.get('device'))
         if self._skip(func, sig, tensor_parameters):
-            pass
+            yield None, None
+        elif func.__name__ in ['scalar_tensor']:
+            yield (1.5,), layout_device_kwargs
         elif func.__name__ in ['arange', 'range']:
             if func.__name__ == 'arange':
                 yield (5, ), layout_device_kwargs
@@ -300,7 +319,7 @@ class Classifier:
         elif func.__name__ in ['randint_like']:
             yield ((make_tensor((2, 2), **tensor_parameters), 1, 5),
                    layout_device_kwargs)
-        elif func.__name__ == 'as_strided':
+        elif func.__name__.rstrip('_') == 'as_strided':
             yield (make_tensor((3, 3), **tensor_parameters),
                    (2, 2), (1, 2)), {}
             yield (make_tensor((3, 3), **tensor_parameters),
@@ -311,17 +330,9 @@ class Classifier:
             if tensor_parameters.get('device', 'cpu') != 'cpu':
                 yield ((make_tensor((3, 3), **tensor_parameters), ),
                        dict(device='cpu'))
-        elif func.__name__ in [
-                'dequantize', 'quantize_per_channel', 'quantize_per_tensor',
-                'get_rng_state', 'initial_seed', 'manual_seed', 'normal',
-                'seed', 'set_rng_state', 'multi_head_attention_forward',
-                'can_cast', 'compiled_with_cxx11_abi', 'get_default_dtype',
-                'get_num_interop_threads', 'get_num_threads', 'load', 'seek',
-                'promote_types', 'save', 'set_default_dtype',
-                'set_default_tensor_type', 'set_flush_denormal',
-                'set_num_interop_threads', 'set_num_threads',
-                'set_printoptions']:
-            pass
+        elif func.__name__ == 'normal':
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
         elif func.__name__ in [
                 'empty', 'ones', 'zeros', 'tril_indices', 'triu_indices',
                 'rand', 'randn']:
@@ -362,7 +373,19 @@ class Classifier:
             for tp, _ in self.iter_tensor_parameters():
                 data = make_tensor((2, 2), **tp)
                 yield (data,), device_kwargs
-        elif func.__name__ in [
+        elif func.__name__.rstrip('_') in [
+                'feature_alpha_dropout', 'dropout', 'alpha_dropout',
+                'feature_dropout']:
+            yield (make_tensor((2, 2), **tensor_parameters), 0.5, False), {}
+        elif func.__name__ == 'fill_':
+            yield (make_tensor((2, 2), **tensor_parameters), 1.5), {}
+        elif func.__name__ == 'resize_as_':
+            yield ((make_tensor((2, 2), **tensor_parameters),
+                    make_tensor((2, 2), **tensor_parameters)), {})
+        elif func.__name__ in ['split_with_sizes', 'unsafe_split_with_sizes']:
+            yield ((make_tensor((2, 2), **tensor_parameters),
+                    (1, 1)), {})
+        elif func.__name__.rstrip('_') in [
                 'abs', 'absolute', 'acos', 'acosh',
                 'angle', 'asin', 'asinh', 'atan', 'atanh', 'cos',
                 'cosh', 'deg2rad', 'digamma', 'erf', 'erfc', 'erfinv',
@@ -390,8 +413,7 @@ class Classifier:
                 'selu_', 'rrelu_', 'relu_', 'leaky_relu_', 'hardtanh_',
                 'elu_', 'celu_', 'isposinf', 'isneginf', 'nansum',
                 'matrix_exp', 'atleast_1d', 'atleast_2d', 'atleast_3d',
-                'signbit', 'arccosh']:
-            # unary operations
+                'signbit', 'arccosh', 'zero']:
             yield (make_tensor((2, 2), **tensor_parameters),), {}
         elif func.__name__ in [
                 'imag', 'conj', 'real', 'view_as_real', 'isreal']:
@@ -403,11 +425,12 @@ class Classifier:
                 'equal', 'ge', 'gt', 'le', 'lt', 'isclose', 'ne',
                 'cosine_similarity', 'pairwise_distance',
                 'binary_cross_entropy_with_logits', 'result_type',
-                'polar', 'hypot', 'complex', 'nextafter']:
+                'polar', 'hypot', 'complex', 'nextafter',
+                'is_same_size']:
             # binary operations
             yield (make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters)), {}
-        elif func.__name__ in ['gcd', 'lcm', 'true_divide']:
+        elif func.__name__.rstrip('_') in ['gcd', 'lcm', 'true_divide']:
             yield (make_tensor((2, 2), dtype=int, **tensor_parameters),
                    make_tensor((2, 2), dtype=int, **tensor_parameters)), {}
         elif func.__name__ in ['mvlgamma']:
@@ -429,7 +452,7 @@ class Classifier:
             yield (make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters)), dict(value=1.5)
-        elif func.__name__ in ['clamp', 'clip']:
+        elif func.__name__.rstrip('_') in ['clamp', 'clip']:
             yield ((make_tensor((2, 2), **tensor_parameters),),
                    dict(min=-1, max=1))
         elif func.__name__ in ['quantile']:
@@ -442,7 +465,8 @@ class Classifier:
             yield (make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2, 2), require_positive=True,
-                               **tensor_parameters)), {}
+                               **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)), {}
         elif func.__name__ in ['linear']:
             yield (make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), require_positive=True,
@@ -464,7 +488,12 @@ class Classifier:
                    dict(eigenvectors=True))
         elif func.__name__ in ['lobpcg', 'pca_lowrank', 'svd',
                                'svd_lowrank']:
-            yield (make_tensor((6, 6), **tensor_parameters),), {}
+            yield (make_tensor([[1, 0, 0, 0, 0, 0],
+                                [0, 2, 0, 0, 0, 0],
+                                [0, 0, 3, 0, 0, 0],
+                                [0, 0, 0, 4, 0, 0],
+                                [0, 0, 0, 0, 5, 0],
+                                [0, 0, 0, 0, 0, 6]], **tensor_parameters),), {}
         elif func.__name__ in ['ger', 'outer']:
             yield (make_tensor((2,), **tensor_parameters),
                    make_tensor((2,), **tensor_parameters)), {}
@@ -538,7 +567,7 @@ class Classifier:
             yield (make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters)), {}
-        elif func.__name__ in ['addmv']:
+        elif func.__name__.rstrip('_') in ['addmv']:
             yield (make_tensor((2,), **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2,), **tensor_parameters)), {}
@@ -593,7 +622,7 @@ class Classifier:
             yield (make_tensor((2, 2), **tensor_parameters), 0,
                    make_tensor([0, 0], dtype=int,
                                **tensor_parameters), 1.5), {}
-        elif func.__name__ in ['index_put']:
+        elif func.__name__.rstrip('_') in ['index_put']:
             yield (make_tensor((2, 2), **tensor_parameters),
                    (make_tensor([0, 0], dtype=int, **tensor_parameters), ),
                    make_tensor((2, 2), **tensor_parameters)), {}
@@ -648,6 +677,26 @@ class Classifier:
         elif func.__name__ in ['einsum']:
             yield ('i,j->ji', make_tensor((2,), **tensor_parameters),
                    make_tensor((2,), **tensor_parameters)), {}
+        elif (func.__name__ in ['instance_norm']
+              and func.__module__ == 'torch'):
+            yield ((make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)),
+                   dict(running_mean=make_tensor((2,), **tensor_parameters),
+                        running_var=make_tensor((2,), **tensor_parameters),
+                        eps=1e-5,
+                        use_input_stats=True,
+                        cudnn_enabled=False, momentum=0.1))
+        elif (func.__name__ in ['batch_norm']
+              and func.__module__ == 'torch'):
+            yield ((make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters),
+                   make_tensor((2,), **tensor_parameters)),
+                   dict(running_mean=make_tensor((2,), **tensor_parameters),
+                        running_var=make_tensor((2,), **tensor_parameters),
+                        eps=1e-5,
+                        training=False,
+                        cudnn_enabled=False, momentum=0.1))
         elif func.__name__ in ['batch_norm', 'instance_norm']:
             yield (make_tensor((2, 2), **tensor_parameters),
                    make_tensor((2,), **tensor_parameters),
@@ -707,6 +756,12 @@ class Classifier:
                    make_tensor((2, 2), **tensor_parameters),
                    make_tensor([2, 2], dtype=int, **tensor_parameters),
                    make_tensor([2, 2], dtype=int, **tensor_parameters)), {}
+        elif (func.__name__ in ['poisson_nll_loss']
+              and func.__module__ == 'torch'):
+            yield ((make_tensor((2, 2), **tensor_parameters),
+                   make_tensor((2, 2), **tensor_parameters)),
+                   dict(full=False, log_input=True, eps=1e-8,
+                        reduction=0))
         elif func.__name__ in ['hinge_embedding_loss', 'kl_div', 'l1_loss',
                                'mse_loss', 'multilabel_soft_margin_loss',
                                'poisson_nll_loss', 'smooth_l1_loss',
@@ -807,10 +862,25 @@ class Classifier:
             yield output, dict(kernel_size=(1, 1, 1))
         elif func.__name__ in ['dropout3d']:
             yield (make_tensor((2, 2, 2), **tensor_parameters),), {}
-        elif func.__name__ in ['embedding', 'embedding_bag']:
+        elif func.__name__ in ['embedding'] and func.__module__ == 'torch':
+            yield (make_tensor((2, 2), **tensor_parameters),
+                   make_tensor([[0, 0], [0, 0]], dtype=int,
+                               **tensor_parameters)), {}
+        elif (func.__name__ in ['embedding']
+              and func.__module__ == 'torch.nn.functional'):
             yield (make_tensor([[0, 0], [0, 0]], dtype=int,
                                **tensor_parameters),
                    make_tensor((2, 2), **tensor_parameters)), {}
+        elif func.__name__ in ['embedding_bag'] and func.__module__ == 'torch':
+            yield ((make_tensor((2, 2), dtype=float, **tensor_parameters),
+                    make_tensor([0, 0], dtype=int, **tensor_parameters),
+                    make_tensor([0, 0], dtype=int, **tensor_parameters)), {})
+        elif (func.__name__ in ['embedding_bag']
+              and func.__module__ == 'torch.nn.functional'):
+            yield ((make_tensor([[0, 0], [0, 0]], dtype=int,
+                                **tensor_parameters),
+                    make_tensor((2, 2), **tensor_parameters)),
+                   dict(offsets=None))
         elif func.__name__ in ['one_hot']:
             yield (make_tensor((2, 2), dtype=int, **tensor_parameters),), {}
         elif func.__name__ in ['int_repr']:
@@ -818,11 +888,8 @@ class Classifier:
             if tensor_parameters.get('layout', torch.strided) == torch.strided:
                 yield (make_tensor((2, 2), dtype=torch.qint32,
                                    **tensor_parameters),), {}
-        elif func.__name__ in ['q_per_channel_axis',
-                               'q_per_channel_scales',
-                               'q_per_channel_zero_points', 'q_scale',
-                               'q_zero_point',
-                               'quantized_lstm', 'quantized_gru']:
+        elif (func.__name__.startswith('q_')
+              or 'quantize' in func.__name__):
             pass
         else:
             print('-'*80)
@@ -842,7 +909,8 @@ class Classifier:
             notests = False
             if args is NotImplemented:
                 return 'NOTIMPL', 'not impl', []
-                break
+            if args is None:
+                return 'N/A', 'not applicable', []
             try:
                 if tensor_parameters.get('requires_grad'):
                     func(*args, **kwargs)
@@ -924,6 +992,7 @@ class Classifier:
         title_status = defaultdict(lambda: defaultdict(int))
         detail_title = defaultdict(lambda: defaultdict(int))
         detail_total = defaultdict(int)
+        flag_count = defaultdict(int)
         for section_id, section in enumerate(self.iter_sections()):
             funcs = []
             if self.config.has_option(section, '_funcs'):
@@ -937,14 +1006,13 @@ class Classifier:
             section_title = self.config.get(section, 'title')
 
             f = io.StringIO('')
-            headers = ['Function'] + list(titles)
+            headers = ['Flag', 'Function'] + list(titles)
             lst = []
             for func, sig in funcs:
                 dname = get_docname(func, sig)
-                attr = self.attrs.get(func.__name__)
-                if attr is not None:
-                    dname += ' ' + attr
-                row = [dname]
+                flag = self.flags.get(func.__name__, '')
+                flag_count[flag] += 1
+                row = [flag, dname]
                 for tensor_parameters, title in zip(
                         tensor_parameters_list, titles):
                     status, state, fail_details \
@@ -963,6 +1031,26 @@ class Classifier:
             if lst:
                 text_utils.table(f, lst, list(range(len(headers))), headers)
                 lines.append(f.getvalue())
+
+        lines.append('''
+# Flags
+
+Flags are defined in the FLAGS section of <a
+href="pytorch_functions.ini">pytorch_functions.ini</a>.
+
+''')
+        section = 'FLAGS'
+        headers = ['Flag', 'Description', 'Usage count']
+        lst = []
+        for option in self.config.options(section):
+            descr = self.config.get(section, option)
+            flag = option.upper()
+            lst.append([flag, descr, str(flag_count.get(flag, '-'))])
+        flag, descr = '', 'no flag specified'
+        lst.append([flag, descr, str(flag_count.get(flag, '-'))])
+        f = io.StringIO('')
+        text_utils.table(f, lst, list(range(len(headers))), headers)
+        lines.append(f.getvalue())
 
         f = io.StringIO('')
         headers = ['Section'] + list(titles)
@@ -1018,7 +1106,7 @@ The following table lists the ranking of failure messages:\n''',
                 sorted((v, k) for k, v in detail_total.items())):
             if detail == 'SKIPPED':
                 continue
-            if total <= 1:
+            if total < 1:
                 # don't show single failures
                 break
             row = [detail]
