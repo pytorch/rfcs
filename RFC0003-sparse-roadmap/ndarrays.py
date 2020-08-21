@@ -610,7 +610,38 @@ def is_sequence(data):
         return False
     raise NotImplementedError(f'{type(data)=}')  # pragma: no cover
 
+def gcs_to_dense_convert(coords, strides0, strides1, dims0, dims1):
+    strides = [strides0, strides1]
+    dims = [dims0, dims1]
+    dense = []
+    for i, p in enumerate(coords):
+        dim = dims[i]
+        stride = strides[i]
 
+        if len(dim) != len(stride):
+            raise Exception("dim and stride must be same for coord i=", i)
+
+        for r in range(len(dim)):
+            dense.append((p // stride[r]) % dim[r])
+
+    return dense
+
+def dense_to_gcs_convert(coords, shape, l):
+    gcs = []
+    shape0 = shape[0:l]
+    shape1 = shape[l-1:-1]
+    ndims = len(shape)
+    
+    dims = [list(range(l)), list(range(l,ndims))]
+    strides = [make_strides(shape0), make_strides(shape1)]
+
+    for i in range(2):
+        stride = strides[i]
+        dim = dims[i]
+        gcs.append(sum([stride[r] * coords[dim[r]] for r in range(len(dim))]))
+
+    return gcs
+    
 ######################
 ##### Unit-tests #####
 ######################

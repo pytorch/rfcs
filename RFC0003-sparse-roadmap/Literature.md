@@ -213,9 +213,20 @@ due to irreregular memory access and better load balance caused by non-uniform d
 
 Link: https://dl.acm.org/doi/abs/10.1145/3229710.3229720
 
+### GPU Kernels for Block-Sparse Weights
 
-TODO:
+Link: https://cdn.openai.com/blocksparse/blocksparsepaper.pdf
+
+### TODO list
 
 * https://ieeexplore.ieee.org/document/7092787
 * https://ieeexplore.ieee.org/abstract/document/7965199?casa_token=jFN4uanr7p4AAAAA:jD4CKEczgvpg6bZ09NHFRSrQivmw8CzmP7ak2owWzr1nSqnGh1MIJYzl1OtMj-LOXVBljRDwIwzf
 * https://ieeexplore.ieee.org/abstract/document/9136784
+* https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7877136
+* https://arxiv.org/pdf/1803.08601.pdf
+* http://gauss.cs.ucsb.edu/publication/hypersparse-ipdps08.pdf
+* https://par.nsf.gov/servlets/purl/10126672
+* https://www.lri.fr/~baboulin/europar2016.pdf
+* https://arxiv.org/pdf/1707.05141.pdf
+* https://ieeexplore.ieee.org/document/7877119
+* 
