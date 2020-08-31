@@ -1,30 +1,11 @@
-# Contributing to rfcs
-We want to make contributing to this project as easy and transparent as
-possible.
+# Contributing to PyTorch RFCs
 
-## Pull Requests
-We actively welcome your pull requests.
+This repository is meant for Request For Comments (RFCs) - design proposals
+for topics that are too large to discuss on a standard feature request issue
+on the main PyTorch repository.
 
-1. Fork the repo and create your branch from `master`.
-2. If you've added code that should be tested, add tests.
-3. If you've changed APIs, update the documentation.
-4. Ensure the test suite passes.
-5. Make sure your code lints.
-6. If you haven't already, complete the Contributor License Agreement ("CLA").
-
-## Contributor License Agreement ("CLA")
-In order to accept your pull request, we need you to submit a CLA. You only need
-to do this once to work on any of Facebook's open source projects.
-
-Complete your CLA here: <https://code.facebook.com/cla>
-
-## Issues
-We use GitHub issues to track public bugs. Please ensure your description is
-clear and has sufficient instructions to be able to reproduce the issue.
-
-Facebook has a [bounty program](https://www.facebook.com/whitehat/) for the safe
-disclosure of security bugs. In those cases, please go through the process
-outlined on that page and do not file a public issue.
+If you are unsure whether something should be an RFC or a feature request
+issue, please open an issue in the main PyTorch repository first to discuss.
 
 ## License
 By contributing to rfcs, you agree that your contributions will be licensed
