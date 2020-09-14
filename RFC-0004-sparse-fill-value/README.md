@@ -19,7 +19,7 @@ fill value as a future extension.
 
 In general, the unspecified elements of sparse tensors have
 domain-specific interpretations:
-- In Linear Algebra domain, the unspecified elements are zero valued.
+- In Linear Algebra domain, the unspecified elements are zero-valued.
 - In Graph domain, the unspecified elements of adjacency matrices
   represent non-edges. In this document, a non-edge corresponds to
   an unspecified fill value.
@@ -28,15 +28,15 @@ domain-specific interpretations:
   Evaluation of such functions on sparse tensors can be element-wise,
   or one-dimension-wise operations. This includes the evaluation of
   the functions on the values corresponding to unspecified
-  elements. Even when the unspecified elements are initially being
-  zero valued, the values of unspecified elements may be mapped to
+  elements. Even when the unspecified elements are initially
+  zero-valued, the values of unspecified elements may be mapped to
   nonzero values (see [an example
   below](#application-random-sequence-of-rare-events-with-non-zero-mean)). So,
   in the domain of Calculus, the unspecified elements of sparse
   tensors can have any defined value.
 
 Currently, in PyTorch, the unspecified elements of sparse tensors are
-zero valued, but not only. For instance, the `torch.sparse.softmax`
+zero-valued, but not only. For instance, the `torch.sparse.softmax`
 function assumes that the unspecified elements of a sparse tensor
 input are negative infinity (-inf) valued.
 
@@ -45,13 +45,13 @@ In PyTorch 1.6, element-wise functions from Calculus such as `exp`,
 etc, on sparse tensors are not supported, because the existing
 functions on sparse tensors assume that the unspecified elements are
 zero valued (this applies to functions in `torch` namespace, functions
-in `torch.sparse` namespace may use different interpretation for
+in `torch.sparse` namespace may use a different interpretation for
 unspecified elements).
 
-To support Calculus functions on sparse tensors, we'll propose adding a
+To support Calculus functions on sparse tensors, we propose adding a
 `fill_value` property to PyTorch sparse tensors that will represent the
 values of unspecified sparse tensor elements.  While doing so, we also
-need to consider
+need to consider:
 - how the nonzero fill value affects the result of linear algebra
   operations such as matrix multiplication, etc.
 - how to define a fill value for hybrid tensors (tensors with sparse
@@ -62,20 +62,20 @@ need to consider
 
 ## Proposal
 
-This proposal is about enabling sparse tensor support for Calculus
-domain while preserving the existing functionality for Linear Algebra
-domain, and allowing extensions to Graph domain.
+This proposal is about enabling sparse tensor support for the Calculus
+domain while preserving the existing functionality for the Linear Algebra
+domain, and allowing extensions to the Graph domain.
 
 In the following, we describe the sparse tensor `fill_value` feature
-with examples to sparse tensors in COO storage format.  When a new
+with examples involving sparse tensors in COO storage format.  When a new
 sparse tensor storage format is introduced to PyTorch, the same
-semantics apply to the new format.
+semantics should be applied to the new format.
 
 1.  We propose to extend sparse tensor constructors with a keyword
-    argument `fill_value` that users can use to define the value for
+    argument `fill_value`, used to define the value for
     unspecified elements of the constructed sparse tensor.
 
-    For instance, the Python signature of `sparse_coo_tensor` would be
+    For instance, the Python signature of `sparse_coo_tensor` would be:
 
     ```python
     torch.sparse_coo_tensor(indices, values, size=None, fill_value=None, dtype=None, device=None, requires_grad=False)
@@ -83,10 +83,10 @@ semantics apply to the new format.
 
 2.  The default `fill_value` is `0`.
 
-    This choice is consistent with the interpretation of unspecified
-    element in Linear Algebra domain.
+    This choice is consistent with the interpretation of an unspecified
+    element in Linear Algebra.
 
-3.  PyTorch functions that have `layout` argument, may use different
+3.  PyTorch functions that have the `layout` argument may use a different
     `fill_value` when constructing a sparse tensor as defined by the
     following table:
 
@@ -107,15 +107,15 @@ semantics apply to the new format.
     | `torch.zeros`         | 0                                    |
     | `torch.zeros_like`    | 0                                    |
 
-4.  The fill value of a sparse tensor can be acquired via
+4.  The fill value of a sparse tensor can be acquired via the
     `fill_value()` method that returns a strided `torch.Tensor`
-    instance that has the same dtype and storage location properties
+    instance with the same dtype and storage location properties
     as the elements of the sparse tensor:
 
     - `A.fill_value().dtype == A.dtype`
     - `A.fill_value().device == A.device`
 
-    The fill value of a sparse non-hybrid tensor is a scalar tensor
+    The fill value of a sparse non-hybrid tensor is a scalar tensor:
     `torch.tensor(0, dtype=A.dtype, device=A.device)`.
 
 5.  The fill value of a hybrid sparse tensor has the same shape as the
@@ -135,8 +135,8 @@ semantics apply to the new format.
        properties that any array element has, including the shape and
        memory consumption.
 
-    2. A non-scalar fill value of a hybrid tensor is more memory
-       efficient than if the fill value would be a scalar.
+    2. A non-scalar fill value of a hybrid tensor is more memory-efficient
+       than if the fill value were a scalar.
 
        For instance, when applying a row-wise function, say, `softmax`
        to a hybrid tensor, each row may induce a different fill value.
@@ -162,7 +162,7 @@ semantics apply to the new format.
 
        Observe that the softmax result can be represented as a sparse
        tensor with the same sparsity structure (same indices) as the
-       input only when the fill value is a 1-D dense tensor, that is,
+       input only when the fill value is a 1-D dense tensor, that is:
 
        ```python
        A.softmax(0) == torch.sparse_coo_tensor(indices=A.indices(),
@@ -171,7 +171,7 @@ semantics apply to the new format.
                                                fill_value=[0.2232, 0.2220])
        ```
 
-       The alternative, if the fill value would be defined as scalar,
+       The alternative, if the fill value was defined as scalar,
        would be memory inefficient because the result of
        `A.softmax(0)` is a full sparse tensor with all elements
        specified.
@@ -190,16 +190,16 @@ semantics apply to the new format.
 
 6.  The fill value of a sparse tensor can be changed in place.
 
-    For instance,
+    For instance:
 
     ```python
     A.fill_value().fill_(1.2)
     ```
 
-    resets the fill value of a sparse tensor `A` to contain `1.2`.
+    resets the fill value of a sparse tensor `A` to be `1.2`.
 
 7.  If `A` is a sparse tensor and `f` is any calculus function that is
-    applied to a tensor element-wise, then
+    applied to a tensor element-wise, then:
 
     ```python
     f(A) == torch.sparse_coo_tensor(A.indices(), f(A.values()), fill_value=f(A.fill_value()))
@@ -238,7 +238,7 @@ semantics apply to the new format.
        ```
 
        This check ensures that the existing functions will not produce
-       silently incorrect results when user passes a sparse tensor
+       incorrect results silently when users pass a sparse tensor
        with nonzero fill value as an input while the function assumes
        it to be zero.
 
@@ -266,7 +266,7 @@ semantics apply to the new format.
        corresponding matrix products that has reduced computational
        complexity.
 
-10. We propose to add an optional argument `fill_value` to `to_sparse`
+10. We propose to add an optional argument `fill_value` to the `to_sparse`
     method:
 
     ```python
@@ -274,7 +274,7 @@ semantics apply to the new format.
     ```
 
     The `fill_value` argument has the same semantics as in sparse
-    tensor constructor (see point 1) and its shape must be consistent
+    tensor constructors (see point 1) and its shape must be consistent
     with the shape of the input tensor (`self`) and the value of
     `sparseDims` when specified: `self.shape[:sparseDims] ==
     fill_value.shape`.
@@ -291,7 +291,7 @@ semantics apply to the new format.
 
 ### Future extensions and existing issues
 
-12. For Graph domain, the undefined fill value can be specified as a
+12. For the Graph domain, the undefined fill value can be specified as a
     tensor with zero dimension(s) that satisfies all the relations
     listed above except point 5. Invalidation of the point 5 will
     provide a consistent way to differentiate between defined and
@@ -314,7 +314,7 @@ semantics apply to the new format.
     This works only when the initial fill value of `A` is a defined
     value with the shape constraints specified in point 5.
 
-13. The introduction of nonzero fill value feature requires
+13. The introduction of a nonzero fill value feature requires
     revisiting the existing sparse tensor API.
 
     1. The acronym NNZ means the "Number of nonzeros" in a sparse
@@ -338,8 +338,8 @@ semantics apply to the new format.
          tensor in COO format may contain zero values that are not
          accounted in `nnz`
 
-       With the introduction of nonzero fill value, the misuse of
-       acronym NNZ will deepen because with nonzero fill value the
+       With the introduction of nonzero fill values, the misuse of
+       acronym NNZ will get worse because with nonzero fill value the
        sparse tensor may have no zero elements, e.g. `torch.full((10,
        10), 1.0, layout=torch.sparse_coo)` for which `nnz` would be
        `0`.
@@ -373,7 +373,7 @@ the neuroscience measurements of cells membrane potential:
 <a href="https://commons.wikimedia.org/wiki/File:IPSPsummation.JPG"><img src="https://upload.wikimedia.org/wikipedia/commons/a/a1/IPSPsummation.JPG" width="50%"/></a>
 
 
-For simplicity, let the corresponding signal be
+For simplicity, let the corresponding signal be:
 
 ```
 period:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 ... 1000000
@@ -400,7 +400,7 @@ mV_unit = -8.0
 membrane_potential = signal * mV_unit
 ```
 
-that can be then used in computing other physical quantities, for instance,
+that can be then used in computing other physical quantities, for instance:
 
 ```python
 intracellular_concentration_of_potassium = extracellular_concentration_of_potassium * torch.exp(-a * membrane_potential)
@@ -411,7 +411,7 @@ equation](https://en.wikipedia.org/wiki/Nernst_equation). Notice that
 the result `intracellular_concentration_of_potassium` is a sparse
 tensor with a nonzero fill value.
 
-Without the nonzero fill value support, the researchers of the field
+Without the nonzero fill value support, researchers in this field
 would not be able to compute these quantities as simply as above
 because they would need to keep track on the constant level of the
 signals at different transformation steps. For instance, using Pytorch
@@ -435,20 +435,20 @@ intracellular_concentration_of_potassium_var = torch.sparse_coo_tensor(
     size = signal.size())
 ```
 
-which is convoluted, error-prone, and does not lead to solitary data
+which is convoluted, error-prone, and does not result in a single data
 structure as is `intracellular_concentration_of_potassium` above.
 
 ## Review of sparse array software
 
-As a rule, software that implement sparse matrix support, do not
+As a rule, software that implements sparse matrix support does not
 implement support for nonzero fill value. The reason for this is
 twofold: either the application of the software do not require this
-feature (such as applications from Linear Algebra and Graph domains),
-or the feature declared not implemented yet. However, there exists
-also software that implement the nonzero fill value support for
+feature (such as applications from Linear Algebra and Graph theory),
+or the feature is declared 'not implemented yet'. However, software
+also exists that implements the nonzero fill value support for
 sparse matrices.  In the following, we will review a selection of
-sparse array software to learn the different approaches how the
-fill value feature (or the lack of it) is handled.
+sparse array software to learn the different approaches to handling
+the fill value feature (or the lack of it).
 
 ### Wolfram Language
 
@@ -498,15 +498,15 @@ See also [the feature request of default value for scipy.sparse](https://stackov
 
 ## Final notes
 
-In this proposal, we propose attaching the fill value to a sparse
-tensor explicitly in order to cover the Calculus domain, that deals
+This proposal is to explicitly attach the fill value to a sparse
+tensor in order to cover the Calculus domain, that deals
 mainly with element-wise operations on tensors. The explicit
 definition of the fill value is required because the corresponding
 calculus algorithms cannot make any implicit assumption of the
 fill value (the fill value can be any defined value).
 
 In conclusion, specifying the fill value in sparse tensors remains
-optional for Matrix and Graph domains, however, for Calculus domain,
+optional for Matrix and Graph domains, however, for the Calculus domain,
 the fill value is essential for ensuring mathematical correctness of
 algorithms that consider sparse tensors as a storage-efficient
 representations of a general tensor concept.
