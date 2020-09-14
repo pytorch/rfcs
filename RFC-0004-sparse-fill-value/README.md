@@ -266,7 +266,20 @@ semantics apply to the new format.
        corresponding matrix products that has reduced computational
        complexity.
 
-10. Sparse tensors with defined fill-value have intrinsic constraints
+10. We propose to add an optional argument `fill_value` to `to_sparse`
+    method:
+
+    ```python
+    torch.Tensor.to_sparse(self, sparseDims=None, fill_value=None)
+    ```
+
+    The `fill_value` argument has the same semantics as in sparse
+    tensor constructor (see point 1) and its shape must be consistent
+    with the shape of the input tensor (`self`) and the value of
+    `sparseDims` when specified: `self.shape[:sparseDims] ==
+    fill_value.shape`.
+
+11. Sparse tensors with defined fill-value have intrinsic constraints
     between all the unspecified tensor elements (these are always
     equal) that must be taken into account when implementing Autograd
     backward methods for functions that receive sparse tensors as
@@ -278,7 +291,7 @@ semantics apply to the new format.
 
 ### Future extensions and existing issues
 
-11. For Graph domain, the indefined fill-value can be specified as a
+12. For Graph domain, the indefined fill-value can be specified as a
     tensor with zero dimension(s) that satisfies all the relations
     listed above except point 5. Invalidation of the point 5 will
     provide a consistent way to differentiate between defined and
@@ -301,7 +314,7 @@ semantics apply to the new format.
     This works only when the initial fill-value of `A` is a defined
     value with the shape constraints specified in point 5.
 
-12. The introduction of non-zero fill-value feature requires
+13. The introduction of non-zero fill-value feature requires
     revisiting the existing sparse tensor API.
 
     1. The acronym NNZ means the "Number of Non-Zeros" in a sparse
@@ -343,7 +356,7 @@ semantics apply to the new format.
          even when the fill-value specified is non-zero.
        - Other ideas?
 
-13. Releated PyTorch issues:
+14. Releated PyTorch issues:
 
    - [Sparse tensor eliminate zeros](https://github.com/pytorch/pytorch/issues/31742)
    - [Add sparse softmax/log_softmax functionality (ignore zero entries)](https://github.com/pytorch/pytorch/issues/23651)
