@@ -71,6 +71,14 @@ with examples involving sparse tensors in COO storage format.  When a new
 sparse tensor storage format is introduced to PyTorch, the same
 semantics should be applied to the new format.
 
+0.  Used terminology
+
+    - "defined value" is a value for which memory is allocated and
+      initialized,
+    - "undefined value" is a value for which memory is allocated, but
+      the content of the memory can be arbitrary,
+    - "indefinite value" represents a structural lack of value.
+
 1.  We propose to extend sparse tensor constructors with a keyword
     argument `fill_value`, used to define the value for
     unspecified elements of the constructed sparse tensor.
@@ -287,7 +295,7 @@ semantics should be applied to the new format.
     backward methods for functions that receive sparse tensors as
     inputs.
 
-    Sparse tensors with undefined fill value don't have the intrinsic
+    Sparse tensors with indefinite fill value don't have the intrinsic
     constraints as discussed above.
 
 
@@ -298,21 +306,21 @@ require addressing the following extensions and issues. These are
 given here as suggestions to clean up the PyTorch sparce tensor
 support in general.
 
-12. For the Graph domain, the undefined fill value can be specified as a
+12. For the Graph domain, the indefinite fill value can be specified as a
     tensor with zero dimension(s) that satisfies all the relations
     listed above except point 5. Invalidation of the point 5 will
     provide a consistent way to differentiate between defined and
     indefinite fill values.
 
     For instance, to reset a fill value of a sparse tensor to
-    undefined fill value, one can use:
+    indefinite fill value, one can use:
 
     ```python
     A.fill_value().resize_((0,) * len(A.values().shape[1:]))
     ```
 
     Note that this operation is reversible, that is, to reset a
-    undefined fill value to a defined value, say `1.2`, one can use:
+    indefinite fill value to a defined value, say `1.2`, one can use:
 
     ```python
     A.fill_value().resize_(A.values().shape[1:]).fill_(1.2)
@@ -524,7 +532,7 @@ for interpreting the unspecified entries in a sparse matrix:
 
 - Matrix (here Linear Algebra) semantics where the fill value is
   assumed to be 0,
-- Graph semantics where the fill value is assumed to be undefined
+- Graph semantics where the fill value is assumed to be indefinite
   value.
 
 The Scikit-Learn algorithms of the Matrix and Graph domains use sparse
@@ -559,4 +567,4 @@ domains of scientific research:
 | :--------------| :----------------- | :------------------
 | Linear Algebra | 0                  | zero valued elements in sparse matrices, linear algebra matrix operations and decompositions
 | Calculus       | any defined value  | most common value in a sparse array, element-wise operations
-| Graph          | undefined value    | a non-edge of a graph, structural lack of data
+| Graph          | indefinite value   | a non-edge of a graph, structural lack of data
