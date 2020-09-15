@@ -228,6 +228,15 @@ semantics should be applied to the new format.
     relation holds only if `A` is coalesced (`A.values()` would throw
     an exception otherwise).
 
+    From this relation follows an identity:
+
+    ```python
+    f(A).to_dense() == f(A.to_dense())
+    ```
+
+    that will be advantageous in testing the sparse tensor support of
+    element-wise functions.
+
 8.  The fill value of an element-wise n-ary operation on sparse
     tensors with different fill values is equal to the result of
     applying the operation to the fill values of the sparse
