@@ -431,17 +431,16 @@ support in general.
        `to_mkldnn()` method instead of specifying
        `layout=torch._mkldnn`.
 
-    3. The method `torch.Tensor.to_sparse()` can used for converting
-       in-between different sparse storage formats.
+    3. The method `torch.Tensor.to_sparse()` can be used for
+       converting in-between different sparse storage formats.
 
-       When a new sparse tensor format is introduced ([see, for
-       example, GCS
-       PR](https://github.com/pytorch/pytorch/pull/44190)), a `layout`
-       argument needs to be added to the `to_sparse()` method.
+       For that, the `layout` argument needs to be added to the
+       `to_sparse()` method.
 
        For example, `A.to_sparse(layout=torch.sparse_gcs)` would
-       convert the (strided or sparse COO) tensor `A` to a sparse
-       tensor in GCS storage format.
+       convert a (strided or sparse COO) tensor `A` to a sparse tensor
+       in [GCS storage
+       format](https://github.com/pytorch/pytorch/pull/44190).
 
 15. Related PyTorch issues:
 
