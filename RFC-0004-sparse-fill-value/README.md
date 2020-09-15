@@ -73,11 +73,20 @@ semantics should be applied to the new format.
 
 0.  Used terminology
 
-    - "defined value" is a value for which memory is allocated and
-      initialized,
-    - "undefined value" is a value for which memory is allocated, but
-      the content of the memory can be arbitrary,
-    - "indefinite value" represents a structural lack of value.
+    - "Defined value" is a value for which memory is allocated and
+      initialized.
+    - "Undefined value" is a value for which memory is allocated, but
+      the content of the memory can be arbitrary.
+    - "Indefinite value" represents a structural lack of value.
+    - "Sparse tensor format" is a memory-efficient storage format for tensors
+      with many equal elements.
+    - "Strided tensor format" is a process-efficient storage format
+      for general tensors.
+    - "Dense tensor" is a tensor with many non-equal elements. Dense
+      tensors can be stored in any tensor format, including a sparse
+      tensor format.
+    - "Dense part" is a strided tensor that is obtained by fixing the
+      indices of all sparse dimensions in a hybrid tensor.
 
 1.  We propose to extend sparse tensor constructors with a keyword
     argument `fill_value`, used to define the value for
