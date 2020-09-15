@@ -36,9 +36,9 @@ domain-specific interpretations:
   tensors can have any defined value.
 
 Currently, in PyTorch, the unspecified elements of sparse tensors are
-zero-valued, but not only. For instance, the `torch.sparse.softmax`
-function assumes that the unspecified elements of a sparse tensor
-input are negative infinity (-inf) valued.
+zero-valued with few exceptions. For instance, the
+`torch.sparse.softmax` function assumes that the unspecified elements
+of a sparse tensor input are negative infinity (-inf) valued.
 
 In PyTorch 1.6, element-wise functions from Calculus such as `exp`,
 `log`, etc, or arithmetic operations such as addition, subtraction,
@@ -92,20 +92,22 @@ semantics should be applied to the new format.
 
     | Function              | `fill_value` of returned sparse tensor |
     | :-------------------- | :----------------------------------- |
-    | `torch.arange`        | 0                                    |
     | `torch.empty`         | undefined value                      |
     | `torch.empty_like`    | undefined value                      |
     | `torch.empty_strided` | N/A                                  |
     | `torch.eye`           | 0                                    |
     | `torch.full`          | same as `fill_value` argument        |
     | `torch.full_like`     | same as `fill_value` argument        |
-    | `torch.linspace`      | 0                                    |
-    | `torch.logspace`      | 0                                    |
     | `torch.ones`          | 1                                    |
     | `torch.ones_like`     | 1                                    |
-    | `torch.range`         | 0                                    |
     | `torch.zeros`         | 0                                    |
     | `torch.zeros_like`    | 0                                    |
+
+    Note that this table does not include functions `torch.arange`,
+    `torch.linspace`, `torch.logspace` and `torch.range` that have the
+    `layout` argument as well. We excluded these functions here
+    because these are likely never used for creating sparse tensors.
+    See also point 13.2 below.
 
 4.  The fill value of a sparse tensor can be acquired via the
     `fill_value()` method that returns a strided `torch.Tensor`
@@ -178,10 +180,10 @@ semantics should be applied to the new format.
 
     Concerns:
 
-    3. The zero testing of non-scalar fill value is more expensive
+    1. The zero testing of non-scalar fill value is more expensive
        than zero testing of scalar fill value, see point 9 below.
 
-    4. Element-wise operations on hybrid tensors will have an
+    2. Element-wise operations on hybrid tensors will have an
        unnecessary computational overhead when the non-scalar
        fill value contains elements all with the same value.
 
@@ -219,7 +221,7 @@ semantics should be applied to the new format.
     ```
     A = [[1, *], [3, 4]]                  # A fill value is 2
     B = [[*, 6], [*, 8]]                  # B fill value is 7
-    A + B = [[1 + 4, 2 + 4], [*, 6 + 8]]  # A + B fill value is 2 + 7 = 9
+    A + B = [[1 + 3, 2 + 4], [*, 6 + 8]]  # A + B fill value is 2 + 7 = 9
     ```
 
 9.  Existing PyTorch functions that support sparse tensor as inputs,
@@ -291,11 +293,16 @@ semantics should be applied to the new format.
 
 ### Future extensions and existing issues
 
+Introducing the fill value feature according to this proposal does not
+require addressing the following extensions and issues. These are
+given here as suggestions to clean up the PyTorch sparce tensor
+support in general.
+
 12. For the Graph domain, the undefined fill value can be specified as a
     tensor with zero dimension(s) that satisfies all the relations
     listed above except point 5. Invalidation of the point 5 will
     provide a consistent way to differentiate between defined and
-    undefined fill values.
+    indefinite fill values.
 
     For instance, to reset a fill value of a sparse tensor to
     undefined fill value, one can use:
@@ -314,8 +321,13 @@ semantics should be applied to the new format.
     This works only when the initial fill value of `A` is a defined
     value with the shape constraints specified in point 5.
 
-13. The introduction of a nonzero fill value feature requires
-    revisiting the existing sparse tensor API.
+    Introduction of indefinite fill value is useful when applications
+    have interdisciplinary nature where the same sparse tensors can be
+    used as inputs to tools of different domains that have different
+    implicit interpretations for the unspecified elements.
+
+13. The introduction of a nonzero fill value feature encourages a
+    revisit of the existing PyTorch tensor API.
 
     1. The acronym NNZ means the "Number of nonzeros" in a sparse
        tensor. In PyTorch, this acronym is used in several places:
@@ -344,17 +356,46 @@ semantics should be applied to the new format.
        10), 1.0, layout=torch.sparse_coo)` for which `nnz` would be
        `0`.
 
-       Possible actions:
+       Recommendation: stop the misuse of NNZ acronym via
 
-       - Stop the misuse of NNZ acronym: (i) replace the usage of
-         "NNZ" with "NSE", (ii) deprecate the use of `_nnz()` in favor
-         or `_nse()`, (iii) remove `_nnz()` starting from PyTorch 2.0.
-       - Do nothing.  This is the (undocumented) approach taken in
-         Wolfram Language where [one can use "NonzeroValues" to
-         determine the number of specified
-         elements](https://community.wolfram.com/groups/-/m/t/1168496)
-         even when the fill value specified is nonzero.
-       - Other ideas?
+       - replace the usage of "NNZ" with "NSE",
+       - deprecate the use of `_nnz()` in favor of `_nse()`,
+       - remove `_nnz()` starting from PyTorch 2.0.
+
+       Alternative: Do nothing.  This is the (undocumented) approach
+       taken in Wolfram Language where [one can use "NonzeroValues" to
+       determine the number of specified
+       elements](https://community.wolfram.com/groups/-/m/t/1168496)
+       even when the fill value specified is nonzero.
+
+    2. The `torch` namespace functions `arange`, `range`, `linspace`,
+       and `logspace` have `layout` argument that is not needed.
+
+       Currently, PyTorch defines three layouts: `strided`,
+       `sparce_coo`, and `_mkldnn`. Because the mentioned functions
+       output 1-D tensors with non-equal values, one never uses
+       `sparse_coo` or `mkldnn` layout in the context of these
+       functions. In fact, using `torch.sparse_coo` or `torch._mkldnn`
+       as the `layout` argument is currently not supported.
+
+       We propose to remove the `layout` argument from these functions
+       in two stages:
+
+       - deprecate the explicit use of the `layout` argument in
+         `arange`, `range`, `linspace`, `logspace` function calls.
+
+       - remove the `layout` argument from `torch.arange`,
+         `torch.linspace` and `torch.logspace` starting from PyTorch
+         2.0.
+
+       In addition, remove the currently deprecated function
+       `torch.range` starting from PyTorch 2.0.
+
+       If one needs the output of, say, `torch.arange` to use sparse
+       storage format, one can use the `to_sparse` method:
+       `torch.arange(...).to_sparse()`. Similarly, one can use
+       `to_mkldnn()` method instead of specifying
+       `layout=torch._mkldnn`.
 
 14. Related PyTorch issues:
 
