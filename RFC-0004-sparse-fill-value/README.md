@@ -351,7 +351,7 @@ semantics should be applied to the new format.
 
 Introducing the fill value feature according to this proposal does not
 require addressing the following extensions and issues. These are
-given here as suggestions to clean up the PyTorch sparce tensor
+given here as suggestions to clean up the PyTorch sparse tensor
 support in general.
 
 13. For the Graph domain, the indefinite fill value can be specified as a
@@ -501,7 +501,7 @@ tensor with a nonzero fill value.
 Without the nonzero fill value support, researchers in this field
 would not be able to compute these quantities as simply as above
 because they would need to keep track on the constant level of the
-signals at different transformation steps. For instance, using Pytorch
+signals at different transformation steps. For instance, using PyTorch
 1.6, the same computation of intracellular concentration of potassium
 would be:
 
