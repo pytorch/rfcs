@@ -1,4 +1,4 @@
-# PyTorch Sparse Tensors: `fill_value` property
+# Adding fill value property to PyTorch sparse tensors
 
 |            |                 |
 | ---------- | --------------- |
@@ -48,10 +48,10 @@ zero valued (this applies to functions in `torch` namespace, functions
 in `torch.sparse` namespace may use a different interpretation for
 unspecified elements).
 
-To support Calculus functions on sparse tensors, we propose adding a
-`fill_value` property to PyTorch sparse tensors that will represent
-the values of unspecified sparse tensor elements.  While doing so, we
-also need to consider:
+To widen support for sparse tensors to include more functions, we
+propose adding a `fill_value` property to PyTorch sparse tensors that
+will represent the values of unspecified sparse tensor elements.
+While doing so, we also need to consider:
 - how the nonzero fill value affects the result of linear algebra
   operations such as matrix multiplication, etc.
 - how to define a fill value for hybrid tensors (tensors with sparse
@@ -74,8 +74,8 @@ semantics should be applied to the new format.
 0.  Used terminology
 
     - "Defined value" is a value for which memory is allocated and
-      initialized.
-    - "Undefined value" is a value for which memory is allocated, but
+      initialized to some value.
+    - "Uninitialized value" is a value for which memory is allocated, but
       the content of the memory can be arbitrary.
     - "Indefinite value" represents a structural lack of value.
     - "Sparse tensor format" is a memory-efficient storage format for tensors
@@ -88,7 +88,7 @@ semantics should be applied to the new format.
     - "Dense part" is a strided tensor that is obtained by fixing the
       indices of all sparse dimensions in a hybrid tensor.
 
-1.  We propose to extend sparse tensor constructors with a keyword
+1.  We propose to extend sparse tensor constructors with an extra keyword
     argument `fill_value`, used to define the value for
     unspecified elements of the constructed sparse tensor.
 
@@ -115,23 +115,22 @@ semantics should be applied to the new format.
     following table:
 
     | Function              | `fill_value` of returned sparse tensor |
-    | :-------------------- | :----------------------------------- |
-    | `torch.empty`         | undefined value                      |
-    | `torch.empty_like`    | undefined value                      |
-    | `torch.empty_strided` | N/A                                  |
-    | `torch.eye`           | 0                                    |
-    | `torch.full`          | same as `fill_value` argument        |
-    | `torch.full_like`     | same as `fill_value` argument        |
-    | `torch.ones`          | 1                                    |
-    | `torch.ones_like`     | 1                                    |
-    | `torch.zeros`         | 0                                    |
-    | `torch.zeros_like`    | 0                                    |
+    | :-------------------- | :------------------------------------- |
+    | `torch.empty`         | uninitialized value                    |
+    | `torch.empty_like`    | uninitialized value                    |
+    | `torch.eye`           | 0                                      |
+    | `torch.full`          | same as `fill_value` argument          |
+    | `torch.full_like`     | same as `fill_value` argument          |
+    | `torch.ones`          | 1                                      |
+    | `torch.ones_like`     | 1                                      |
+    | `torch.zeros`         | 0                                      |
+    | `torch.zeros_like`    | 0                                      |
 
     Note that this table does not include functions `torch.arange`,
-    `torch.linspace`, `torch.logspace` and `torch.range` that have the
-    `layout` argument as well. We excluded these functions here
-    because these are likely never used for creating sparse tensors.
-    See also point 14.ii below.
+    `torch.empty_strided`, `torch.linspace`, `torch.logspace` and
+    `torch.range` that have the `layout` argument as well. We excluded
+    these functions here because these are likely never used for
+    creating sparse tensors.  See also point 14.ii below.
 
 4.  The fill value of a sparse tensor can be acquired via the
     `fill_value()` method that returns a strided `torch.Tensor`
@@ -224,7 +223,7 @@ semantics should be applied to the new format.
     The output of `fill_value()` is computed as
 
     ```python
-    A._fill_value().resize(A.values().shape[1:])
+    A._fill_value().expand(A.values().shape[1:])
     ```
 
     Storing the specified fill value instead of the fill value of the
@@ -399,9 +398,11 @@ support in general.
 
        Recommendation: stop the misuse of NNZ acronym via
 
-       - replace the usage of "NNZ" with "NSE",
-       - deprecate the use of `_nnz()` in favor of `_nse()`,
-       - remove `_nnz()` starting from PyTorch 2.0.
+       For the reasons above, this proposal recommends
+
+       - renaming "NNZ" to "NSE",
+       - deprecating the `_nnz()` method in favor of `_nse()` method,
+       - removing the `_nnz()` method starting from PyTorch 2.0.
 
        Alternative: Do nothing.  This is the (undocumented) approach
        taken in Wolfram Language where [one can use "NonzeroValues" to
@@ -588,7 +589,9 @@ explicitly. Instead, the corresponding algorithms make an implicit
 assumption about the fill value when processing the same SciPy sparse
 arrays.
 
-See also [the feature request of default value for scipy.sparse](https://stackoverflow.com/questions/6256206/scipy-sparse-default-value).
+The [PyData/Sparse project](https://sparse.pydata.org/en/stable/)
+extends SciPy sparse arrays with `fill_value`, see
+[SparseArray](https://sparse.pydata.org/en/stable/generated/sparse.SparseArray.html).
 
 ## Final notes
 
