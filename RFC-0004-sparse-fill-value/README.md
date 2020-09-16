@@ -22,7 +22,7 @@ domain-specific interpretations:
 - In Linear Algebra domain, the unspecified elements are zero-valued.
 - In Graph domain, the unspecified elements of adjacency matrices
   represent non-edges. In this document, a non-edge corresponds to
-  an unspecified fill value.
+  indefinite fill value.
 - In neural networks, sparse tensors can be inputs, say, to activation
   functions that are defined in terms of elementary functions.
   Evaluation of such functions on sparse tensors can be element-wise,
@@ -44,9 +44,7 @@ In PyTorch 1.6, element-wise functions from Calculus such as `exp`,
 `log`, etc, or arithmetic operations such as addition, subtraction,
 etc, on sparse tensors are not supported, because the existing
 functions on sparse tensors assume that the unspecified elements are
-zero valued (this applies to functions in `torch` namespace, functions
-in `torch.sparse` namespace may use a different interpretation for
-unspecified elements).
+zero valued.
 
 To widen support for sparse tensors to include more functions, we
 propose adding a `fill_value` property to PyTorch sparse tensors that
@@ -130,7 +128,7 @@ semantics should be applied to the new format.
     `torch.empty_strided`, `torch.linspace`, `torch.logspace` and
     `torch.range` that have the `layout` argument as well. We excluded
     these functions here because these are likely never used for
-    creating sparse tensors.  See also point 14.ii below.
+    creating sparse tensors.  See also point 15 below.
 
 4.  The fill value of a sparse tensor can be acquired via the
     `fill_value()` method that returns a strided `torch.Tensor`
@@ -154,11 +152,11 @@ semantics should be applied to the new format.
     Using a non-scalar fill value for hybrid tensors is a natural
     extension of a scalar fill value for non-hybrid tensors:
 
-    1. Hybrid tensors can be considered as sparse arrays with dense
-       tensors as elements. The `fill_value` attribute represents an unspecified
-       element of the array, hence, the fill value has all the
-       properties that any array element has, including the shape and
-       memory consumption.
+    1. Hybrid tensors can be considered as sparse arrays with strided
+       tensors as elements. The `fill_value` attribute represents an
+       unspecified element of the array, hence, the fill value has all
+       the properties that any array element has, including the data
+       type, shape, and memory location.
 
     2. A non-scalar fill value of a hybrid tensor is more memory-efficient
        than if the fill value were a scalar.
@@ -171,7 +169,8 @@ semantics should be applied to the new format.
 
        ```python
        >>> A = torch.sparse_coo_tensor(indices=[[0, 3]],
-                                       values=[[.11, .12], [.31, .32]],
+                                       values=[[.11, .12],
+                                               [.31, .32]],
                                        size=(4, 2))
        >>> A.to_dense()
        tensor([[0.1100, 0.1200],
@@ -191,7 +190,8 @@ semantics should be applied to the new format.
 
        ```python
        A.softmax(0) == torch.sparse_coo_tensor(indices=A.indices(),
-                                               values=[[0.2492, 0.2503], [0.3044, 0.3057]],
+                                               values=[[0.2492, 0.2503],
+                                                       [0.3044, 0.3057]],
                                                size=A.size(),
                                                fill_value=[0.2232, 0.2220])
        ```
@@ -226,36 +226,36 @@ semantics should be applied to the new format.
     A._fill_value().expand(A.values().shape[1:])
     ```
 
-    Storing the specified fill value instead of the fill value of the
-    hybrid tensor has several advantages:
+    Using the specified fill value instead of the fill value of the
+    hybrid tensor as a the internal fill value property, has several
+    advantages:
 
     - the specified fill value may have a smaller size than the fill
-      value of the hybrid tensor,
-    - optimal evaluation of element-wise functions, see point 8 below,
-    - and most importantly, optimal detection of zero fill value, see
-      point 10 below.
-
+      value of the hybrid tensor, hence, the memory footprint of a
+      sparse tensor will be slightly smaller,
+    - evaluation of a element-wise function on sparse tensors will be
+      optimal, see point 8 below,
+    - and most importantly, the detection of zero fill value of a
+      hybrid tensor will be optimal, see point 10 below.
 
 7.  The fill value of a sparse tensor can be changed in place.
 
     For instance:
 
     ```python
-    A._fill_value().fill_(1.2)
+    A.fill_value().fill_(1.2)
     ```
 
-    resets the fill value of a sparse tensor `A` to be `1.2`.
+    resets the fill value of a sparse tensor `A` to be `1.2`. Note
+    that one can use both `fill_value()` or `_fill_value()` outputs
+    for resetting the fill value of the given tensor.
 
-8.  If `A` is a sparse tensor and `f` is any calculus function that is
-    applied to a tensor element-wise, then:
+8.  If `A` is a (coalesced) sparse tensor and `f` is any calculus
+    function that is applied to a tensor element-wise, then:
 
     ```python
     f(A) == torch.sparse_coo_tensor(A.indices(), f(A.values()), fill_value=f(A._fill_value()))
     ```
-
-    Note that if `A` would be using COO storage format then this
-    relation holds only if `A` is coalesced (`A.values()` would throw
-    an exception otherwise).
 
     From this relation follows an identity:
 
@@ -305,15 +305,15 @@ semantics should be applied to the new format.
        it to be zero.
 
     2. Update the related functions to handle nonzero fill values of
-       input sparse tensors correctly.
+       sparse tensor inputs correctly.
 
        For instance, consider a matrix multiplication of two sparse
        tensors `A` and `B` with fill values `a` and `b`, respectively,
        then the `matmul` operation can be expanded as follows:
 
        ```python
-       matmul(A, B) = matmul(A - fA + fA, B - fB + fB)
-                    = matmul(A - fA, B - fB) + fA * matmul(ones_like(A), B) + fB * matmul(A, ones_like(B))
+       matmul(A, B) = matmul(A - a + a, B - b + b)
+                    = matmul(A - a, B - b) + a * matmul(ones_like(A), B) + b * matmul(A, ones_like(B))
        ```
 
        where the first term can be computed using existing matmul for
@@ -366,91 +366,81 @@ support in general.
     provide a consistent way to differentiate between defined and
     indefinite fill values.
 
-14. The introduction of a nonzero fill value feature encourages a
-    revisit of the existing PyTorch tensor API.
+14. The acronym NNZ means the "Number of nonzeros" in a sparse
+    tensor. In PyTorch, this acronym is used in several places:
 
-    1. The acronym NNZ means the "Number of nonzeros" in a sparse
-       tensor. In PyTorch, this acronym is used in several places:
+    - in the implementations of sparse tensor and related
+      functionality,
+    - in the `repr` output of COO sparse tensor, see
+      [here](https://pytorch.org/docs/master/generated/torch.sparse_coo_tensor.html#torch.sparse_coo_tensor),
+    - as a private method `_nnz()`, see
+      [here](https://pytorch.org/docs/master/sparse.html?highlight=nnz#torch.sparse.FloatTensor._nnz),
+    - as a optional keyword argument `check_sparse_nnz` in
+      [torch.autograd.gradcheck](https://pytorch.org/docs/master/autograd.html#numerical-gradient-checking).
 
-       - in the implementations of sparse tensor and related
-         functionality,
-       - in the `repr` output of COO sparse tensor, see
-         [here](https://pytorch.org/docs/master/generated/torch.sparse_coo_tensor.html#torch.sparse_coo_tensor),
-       - as a private method `_nnz()`, see
-         [here](https://pytorch.org/docs/master/sparse.html?highlight=nnz#torch.sparse.FloatTensor._nnz),
-       - as a optional keyword argument `check_sparse_nnz` in
-         [torch.autograd.gradcheck](https://pytorch.org/docs/master/autograd.html#numerical-gradient-checking).
+    The acronym NNZ is misused in PyTorch:
 
-       The acronym NNZ is misused in PyTorch:
+    - `nnz` holds the value of the "Number of Specified Elements"
+      (NSE) in a sparse tensor
+    - `nnz` is not always equal to the number of zeros in the sparse
+      tensor, for instance, the `values` of the sparse tensor in COO
+      format may contain zero values that are not accounted in `nnz`
 
-       - `nnz` holds the value of the "Number of Specified Elements"
-         (NSE) in a sparse tensor
-       - `nnz` is not always equal to the number of zeros in the
-         sparse tensor, for instance, the `values` of the sparse
-         tensor in COO format may contain zero values that are not
-         accounted in `nnz`
+    With the introduction of nonzero fill values, the misuse of
+    acronym NNZ will get worse because with nonzero fill value the
+    sparse tensor may have no zero elements, e.g. `torch.full((10,
+    10), 1.0, layout=torch.sparse_coo)` for which `nnz` would be `0`.
 
-       With the introduction of nonzero fill values, the misuse of
-       acronym NNZ will get worse because with nonzero fill value the
-       sparse tensor may have no zero elements, e.g. `torch.full((10,
-       10), 1.0, layout=torch.sparse_coo)` for which `nnz` would be
-       `0`.
+    For the reasons above, this proposal recommends
 
-       Recommendation: stop the misuse of NNZ acronym via
+    - renaming NNZ to NSE,
+    - deprecating the `_nnz()` method in favor of `_nse()` method,
+    - removing the `_nnz()` method starting from PyTorch 2.0.
 
-       For the reasons above, this proposal recommends
+    Alternative: Do nothing.  This is the (undocumented) approach
+    taken in Wolfram Language where [one can use "NonzeroValues" to
+    determine the number of specified
+    elements](https://community.wolfram.com/groups/-/m/t/1168496) even
+    when the fill value specified is nonzero.
 
-       - renaming "NNZ" to "NSE",
-       - deprecating the `_nnz()` method in favor of `_nse()` method,
-       - removing the `_nnz()` method starting from PyTorch 2.0.
+15. The `torch` namespace functions `arange`, `range`, `linspace`, and
+    `logspace` have `layout` argument that is not needed.
 
-       Alternative: Do nothing.  This is the (undocumented) approach
-       taken in Wolfram Language where [one can use "NonzeroValues" to
-       determine the number of specified
-       elements](https://community.wolfram.com/groups/-/m/t/1168496)
-       even when the fill value specified is nonzero.
+    Currently, PyTorch defines three layouts: `strided`, `sparse_coo`,
+    and `_mkldnn`. Because the mentioned functions output 1-D tensors
+    with non-equal values, one never uses `sparse_coo` or `mkldnn`
+    layout in the context of these functions. In fact, using
+    `torch.sparse_coo` or `torch._mkldnn` as the `layout` argument is
+    currently not supported.
 
-    2. The `torch` namespace functions `arange`, `range`, `linspace`,
-       and `logspace` have `layout` argument that is not needed.
+    We propose to remove the `layout` argument from these functions in
+    two stages:
 
-       Currently, PyTorch defines three layouts: `strided`,
-       `sparse_coo`, and `_mkldnn`. Because the mentioned functions
-       output 1-D tensors with non-equal values, one never uses
-       `sparse_coo` or `mkldnn` layout in the context of these
-       functions. In fact, using `torch.sparse_coo` or `torch._mkldnn`
-       as the `layout` argument is currently not supported.
+    - deprecate the explicit use of the `layout` argument in `arange`,
+      `range`, `linspace`, `logspace` function calls,
 
-       We propose to remove the `layout` argument from these functions
-       in two stages:
+    - remove the `layout` argument from `torch.arange`,
+      `torch.linspace` and `torch.logspace` starting from PyTorch 2.0.
 
-       - deprecate the explicit use of the `layout` argument in
-         `arange`, `range`, `linspace`, `logspace` function calls.
+    In addition, remove the currently deprecated function
+    `torch.range` starting from PyTorch 2.0.
 
-       - remove the `layout` argument from `torch.arange`,
-         `torch.linspace` and `torch.logspace` starting from PyTorch
-         2.0.
+    If one needs the output of, say, `torch.arange` to use sparse
+    storage format, one can use the `to_sparse` method:
+    `torch.arange(...).to_sparse()`. Similarly, one can use
+    `to_mkldnn()` method instead of specifying `layout=torch._mkldnn`.
 
-       In addition, remove the currently deprecated function
-       `torch.range` starting from PyTorch 2.0.
+16. The method `torch.Tensor.to_sparse()` can be used for converting
+    in-between different sparse storage formats.
 
-       If one needs the output of, say, `torch.arange` to use sparse
-       storage format, one can use the `to_sparse` method:
-       `torch.arange(...).to_sparse()`. Similarly, one can use
-       `to_mkldnn()` method instead of specifying
-       `layout=torch._mkldnn`.
+    For that, the `layout` argument needs to be added to the
+    `to_sparse()` method.
 
-    3. The method `torch.Tensor.to_sparse()` can be used for
-       converting in-between different sparse storage formats.
+    For example, `A.to_sparse(layout=torch.sparse_gcs)` would convert
+    a (strided or sparse COO) tensor `A` to a sparse tensor in [GCS
+    storage format](https://github.com/pytorch/pytorch/pull/44190).
 
-       For that, the `layout` argument needs to be added to the
-       `to_sparse()` method.
-
-       For example, `A.to_sparse(layout=torch.sparse_gcs)` would
-       convert a (strided or sparse COO) tensor `A` to a sparse tensor
-       in [GCS storage
-       format](https://github.com/pytorch/pytorch/pull/44190).
-
-15. Related PyTorch issues:
+17. Related PyTorch issues:
 
    - [Sparse tensor eliminate zeros](https://github.com/pytorch/pytorch/issues/31742)
    - [Add sparse softmax/log_softmax functionality (ignore zero entries)](https://github.com/pytorch/pytorch/issues/23651)
@@ -535,18 +525,19 @@ structure as is `intracellular_concentration_of_potassium` above.
 
 ## Review of sparse array software
 
-As a rule, software that implements sparse matrix support does not
+As a rule, software that implement sparse matrix support do not
 implement support for nonzero fill value. The reason for this is
 twofold: either the application of the software do not require this
 feature (such as applications from Linear Algebra and Graph theory),
 or the feature is declared 'not implemented yet'. However, software
-also exists that implements the nonzero fill value support for sparse
+also exist that implement the nonzero fill value support for sparse
 matrices.  In the following, we will review a selection of sparse
 array software to learn the different approaches to handling the fill
 value feature (or the lack of it).
 
 ### Wolfram Language
 
+Mathematica's
 [SparseArray](https://reference.wolfram.com/language/ref/SparseArray.html)
 has a constructor variant `SparseArray[data,dims,val]` that "yields a
 sparse array in which unspecified elements are taken to have value
@@ -591,7 +582,8 @@ arrays.
 
 The [PyData/Sparse project](https://sparse.pydata.org/en/stable/)
 extends SciPy sparse arrays with `fill_value`, see
-[SparseArray](https://sparse.pydata.org/en/stable/generated/sparse.SparseArray.html).
+[SparseArray](https://sparse.pydata.org/en/stable/generated/sparse.SparseArray.html). The
+default fill value is `0`.
 
 ## Final notes
 
@@ -603,8 +595,8 @@ cannot make any implicit assumption of the fill value (the fill value
 can be any defined value).
 
 In conclusion, specifying the fill value in sparse tensors remains
-optional for Matrix and Graph domains, however, for the Calculus
-domain, the fill value is essential for ensuring mathematical
+optional for Linear Algebra and Graph domains, however, for the
+Calculus domain, the fill value is essential for ensuring mathematical
 correctness of algorithms that consider sparse tensors as a
 storage-efficient representations of a general tensor concept.  In
 addition, explicit definition of the fill value ensures that
