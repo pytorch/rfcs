@@ -202,10 +202,9 @@ semantics should be applied to the new format.
        `A.softmax(0)` is a full sparse tensor with all elements
        specified.
 
-6.  The fill value specified that is specified in the `fill_value`
-    argument of the sparse tensor constructors may have different
-    (smaller) shape than the fill value of the hybrid tensor (as
-    defined by point 5).
+6.  The fill value that is specified in the `fill_value` argument of
+    the sparse tensor constructors may have different (smaller) shape
+    than the fill value of the hybrid tensor (as defined by point 5).
 
     The specified fill value (after converting it to `torch.Tensor`
     instance) can be acquired via `_fill_value()` method.
@@ -231,9 +230,11 @@ semantics should be applied to the new format.
     Storing the specified fill value instead of the fill value of the
     hybrid tensor has several advantages:
 
-    - lower memory consumption,
+    - the specified fill value may have a smaller size than the fill
+      value of the hybrid tensor,
     - optimal evaluation of element-wise functions, see point 8 below,
-    - optimal detection of zero fill value, see point 10 below.
+    - and most importantly, optimal detection of zero fill value, see
+      point 10 below.
 
 
 7.  The fill value of a sparse tensor can be changed in place.
@@ -274,9 +275,14 @@ semantics should be applied to the new format.
     For instance (`*` represents unspecified element),
 
     ```
-    A = [[1, *], [3, 4]]                  # A fill value is 2
-    B = [[*, 6], [*, 8]]                  # B fill value is 7
-    A + B = [[1 + 3, 2 + 4], [*, 6 + 8]]  # A + B fill value is 2 + 7 = 9
+    A = [[1, *],
+         [3, *]]
+    B = [[5, *],
+         [*, 8]]
+    # assume A and B fill values are 2 and 6, respectively, then
+    A + B = [[6,  *],
+             [9, 10]]
+    # with fill value 2 + 6 = 8
     ```
 
 10. Existing PyTorch functions that support sparse tensor as inputs,
@@ -317,6 +323,10 @@ semantics should be applied to the new format.
        corresponding matrix products that has reduced computational
        complexity.
 
+       In general, updating all linear algebra functions to support
+       nonzero fill value will be a notable effort and it is not the
+       aim of this proposal to seek for it immediately.
+
 11. We propose to add an optional argument `fill_value` to the `to_sparse`
     method:
 
@@ -342,9 +352,6 @@ semantics should be applied to the new format.
     equal) that must be taken into account when implementing Autograd
     backward methods for functions that receive sparse tensors as
     inputs.
-
-    Sparse tensors with indefinite fill value don't have the intrinsic
-    constraints as discussed above.
 
 
 ### Future extensions and existing issues
@@ -406,7 +413,7 @@ support in general.
        and `logspace` have `layout` argument that is not needed.
 
        Currently, PyTorch defines three layouts: `strided`,
-       `sparce_coo`, and `_mkldnn`. Because the mentioned functions
+       `sparse_coo`, and `_mkldnn`. Because the mentioned functions
        output 1-D tensors with non-equal values, one never uses
        `sparse_coo` or `mkldnn` layout in the context of these
        functions. In fact, using `torch.sparse_coo` or `torch._mkldnn`
