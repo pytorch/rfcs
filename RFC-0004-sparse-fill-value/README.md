@@ -346,11 +346,39 @@ semantics should be applied to the new format.
     `sparseDims` when specified: `self.shape[:sparseDims]` must be
     equal to `<constructed sparse tensor>.fill_value().shape`.
 
-12. Sparse tensors with defined fill value have intrinsic constraints
-    between all the unspecified tensor elements (these are always
-    equal) that must be taken into account when implementing Autograd
-    backward methods for functions that receive sparse tensors as
-    inputs.
+12. The fill value of the gradient of an element-wise function on a
+    sparse tensor is equal to the gradient of the sparse tensor fill
+    value.
+
+    For instance, consider an element-wise operation ``F`` on a sparse
+    tensor ``x``: ``y = F(x)`` with ``f`` being the function appied to
+    tensor elements and ``df`` being the first derivtive of ``f``.
+    Then the corresponding autograd function implementation is
+
+    ```
+    class F(torch.autograd.Function):
+
+        @staticmethod
+        def forward(ctx, sparse):
+            ctx.save_for_backward(sparse)
+            return torch.sparse_coo_tensor(
+                sparse.indices(),
+                f(sparse.values()),
+                sparse.shape,
+                fill_value=f(sparse.fill_value()))
+
+        @staticmethod
+        def backward(ctx, grad_output):
+            sparse, = ctx.saved_tensors
+            assert sparse.indices() == grad_output.indices()
+            return torch.sparse_coo_tensor(
+                sparse.indices(),
+                df(sparse.values()) * grad_output.values(),
+                sparse.shape,
+                fill_value = df(sparse.fill_value()) * grad_output.fill_value())
+    ```
+
+    See the example with ``f = torch.cos`` [here](autograd_example.py).
 
 
 ### Future extensions and existing issues
