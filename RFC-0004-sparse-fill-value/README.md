@@ -32,7 +32,7 @@ domain-specific interpretations:
   zero-valued, the values of unspecified elements may be mapped to
   nonzero values (see [an example
   below](#application-random-sequence-of-rare-events-with-non-zero-mean)). So,
-  in the domain of Calculus, the unspecified elements of sparse
+  in the domain of Calculations, the unspecified elements of sparse
   tensors can have any defined value.
 
 Currently, in PyTorch, the unspecified elements of sparse tensors are
@@ -40,7 +40,7 @@ zero-valued with few exceptions. For instance, the
 `torch.sparse.softmax` function assumes that the unspecified elements
 of a sparse tensor input are negative infinity (-inf) valued.
 
-In PyTorch 1.6, element-wise functions from Calculus such as `exp`,
+In PyTorch 1.6, element-wise functions from Calculations such as `exp`,
 `log`, etc, or arithmetic operations such as addition, subtraction,
 etc, on sparse tensors are not supported, because the existing
 functions on sparse tensors assume that the unspecified elements are
@@ -60,7 +60,7 @@ While doing so, we also need to consider:
 
 ## Proposal
 
-This proposal is about enabling sparse tensor support for the Calculus
+This proposal is about enabling sparse tensor support for the Calculations
 domain while preserving the existing functionality for the Linear
 Algebra domain, and allowing extensions to the Graph domain.
 
@@ -616,17 +616,17 @@ default fill value is `0`.
 ## Final notes
 
 This proposal is to explicitly attach the fill value to a sparse
-tensor in order to cover the Calculus domain, that deals mainly with
-element-wise operations on tensors. The explicit definition of the
-fill value is required because the corresponding calculus algorithms
-cannot make any implicit assumption of the fill value (the fill value
-can be any defined value).
+tensor in order to cover the Calculations domain, that deals mainly
+with element-wise operations on tensors. The explicit definition of
+the fill value is required because the corresponding Calculation
+algorithms cannot make any implicit assumption of the fill value (the
+fill value can be any defined value).
 
 In conclusion, specifying the fill value in sparse tensors remains
 optional for Linear Algebra and Graph domains, however, for the
-Calculus domain, the fill value is essential for ensuring mathematical
-correctness of algorithms that consider sparse tensors as a
-storage-efficient representations of a general tensor concept.  In
+Calculations domain, the fill value is essential for ensuring
+mathematical correctness of algorithms that consider sparse tensors as
+a storage-efficient representations of a general tensor concept.  In
 addition, explicit definition of the fill value ensures that
 applications with interdisciplinary nature will work correctly when
 the same sparse tensor is used as input to functions that otherwise
@@ -639,5 +639,5 @@ domains of scientific research:
 | Domain         | fill value         | Typical application
 | :--------------| :----------------- | :------------------
 | Linear Algebra | 0                  | zero valued elements in sparse matrices, linear algebra matrix operations and decompositions
-| Calculus       | any defined value  | most common value in a sparse array, element-wise operations
+| Calculations   | any defined value  | most common value in a sparse array, element-wise operations
 | Graph          | indefinite value   | a non-edge of a graph, structural lack of data
