@@ -434,6 +434,9 @@ support in general.
 15. The `torch` namespace functions `arange`, `range`, `linspace`, and
     `logspace` have `layout` argument that is not needed.
 
+    *The proposal in this point was rejected: [the `layout` argument
+    may be handy in future](https://github.com/pytorch/rfcs/pull/8#discussion_r489898193).*
+
     Currently, PyTorch defines three layouts: `strided`, `sparse_coo`,
     and `_mkldnn`. Because the mentioned functions output 1-D tensors
     with non-equal values, one never uses `sparse_coo` or `mkldnn`
