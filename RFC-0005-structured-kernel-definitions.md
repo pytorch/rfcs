@@ -96,13 +96,14 @@ function.
       directly into the backend kernel. External backends can also opt
       to fuse this logic in.
 
-## Details
+## `native_functions.yaml` syntax
 
 Let’s suppose you want to write a new operator from scratch. The first
 thing you will do is add a native_functions.yaml declaration for it.
-Let’s take `upsample_nearest1d` as the example for this post.  You will
-write an entry like this, describing the *functional* version of this
-operator:
+Let’s take `upsample_nearest1d` as the example for this post.
+
+In the classic system, you will write an entry like this, describing the
+*functional* version of this operator:
 
 ```
 - func: upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> Tensor
@@ -123,13 +124,16 @@ out= variant of this function. This version gets a separate entry:
 
 Ordinarily, these two declarations would cause function signatures for
 `upsample_nearest1d_cpu`, etc., to be generated into NativeFunctions.h,
-and then you would go ahead and implement them.  However, we propose a
-new *structured* format for writing kernels. We’ll do this by marking
-the out version of this operator as structured and deleting dispatch
-entries from the functional version (the functional operator is
-*implicitly* associated with the out-of-place version in the same way
-derivatives.yaml schemas are matched with their functional/inplace/out
-variants):
+and then you would go ahead and implement them.
+
+### Structured keyword proposal
+
+We propose a new *structured* format for writing kernels. In this
+proposal variant, we’ll do this by marking the out version of this
+operator as structured and deleting dispatch entries from the functional
+version (the functional operator is *implicitly* associated with the
+out-of-place version in the same way derivatives.yaml schemas are
+matched with their functional/inplace/out variants):
 
 ```
 - func: upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> Tensor
@@ -141,6 +145,53 @@ variants):
     CPU: upsample_nearest1d_structured_cpu
     CUDA: upsample_nearest1d_structured_cuda
 ```
+
+**Variation:** Sebastian Messmer suggests that we have to write
+``structured:: True`` on all kernels participating in structured
+processing:
+
+```
+- func: upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> Tensor
+  structured: True  # [NEW]
+
+- func: upsample_nearest1d.out(Tensor self, int[1] output_size, float? scales=None, *, Tensor(a!) out) -> Tensor(a!)
+  structured: True
+  dispatch:
+    CPU: upsample_nearest1d_structured_cpu
+    CUDA: upsample_nearest1d_structured_cuda
+```
+
+**Variation:** Basil Hosmer suggests that instead of implicitly
+associating the schemas, we explicitly give a link to the schema:
+
+```
+- func: upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> Tensor
+  delegate: upsample_nearest1d.out  # [NEW]
+
+- func: upsample_nearest1d.out(Tensor self, int[1] output_size, float? scales=None, *, Tensor(a!) out) -> Tensor(a!)
+  structured: True
+  dispatch:
+    CPU: upsample_nearest1d_structured_cpu
+    CUDA: upsample_nearest1d_structured_cuda
+```
+
+**Variation:** We can also group related kernels more seriously
+together.  Probably the most minimal syntax change here is to just
+introduce funcs which lets you bundle together:
+
+```
+- funcs:
+    - upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> Tensor
+    - upsample_nearest1d.out(Tensor self, int[1] output_size, float? scales=None, *, Tensor(a!) out) -> Tensor(a!)
+  dispatch:
+    CPU: upsample_nearest1d_structured_cpu
+    CUDA: upsample_nearest1d_structured_cuda
+```
+
+This complicates ``native_functions.yaml`` ingestion for people who
+don't care about grouping.
+
+## Functions to define
 
 Structured definitions require a different set of functions to be
 written to implement the operator.  In this particular case, the
