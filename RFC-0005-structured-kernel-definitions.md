@@ -514,7 +514,7 @@ Now you can simply construct it appropriately in your function
 definitions:
 
 ```
-TORCH_META_FN(add) (
+TORCH_META_FUNC(add) (
   const Tensor& self, const Tensor& other)
 ) {
   // Call method on TensorIteratorBase to actually build the struct
