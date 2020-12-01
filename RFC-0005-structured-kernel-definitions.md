@@ -208,7 +208,7 @@ struct MetaBase {
 namespace meta {
 
 struct upsample_nearest1d : public MetaBase {
-  upsample_nearest1d(const Tensor& self, IntArrayRef output_size, optional<double> scales); // user defined
+  void meta(const Tensor& self, IntArrayRef output_size, optional<double> scales); // user defined
 };
 
 } // namespace meta
@@ -236,7 +236,8 @@ struct upsample_nearest1d_cuda_functional final : public upsample_nearest1d_cuda
 
 Tensor upsample_nearest1d_cuda(const Tensor& self, IntArrayRef output_size, optional<double> scales) {
   CUDADeviceGuard g(self.device());
-  upsample_nearest1d_cuda_functional op(self, output_size, scales);
+  upsample_nearest1d_cuda_functional op;
+  op.meta(self, output_size, scales);
   op.impl(op.outputs_[0], self, output_size, scales);
   return std::move(op.output_[0]);
 }
@@ -244,12 +245,9 @@ Tensor upsample_nearest1d_cuda(const Tensor& self, IntArrayRef output_size, opti
 // out-place implementation
 
 struct upsample_nearest1d_cuda_out final : public upsample_nearest1d_cuda {
-  upsample_nearest1d_cuda_out(
-    const Tensor& out, const Tensor& self, IntArrayRef output_size, optional<double> scales
-  ) : upsample_nearest1d_cuda(self, output_size, scales)
-    , outputs_({std::ref(out)})
-    {};
-
+  upsample_nearest1d_cuda_out(const Tensor& out)
+    : outputs_{std::ref(out)} {}
+  }
   void set_output(int64_t output_idx, IntArrayRef sizes, IntArrayRef strides, TensorOptions options) override {
     TORCH_CHECK(outputs_[output_idx].options() == options);
     at::native::cuda::resize_(outputs_[output_idx], sizes);
@@ -263,7 +261,8 @@ Tensor& upsample_nearest1d_out_cuda(Tensor& result, const Tensor& self, IntArray
   // In event of multiple tensor arguments, code generation should
   // be responsible for making sure all devices are consistent
   CUDADeviceGuard g(self.device());
-  upsample_nearest1d_cuda_out op(result, self, output_size, scales);
+  upsample_nearest1d_cuda_out op(result);
+  op.meta(self, output_size, scales);
   op.impl(result, self, output_size, scales);
   // Add this if version bumping happens here
   // increment_version(result);
@@ -276,8 +275,8 @@ Tensor& upsample_nearest1d_out_cuda(Tensor& result, const Tensor& self, IntArray
 ```
 
 The key idea is we use object oriented programming to factor the
-boilerplate into several parts (the user-provided `impl` definition
-and the framework-provided `set_output` helper) which we then specialize
+boilerplate into several parts (the user-provided `meta` and `impl` definitions,
+as well as the framework-provided `set_output` helper) which we then specialize
 for each variation (functional/out/inplace) of the kernel that
 we need to generate.  Here is the step-by-step:
 
@@ -289,10 +288,10 @@ we need to generate.  Here is the step-by-step:
    output.
 
 2. `meta::upsample_nearest1d` inherits from `MetaBase`; there is one
-   per structured function group.  The user defines the constructor this
-   function. This function does general shape checking work and
-   eventually makes a call to `set_output` which specifies what the
-   output shape should be (still unspecified!)
+   per structured function group.  The user defines the `meta` method on
+   this class. This method does general shape checking work and
+   eventually makes a call to the virtual `set_output` which specifies
+   what the output shape should be (still unspecified!)
 
 3. For each device type to be implemented, we extend the meta class
    into a class with a user-defined `impl` method that says how to
@@ -307,13 +306,13 @@ we need to generate.  Here is the step-by-step:
 
 4. Finally, for each variant of the function we need (functional,
    out-of-place, inplace), we extend one last time to provide the
-   correct implementation of `set_output`.
+   correct override implementation of `set_output`.
 
 5. In the final kernel function we register for operators, we construct
-   one of these classes, call its impl method, and then finally
-   return the output tensor in an appropriate way.  These functions
-   also take care of other boilerplate operation, such as setting
-   up device guards, version counter bumps, etc.
+   one of these classes, call its meta and impl methods, and then
+   finally return the output tensor in an appropriate way.  These
+   functions also take care of other boilerplate operation, such as
+   setting up device guards, version counter bumps, etc.
 
 The boilerplate here is written very carefully for performance:
 
@@ -324,9 +323,7 @@ The boilerplate here is written very carefully for performance:
 
 * The use of `set_output` as a method means we can avoid allocating an
   owning vector to store sizes; instead, initializer lists can be used
-  whenever the size is statically known.  A previous version of this
-  function required an intermediate `TensorMeta` struct to be returned
-  from the meta function.
+  whenever the size is statically known.
 
 * `set_output` is virtual.  This is a tradeoff between code size
   and devirtualization: by making `set_output` virtual, we can
@@ -375,12 +372,13 @@ struct upsample_nearest1d_common final : public meta::upsample_nearest1d {
 Tensor upsample_nearest1d_common(const Tensor& self, IntArrayRef output_size, optional<double> scales) {
   // TODO: RecordFunction could be added here, if desired
   DeviceGuard g(self.device());
-  upsample_nearest1d_common op(self, output_size, scales);
+  upsample_nearest1d_common op;
+  op.meta(self, output_size, scales);
   ExcludeDispatchKeyGuard g2(DispatchKey::Common);
   // Notice that upsample_nearest1d is ignored here. It may be a good idea
   // to skip this implementation, or use a slightly different variant, if
   // a backend explicitly registered upsample_nearest1d
-  at::upsample_nearest1d_out(op.tensor_, self, output_size, scales);
+  at::upsample_nearest1d_out(op.outputs_[0], self, output_size, scales);
   return std::move(op.tensor_);
 }
 
@@ -415,7 +413,8 @@ struct upsample_nearest1d_meta final : public meta::upsample_nearest1d {
 };
 
 Tensor upsample_nearest1d_meta(const Tensor& self, IntArrayRef output_size, optional<double> scales) {
-  upsample_nearest1d_meta op(self, output_size, scales);
+  upsample_nearest1d_meta op;
+  op.meta(self, output_size, scales);
   return std::move(op.outputs_[0]);
 }
 
@@ -518,9 +517,11 @@ definitions:
 TORCH_META_FN(add) (
   const Tensor& self, const Tensor& other)
 ) {
-  // TODO: we have a virtual constructor disaster...
+  // Call method on TensorIteratorBase to actually build the struct
   build(...config..., {self, other});
-  // set_output not necessary, as TensorIteratorBase constructor handles it
+  // TensorIteratorBase itself will call back to set_output when
+  // it tries to do output allocation.  It can also save a pointer
+  // to the output for itself
 }
 
 namespace native {
