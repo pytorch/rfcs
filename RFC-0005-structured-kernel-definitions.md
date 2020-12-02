@@ -186,19 +186,22 @@ explain it below.
 // Not code generated; common code
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-#define TORCH_META_FUNC(name) name::name
-#define TORCH_IMPL_FUNC(name) void name::impl
+#define TORCH_META_FUNC(name) void structured_##name::meta
+#define TORCH_META_FUNC2(name, overload) void structured_##name##_##overload::meta
+#define TORCH_IMPL_FUNC(name) void structured_##name::impl
 
 // Parent class for all code-generated meta:: classes
 struct MetaBase {
   // TODO: Maybe some of these should be optional, but in many cases they
   // be implicitly made optional by passing an empty list
   virtual void set_output(int64_t output_idx, IntArrayRef size, IntArrayRef strides, TensorOptions options, DimnameList names) = 0;
+  // Returns a reference to an undefined tensor if no output is
+  // available
+  virtual const Tensor& maybe_get_output(int64_t output_idx) = 0;
 
   // Convenience helpers
-  void set_output(IntArrayRef size, TensorOptions options) {
-    set_output(0, size, {}, options, {});
-  }
+  void set_output(IntArrayRef size, TensorOptions options) { set_output(0, size, {}, options, {}); }
+  const Tensor& maybe_get_output() { return maybe_get_output(0); }
 };
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
@@ -207,7 +210,7 @@ struct MetaBase {
 
 namespace meta {
 
-struct upsample_nearest1d : public MetaBase {
+struct structured_upsample_nearest1d : public MetaBase {
   void meta(const Tensor& self, IntArrayRef output_size, optional<double> scales); // user defined
 };
 
@@ -219,22 +222,25 @@ struct upsample_nearest1d : public MetaBase {
 
 namespace native {
 
-struct upsample_nearest1d_cuda : public meta::upsample_nearest1d {
+struct structured_upsample_nearest1d_cuda : public meta::upsample_nearest1d {
   void impl(const Tensor& self, IntArrayRef output_size, optional<double> scales); // user defined
 };
 
 // functional implementation
 
 // NB: set_output could be devirtualized with CRTP, but for now we don't do this
-struct upsample_nearest1d_cuda_functional final : public upsample_nearest1d_cuda {
+struct structured_upsample_nearest1d_cuda_functional final : public structured_upsample_nearest1d_cuda {
   void set_output(int64_t output_idx, IntArrayRef sizes, IntArrayRef strides, TensorOptions options, DimNameList names) override {
     outputs_[output_idx] = at::native::empty_strided(sizes, strides, options);
     if (!names.empty()) namedinference::propagate_names(outputs_[output_idx], names);
   }
+  const Tensor& maybe_get_output(int64_t output_idx) override {
+    return outputs_[output_idx];
+  }
   std::array<Tensor, 1> outputs_;
 };
 
-Tensor upsample_nearest1d_cuda(const Tensor& self, IntArrayRef output_size, optional<double> scales) {
+Tensor structured_upsample_nearest1d_cuda(const Tensor& self, IntArrayRef output_size, optional<double> scales) {
   CUDADeviceGuard g(self.device());
   upsample_nearest1d_cuda_functional op;
   op.meta(self, output_size, scales);
@@ -244,29 +250,29 @@ Tensor upsample_nearest1d_cuda(const Tensor& self, IntArrayRef output_size, opti
 
 // out-place implementation
 
-struct upsample_nearest1d_cuda_out final : public upsample_nearest1d_cuda {
-  upsample_nearest1d_cuda_out(const Tensor& out)
-    : outputs_{std::ref(out)} {}
-  }
+struct structured_upsample_nearest1d_cuda_out final : public structured_upsample_nearest1d_cuda {
+  upsample_nearest1d_cuda_out(const Tensor& out) : outputs_{std::ref(out)} {}
   void set_output(int64_t output_idx, IntArrayRef sizes, IntArrayRef strides, TensorOptions options) override {
-    TORCH_CHECK(outputs_[output_idx].options() == options);
-    at::native::cuda::resize_(outputs_[output_idx], sizes);
-    at::native::cuda::as_strided_(outputs_[output_idx], strides);
+    at::native::resize_output(outputs_[output_idx], sizes);
+    if (!strides.empty()) {
+        TORCH_INTERNAL_ASSERT(!options.memory_format_opt().has_value());
+        outputs_[output_idx].get().as_strided_(sizes, strides);
+    } else if (options.memory_format_opt().has_value()) {
+        outputs_[output_idx].get().unsafeGetTensorImpl()->empty_tensor_restride(*options.memory_format_opt());
+    }
     if (!names.empty()) namedinference::propagate_names(outputs_[output_idx], names);
   }
   std::array<std::reference_wrapper<Tensor>, 1> outputs_;
 };
 
-Tensor& upsample_nearest1d_out_cuda(Tensor& result, const Tensor& self, IntArrayRef output_size, optional<double> scales) {
+Tensor& structured_upsample_nearest1d_out_cuda(Tensor& out, const Tensor& self, IntArrayRef output_size, optional<double> scales) {
   // In event of multiple tensor arguments, code generation should
   // be responsible for making sure all devices are consistent
   CUDADeviceGuard g(self.device());
-  upsample_nearest1d_cuda_out op(result);
+  upsample_nearest1d_cuda_out op(out);
   op.meta(self, output_size, scales);
-  op.impl(result, self, output_size, scales);
-  // Add this if version bumping happens here
-  // increment_version(result);
-  return result;
+  op.impl(out, self, output_size, scales);
+  return out;
 }
 
 // CPU follows similarly
@@ -316,10 +322,9 @@ we need to generate.  Here is the step-by-step:
 
 The boilerplate here is written very carefully for performance:
 
-* In all of the places where we call other operators, we bypass
-  dispatcher, instead directly calling to their native implementations.
-  This is feasible because we generate code for CPU/CUDA implementations
-  separately, so we can directly code in the correct location.
+* Because we generate code separately for CPU/CUDA, we can bypass
+  the dispatcher entirely. In the current implementation, we don't
+  do this, but the optimization opportunity is available.
 
 * The use of `set_output` as a method means we can avoid allocating an
   owning vector to store sizes; instead, initializer lists can be used
@@ -497,14 +502,14 @@ TensorIterator defines an override of `set_output` that recovers the old
 behavior, while structured kernel subclasses override `set_output` in
 the same way as before.
 
-The code generation only requires a very modest extension: an `inherits`
+The code generation only requires a very modest extension: an `structured_inherits`
 field that lets you replace `MetaBase` with your own custom base
 implementation class:
 
 ```
 - func: add.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   structured: True
-  inherits: TensorIteratorBase  # [NEW]
+  structured_inherits: TensorIteratorBase  # [NEW]
   dispatch:
     CPU: upsample_nearest1d_structured_cpu
     CUDA: upsample_nearest1d_structured_cuda
@@ -514,20 +519,24 @@ Now you can simply construct it appropriately in your function
 definitions:
 
 ```
-TORCH_META_FUNC(add) (
-  const Tensor& self, const Tensor& other)
+TORCH_META_FUNC2(add, Tensor) (
+  const Tensor& self, const Tensor& other, Scalar alpha
 ) {
-  // Call method on TensorIteratorBase to actually build the struct
-  build(...config..., {self, other});
-  // TensorIteratorBase itself will call back to set_output when
-  // it tries to do output allocation.  It can also save a pointer
-  // to the output for itself
+  build_binary_op(maybe_get_output(), self, other);
+  native::alpha_check(dtype(), alpha);
 }
 
-namespace native {
-  TORCH_IMPL_FUNC(add_cpu) (
-    const Tensor& out, const Tensor& self, Tensor& other
-  ) {
-    add_stub(device_type(), *this);
-  }
+TORCH_IMPL_FUNC(add_out) (
+  Tensor& result, const Tensor& self, const Tensor& other, Scalar alpha
+) {
+  add_stub(device_type(), *this, alpha);
+  TORCH_INTERNAL_ASSERT(result.scalar_type() == output().dtype());
 }
+```
+
+In the case of TensorIterator, all of the arguments are stored in the
+struct at construction time, so the impl func doesn't need to make
+use of any of the tensors.  Additionally, when `set_output` is invoked
+in the meta function, after doing all appropriate allocations, it will
+delegate to the underlying `set_output` in TensorIterator, letting it
+query with `maybe_get_output()` to register any outputs necessary.
