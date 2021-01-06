@@ -33,7 +33,7 @@ checking function and an out-kernel when writing a function.
   framework operators, reduce the number of redispatches to improve
   performance.
 
-* **Unify with version counter bumps and view metadata tracking**: these
+* (Under question) **Unify with version counter bumps and view metadata tracking**: these
   are currently done in autograd generated code but must be performed
   unconditionally even when autograd is disabled. This logic to be
   incorporated with logic here.
@@ -168,11 +168,11 @@ namespace native {
   // version counter bumps are all handled, etc...
   /* macro expands to: void upsample_nearest1d_structured_cpu::impl( */
   TORCH_IMPL_FUNC(upsample_nearest1d_structured_cpu) (
-    const Tensor& out, const Tensor& self, IntArrayRef output_size, optional<double> scales
+    const Tensor& self, IntArrayRef output_size, optional<double> scales, Tensor& out
   );
   /* macro expands to: void upsample_nearest1d_structured_cpu::impl( */
   TORCH_IMPL_FUNC(upsample_nearest1d_structured_cuda) (
-    const Tensor& out, const Tensor& self, IntArrayRef output_size, optional<double> scales
+    const Tensor& self, IntArrayRef output_size, optional<double> scales, Tensor& out
   );
 }
 ```
@@ -183,7 +183,8 @@ explain it below.
 
 ```
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-// Not code generated; common code
+// Common code
+// Abridged from aten/src/ATen/TensorMeta.h
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
 #define TORCH_META_FUNC(name) void structured_##name::meta
@@ -206,6 +207,7 @@ struct MetaBase {
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 // Code generated per operator
+// Generated to build/aten/src/ATen/MetaFunctions.h
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
 namespace meta {
@@ -218,6 +220,7 @@ struct structured_upsample_nearest1d : public MetaBase {
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 // Code generated per dispatch table entry for operator
+// Generated to, e.g., build/aten/src/ATen/RegisterCUDA.cpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
 namespace native {
@@ -244,8 +247,8 @@ Tensor structured_upsample_nearest1d_cuda(const Tensor& self, IntArrayRef output
   CUDADeviceGuard g(self.device());
   upsample_nearest1d_cuda_functional op;
   op.meta(self, output_size, scales);
-  op.impl(op.outputs_[0], self, output_size, scales);
-  return std::move(op.output_[0]);
+  op.impl(self, output_size, scales, op.outputs_[0]);
+  return std::move(op.outputs_[0]);
 }
 
 // out-place implementation
@@ -540,3 +543,102 @@ use of any of the tensors.  Additionally, when `set_output` is invoked
 in the meta function, after doing all appropriate allocations, it will
 delegate to the underlying `set_output` in TensorIterator, letting it
 query with `maybe_get_output()` to register any outputs necessary.
+
+## Piggybacking other improvements
+
+Ports to structured kernels must be done individually by hand.  Because
+the porting process is already labor intensive, we should do other
+improvements "while the patient is open".  Here are some candidate
+improvements which should consider applying
+
+### Removing mutable references from out arguments
+
+Historically, out and inplace variants of functions take a `Tensor&`
+rather than a `const Tensor&`.  This convention has lead to no end
+of confusion for kernel writers, who incorrectly surmise that given
+a mutable reference `Tensor& out`, one may assign the output by
+writing `out = ... some expression ...`  (this doesn't work).
+
+The absence of the const modifier is currently relied upon by
+template metaprogramming machinery (to detect if arguments are out
+tensors or not); however, because the implementations of structured
+kernels are a layer below the operator registration layer, the
+const modifier can be eliminated from the `TORCH_IMPL_FUNC` API
+without requiring the rest of the system to be updated.
+
+One implication of this change is that the out parameter cannot be
+easily passed to existing public API that requires a mutable reference.
+This can be easily remedied by updating the existing APIs to accept
+const references and not only mutable references.
+
+### Type refinement
+
+Once we have dispatched to a CPU kernel, we know that the tensor in
+question is in fact a CPU tensor, and not (for example) a CUDA tensor.
+However, this information is not retained inside of the body of the
+kernel, and so if a user makes a method call or regular `at::` namespace
+function call, the dispatcher still must inspect the type tag to
+rediscover, yes, indeed, we still have a CPU tensor.
+
+One promising approach to solving this problem is to refine the type of
+a tensor from `Tensor` to `CPUTensor`, where a `CPUTensor` represents a
+tensor that is statically known to be a CPU Tensor.  Operations
+(functions and methods) on `CPUTensor` bypass dispatching and go
+directly to the CPU implementations in question.  `const CPUTensor&` can
+be defined to implicitly convert into `const Tensor&`, which means
+existing APIs that don't know how to short circuit can continue to do
+pre-existing behavior.
+
+The primary consequence of making this change immediately is we must
+immediately create a CPUTensor class with enough methods to cover the
+usual surface area (even if those methods don't apply any performance
+optimization).  With code generation this should not be too much code.
+This would also require the creation of a CPUTensorRef class to ensure
+that CPUTensors can be created from `const Tensor&` without incurring
+a reference count bump).
+
+One question is wheter or not the existence of CPUTensor means we should
+eliminate the `at::cpu::` namespace (as they serve near equivalent purposes;
+if you have functions which support CPUTensor, simply (unsafely) cast
+your Tensor to a CPUTensor and then utilize the regular API.)  One
+possible argument for retaining the `at::cpu::` namespace is that these
+functions are guaranteed to bypass dispatching, whereas other functions
+may implicitly downcast to `Tensor` and do an optimized call.
+
+## Long term status of unstructured kernels
+
+Structured operators are currently strictly defined in terms of an out
+operation.  However, there are some operators in PyTorch which do not
+have out variants, because they typically don't make sense.  Some of the
+most notable operator types of this form:
+
+* View operations
+* Factory functions
+* `copy_`
+
+Since non-structured kernels simply operate at a lower level of
+abstraction, in principle, it is not a big deal if some operators
+never become structured; to make an analogy, sometimes you have to
+write assembly, and as long as it is not too frequent, there is not
+too much to be gained from trying to extend the functionality of your
+system to expunge these entirely.
+
+However, there is one practical problem with doing this: we continue
+to have separate code generation paths for structured and unstructured
+kernels, and in some cases, there are improvements that could be
+profitably applied to both structured and unstructured kernels (for
+example, elimination of mutable `Tensor&` references).  For some
+improvements, the correct answer to "I want my operator to have this
+improvement" is "port it to structured kernels".  However, in the cases
+where this is not possible, there must be some alternate recourse.
+
+Here are the list of planned improvements to structured kernels which
+also should be equivalently applied to unstructured kernels:
+
+* Generation of `at::cpu::` stubs for static runtime.  Suggested
+  resolution: implement for unstructured as well.
+
+* Removal of mutable references. Suggested resolution: don't bother
+  fixing in the unstructured case (until someone decides to purge
+  mutable references from the public API.  Which, let's be honest,
+  probably isn't going to happen).
