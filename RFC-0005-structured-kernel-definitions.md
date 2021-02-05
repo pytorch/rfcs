@@ -168,11 +168,11 @@ namespace native {
   // version counter bumps are all handled, etc...
   /* macro expands to: void upsample_nearest1d_structured_cpu::impl( */
   TORCH_IMPL_FUNC(upsample_nearest1d_structured_cpu) (
-    const Tensor& self, IntArrayRef output_size, optional<double> scales, Tensor& out
+    const Tensor& self, IntArrayRef output_size, optional<double> scales, const Tensor& out
   );
   /* macro expands to: void upsample_nearest1d_structured_cpu::impl( */
   TORCH_IMPL_FUNC(upsample_nearest1d_structured_cuda) (
-    const Tensor& self, IntArrayRef output_size, optional<double> scales, Tensor& out
+    const Tensor& self, IntArrayRef output_size, optional<double> scales, const Tensor& out
   );
 }
 ```
@@ -569,7 +569,10 @@ without requiring the rest of the system to be updated.
 One implication of this change is that the out parameter cannot be
 easily passed to existing public API that requires a mutable reference.
 This can be easily remedied by updating the existing APIs to accept
-const references and not only mutable references.
+const references and not only mutable references, or, if truly
+necessary, using a `const_cast` to get out of jail free.
+
+**Mutable reference removal has landed.**
 
 ### Type refinement
 
@@ -605,6 +608,8 @@ possible argument for retaining the `at::cpu::` namespace is that these
 functions are guaranteed to bypass dispatching, whereas other functions
 may implicitly downcast to `Tensor` and do an optimized call.
 
+**Type refinement HAS NOT landed.**
+
 ## Long term status of unstructured kernels
 
 Structured operators are currently strictly defined in terms of an out
@@ -636,9 +641,80 @@ Here are the list of planned improvements to structured kernels which
 also should be equivalently applied to unstructured kernels:
 
 * Generation of `at::cpu::` stubs for static runtime.  Suggested
-  resolution: implement for unstructured as well.
+  resolution: implement for unstructured as well.  **This has
+  LANDED.**
 
 * Removal of mutable references. Suggested resolution: don't bother
   fixing in the unstructured case (until someone decides to purge
   mutable references from the public API.  Which, let's be honest,
   probably isn't going to happen).
+
+## How to get involved with structured kernels
+
+There's still a lot of work to be done in structured kernels!  Here
+are some of the things to be done.
+
+Folks who have expressed interest in helping: @ailzhang, @bdhirsh,
+@hameerabbasi
+
+### Port kernels to be structured
+
+Kernels vary wildly in difficulty with regards to how difficult they are
+to port, but at least a substantial chunk of operators should be
+possible to port to structured without too much difficulty.
+
+Ailing has graciously attempted to port a kernel, and made some
+observations about things you might have to do when porting:
+
+1. Every kernel in the operator must be c10 full.  If something is
+   using hacky wrapper, port it to stop using hacky wrapper (usually
+   by reordering arguments) first.
+
+2. Don't accidentally remove the dispatch table for the out kernel,
+   you still need that one!
+
+3. Change all `Tensor&` arguments to `const Tensor&` (as structured
+   kernels do not take mutable references).  If possible, change all the
+   helper functions the kernel uses to also use `const Tensor&` (most
+   commonly, you will need to change `DispatchStub` signatures).  If you
+   can't conveniently change an API because it would have large knock
+   on effects, use a `const_cast<Tensor&>` and mark it with a TODO.
+
+There are some kernels which should be easier to port to structured.
+[This post](http://blog.ezyang.com/2020/05/a-brief-taxonomy-of-pytorch-operators-by-shape-behavior/)
+taxonomizes operators; we have working examples of non-reduction
+TensorIterator kernels and Fixed kernels, and those should work out
+without too many hiccups.  For example, try finishing the rest of the
+upsample kernels.
+
+Things that are known not to work:
+
+* Operators that call a lot of other operators (even if they are not
+  technically composite).  In these situations, there may not be any
+  place where shape computation is actually done in the old kernel, so
+  you would have to reconstruct this logic from scratch.  Many linear
+  algebra kernels fall in this bucket.
+
+* Reductions.  These use the TensorIterator API in a way that we have
+  trouble supporting today (they allocate output outside of
+  TensorIterator and then "force" TensorIterator to not resize in
+  shape computation).
+
+* Kernels that directly overwrite `Tensor&` argument (reductions are
+  known to do this!)  Then again, these kernels are just WRONG and
+  should be fixed.
+
+What operators to prioritize?  Consider picking some important model
+(James Reed and Yinghai Lu may ahve some suggestions) and getting to
+100% coverage there.
+
+### Get tracing with meta tensors working
+
+Right now, `torch.jit.trace` requires you to provide real tensors,
+because it's the only way to get accurate shape tracking.  Meta tensors,
+which take advantage of structured kernels, allow for JAX style tracing
+where you can feed in tracers that have shape but no data, and do fast
+tracing on the fly.
+
+Most of the pieces to make this work should exist, it's just a matter of
+putting it all together.
