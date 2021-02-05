@@ -705,7 +705,7 @@ Things that are known not to work:
   should be fixed.
 
 What operators to prioritize?  Consider picking some important model
-(James Reed and Yinghai Lu may ahve some suggestions) and getting to
+(James Reed and Yinghai Lu may have some suggestions) and getting to
 100% coverage there.
 
 ### Get tracing with meta tensors working
