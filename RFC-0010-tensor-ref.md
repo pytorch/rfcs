@@ -116,4 +116,4 @@ Main points:
 
 ## See also
 
-* FB Only: [We shouldn't feel bad about passing Tensor by reference](https://fb.workplace.com/groups/pytorch.dev/permalink/801504910427991)
+* [We shouldn't feel bad about passing Tensor by reference](https://dev-discuss.pytorch.org/t/we-shouldnt-feel-bad-about-passing-tensor-by-reference/85)
