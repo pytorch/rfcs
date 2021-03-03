@@ -106,6 +106,14 @@ Main points:
   with N overloads, one per default argument.  This is not a huge burden
   in the presence of code generation).
 
+* Instead of trying to force the above implementation of `TensorRef` to
+  be used everywhere, it could instead be a utility class used in
+  limited situations to improve interoperability with code that expects
+  a `const Tensor&` when you don't have a `Tensor` available.  The true,
+  widely used `TensorRef`, could then be implemented as a trivial object
+  (and you would use the nontrivial object only when you need to call
+  into legacy code).
+
 ## See also
 
 * FB Only: [We shouldn't feel bad about passing Tensor by reference](https://fb.workplace.com/groups/pytorch.dev/permalink/801504910427991)
