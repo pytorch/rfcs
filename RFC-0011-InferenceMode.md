@@ -22,7 +22,7 @@ The following modes are ranked from slowest to fastest in speed, and from the mo
 # New concepts
 
 In this RFC we introduces the following new concepts:
-- **InplaceOrView** is a new dispatch key in dispatcher. It's fallthrough kernel by default, but it does `increment_version` for inplace ops and `as_view` setup for view ops. Here's some genernated InplaceOrView kernels:
+- **InplaceOrView** is a new dispatch key in dispatcher. It's fallthrough kernel by default, but it does `increment_version` for inplace ops and `as_view` setup for view ops. Here's some generated InplaceOrView kernels:
 ```
    Tensor & add__Tensor(c10::DispatchKeySet ks, Tensor & self, const Tensor & other, Scalar alpha) {
 
