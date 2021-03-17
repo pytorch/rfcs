@@ -97,7 +97,7 @@ In this RFC we introduces the following new concepts:
    But it's fine that we don't care about perf of this case that much.
 
 ## Alternative implementations we've considered and why they don't work:
-1. For NormalMode + All inference tensors + functional op, an alternative behavior we perfer but didn't implement is throwing an error by forcing this op go through VariableType kernel and hit the assert_no_inference_tensor check. But to do that we'll have to add c10::autograd_dispatch_keyset to the globally enabled set, but doing that might accidentally call autograd kernel from a backend that doesn't match tensor input. Thus we allow functional ops run without throwing an error.
+1. For NormalMode + All inference tensors + functional op, an alternative behavior we prefer but didn't implement is throwing an error by forcing this op go through VariableType kernel and hit the assert_no_inference_tensor check. But to do that we'll have to add c10::autograd_dispatch_keyset to the globally enabled set, but doing that might accidentally call autograd kernel from a backend that doesn't match tensor input. Thus we allow functional ops run without throwing an error.
 2. Why implementation (1) and (2)?
 ```
     // 1. When InferenceMode is enabled, Autograd dispatch keys are excluded
