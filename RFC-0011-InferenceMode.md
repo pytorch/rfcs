@@ -3,12 +3,12 @@ Note: a large part of this RFC will become "InferenceMode" documentation once it
 ## Goals:
 - Provide a RAII in C++ and a context manager in Python frontend to switch between inference mode and normal mode, with the following constraints:
   - correctness is always guaranteed. (compared to `AutoNonVariableType` which has risks producing silent wrong result.)
-  - performance of infenrence mode should match current existing `AutoNonVariableTypeMode` which is widely used in prod.
+  - performance of inference mode should match current existing `AutoNonVariableTypeMode` which is widely used in prod.
   - switching between normal mode and inference mode should be really easy with minimal code change.
 - Make `AutoNonVariableTypeMode` an internal only API, replace all callsites of `AutoNonVariableTypeMode` outside pytorch codebase with the new `InferenceMode`.
 
 ## Non-goals:
-- Match the theorectical best inference performance which can be achieved by striping all autograd related stuff at build time (not flexible).
+- Match the theoretical best inference performance which can be achieved by stripping all autograd related stuff at build time (not flexible).
 - Allowing the most flexible interaction between normal mode and inference mode. Current main use case for inference mode is "either inference or normal" without mixing, so we ban a lot of interactions between two modes to keep the implementation simple.
 
 # Different levels of control over autograd (copied from @Alban)
@@ -60,11 +60,11 @@ In this RFC we introduces the following new concepts:
      return result;
    }
  ```
- - **Inference mode** can be turned on when you are sure you don't need any autograd computation. This saves the cost of creating autograd graph and as_view/version_counter setup compared to the normal mode.
+ - **Inference mode** can be turned on when you are sure you don't need any autograd computation. This saves the cost of creating autograd graph and `as_view` / `version_counter` setup compared to the normal mode.
  - **Inference tensor** is defined as a tensor without Autograd **and** InplaceOrView keys on it.
  - **Normal tensor** has both Autograd & InplaceOrView keys. This includes both `requires_grad=true` and `requires_grad=false` tensors. (see [Ideal end state] section for more details).
  - Additional notes:
-   - All Inference tensors are created in inference mode, but not all of the tensors created in inference mode are inference tensors. For example, a view of normal tensor created in inference mode is still a normal tensor (but with special creation_meta!).
+   - All Inference tensors are created in inference mode, but not all of the tensors created in inference mode are inference tensors. For example, a view of normal tensor created in inference mode is still a normal tensor (but with special `creation_meta`!).
    - (Autograd & !InplaceOrView) and (!Autogad & InplaceOrView) are invalid states, we don't have such tensors.
 
 # Expected Behavior
