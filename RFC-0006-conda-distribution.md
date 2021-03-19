@@ -3,10 +3,9 @@
 |            |                 |
 | ---------- | --------------- |
 | Authors    | Ralf Gommers    |
-| Status     | Draft           |
+| Status     | Rejected        |
 | Type       | Process         |
 | Created    | 2020-11-26      |
-| Resolution | TBD             |
 
 This proposal addresses the need for a PyTorch conda distribution, meaning a
 collection of integration-tested packages that can be installed from a single
