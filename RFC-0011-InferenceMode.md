@@ -60,8 +60,32 @@ In this RFC we introduces the following new concepts:
      return result;
    }
  ```
- - **Inference mode** can be turned on when you are sure you don't need any autograd computation. This saves the cost of creating autograd graph and `as_view` / `version_counter` setup compared to the normal mode.
- - **Inference tensor** is defined as a tensor without Autograd **and** InplaceOrView keys on it.
+ - **Inference mode** a thread local state that can be turned on via RAII guard/context manager. (Either you are in inference mode, or you are not.) Intuitively, inference mode lets you do inference only operation with better performance than normal mode.
+   - All operations do not create autograd graph, even if the inputs require_grad=True
+   - Setting requires_grad in inference mode will update requires_grad field on tensors, but behavior won't change.  
+   - Things that continue to work:
+     - Inplace operations on both normal/inference tensors are OK
+        - Inplace operation on inference tensor is guaranteed not to VC bump
+        - NB: if you do an inplace operation on a normal tensor, you WILL get a version counter bump
+     - View operations on both normal/inference tensors are OK
+        -  View operation on inference tensor is guaranteed not to allocate view metadata
+        -  View operation on normal tensor produces a "bad" normal tensor (for safety reasons). Bad normal tensors (impl: CreationMeta) cannot be inplace modified outside inference mode. These normal tensors behave identically to no_grad, except that they always raise error (rather than give a warning).
+
+* **Inference tensor** are tensors that are constructed if and only if inference mode is enabled, with the exception of views on normal tensors. Non-inference tensors are called **normal tensors**. 
+    * Q: Why not views on normal tensors? A: Because we guarantee performance on inference tensors, but views on normal tensors require additional safety checks (e.g. normal tensor ----(view)---> ----(inplace)----> this should properly bump version on base which requires view produce a normal tensor).
+    * Setting requires_grad on an inference tensors outside of inference mode raises an error.
+        * NB: Inference tensors and bad normal tensors are leaf tensors.
+    * Outside of inference mode, the following operations on inference tensors is forbidden:
+        * Inplace/view operations (functional operations produce normal tensors), if at least one input tensor is inference mode.
+            * Why? In principle, these are safe if they produce inference tensors, but we are trying to maintain the invariant that inference tensors are ONLY created in inference mode.
+            * Impl: Functional on normal tensors is allowed because we cannot conveniently ban it (VariableType/InplaceOrView kernel are all skipped)
+        * Mixing inference and normal tensors, even for functional operations, is forbidden.
+            * Why? For simplicity of implementation. In particular, if you save the inference tensor in backwards, you’re likely to hit an error in a weird place (better to error early). By forbidding mixed operations, it is impossible for this situation to occur.
+    * Impl: inference tensors are guaranteed not to have AutogradMeta
+
+
+
+
  - **Normal tensor** has both Autograd & InplaceOrView keys. This includes both `requires_grad=true` and `requires_grad=false` tensors. (see [Ideal end state] section for more details).
  - Additional notes:
    - All Inference tensors are created in inference mode, but not all of the tensors created in inference mode are inference tensors. For example, a view of normal tensor created in inference mode is still a normal tensor (but with special `creation_meta`!).
