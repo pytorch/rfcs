@@ -62,14 +62,14 @@ In this RFC we introduces the following new concepts:
  ```
  - **Inference mode** a thread local state that can be turned on via RAII guard/context manager. (Either you are in inference mode, or you are not.) Intuitively, inference mode lets you do inference only operation with better performance than normal mode.
    - All operations do not create autograd graph, even if the inputs require_grad=True
-   - Setting requires_grad in inference mode will update requires_grad field on tensors, but behavior won't change.  
+   - Setting requires_grad in inference mode will update requires_grad field on tensors, but it doesn't affect any behavior inside InferenceMode.
    - Things that continue to work:
      - Inplace operations on both normal/inference tensors are OK
         - Inplace operation on inference tensor is guaranteed not to VC bump
         - NB: if you do an inplace operation on a normal tensor, you WILL get a version counter bump
      - View operations on both normal/inference tensors are OK
         -  View operation on inference tensor is guaranteed not to allocate view metadata
-        -  View operation on normal tensor produces a "bad" normal tensor (for safety reasons). Bad normal tensors (impl: CreationMeta) cannot be inplace modified outside inference mode. These normal tensors behave identically to no_grad, except that they always raise error (rather than give a warning).
+        -  View operation on normal tensor produces a normal tensor(NO_GRAD_FN), behavior is the same as creating a view inside NoGrad mode. 
 
 * **Inference tensor** are tensors that are constructed if and only if inference mode is enabled, with the exception of views on normal tensors. Non-inference tensors are called **normal tensors**. 
     * Q: Why not views on normal tensors? A: Because we guarantee performance on inference tensors, but views on normal tensors require additional safety checks (e.g. normal tensor ----(view)---> ----(inplace)----> this should properly bump version on base which requires view produce a normal tensor).
@@ -81,48 +81,19 @@ In this RFC we introduces the following new concepts:
             * Impl: Functional on normal tensors is allowed because we cannot conveniently ban it (VariableType/InplaceOrView kernel are all skipped)
         * Mixing inference and normal tensors, even for functional operations, is forbidden.
             * Why? For simplicity of implementation. In particular, if you save the inference tensor in backwards, you’re likely to hit an error in a weird place (better to error early). By forbidding mixed operations, it is impossible for this situation to occur.
-    * Impl: inference tensors are guaranteed not to have AutogradMeta
-
-
+    * Impl: inference tensors are guaranteed to have is_leaf=True. 
 
 
  - **Normal tensor** has both Autograd & InplaceOrView keys. This includes both `requires_grad=true` and `requires_grad=false` tensors. (see [Ideal end state] section for more details).
  - Additional notes:
-   - All Inference tensors are created in inference mode, but not all of the tensors created in inference mode are inference tensors. For example, a view of normal tensor created in inference mode is still a normal tensor (but with special `creation_meta`!).
+   - All Inference tensors are created in inference mode, but not all of the tensors created in inference mode are inference tensors. For example, a view of normal tensor created in inference mode is still a normal tensor (but with special `creation_meta=NO_GRAD_FN`!).
    - (Autograd & !InplaceOrView) and (!Autogad & InplaceOrView) are invalid states, we don't have such tensors.
 
-# Expected Behavior
-## Implementation:
-1. Inference Mode: InplaceOrView not in included, Autograd in excluded
-2. Normal Mode: InplaceOrView in included, Autograd not in excluded
-3. In VariableType kernel, throw an error if input is inference tensor.
-4. In InplaceOrView kernel, throw an error if Autograd keyset is not in excluded set already.
-5. In VariableType kernel, throw an error if input is a view with `NO_VARIABLE_TYPE_VIEW` creation_meta.
-## Behavior
-| Mode          | Input                                    | Op         | Go through Kernels                        | Produced Output                                            |   |   |
-|---------------|------------------------------------------|------------|-------------------------------------------|------------------------------------------------------------|---|---|
-| InferenceMode | All inference tensors                    | functional | CPU                                       | inference tensor                                           |   |   |
-| InferenceMode | All inference tensors                    | view       | CPU                                       | inference tensor                                           |   |   |
-| InferenceMode | All inference tensors                    | inplace    | CPU                                       | inference tensor                                           |   |   |
-| InferenceMode | Contains normal tensor                   | functional | InplaceOrView(fallthrough), CPU           | inference tensor                                           |   |   |
-| InferenceMode | Contains normal tensor                   | view       | InplaceOrView, CPU                        | normal tensor (with creation_meta=NO_VARIABLE_TYPE_VIEW)   |   |   |
-| InferenceMode | Contains normal tensor                   | inplace    | InplaceOrView, CPU                        | normal tensor (which is input itself with updated version) |   |   |
-| NormalMode    | All inference tensors                    | functional | InplaceOrView(fallthrough), CPU           | normal tensor (see note*)                                  |   |   |
-| NormalMode    | All inference tensors                    | view       | InplaceOrView(ERROR4!), CPU               |                                                            |   |   |
-| NormalMode    | All inference tensors                    | inplace    | InplaceOrView(ERROR4!), CPU               |                                                            |   |   |
-| NormalMode    | Mixed normal tensor and inference tensor | functional | VariableType(ERROR3!), InplaceOrView, CPU |                                                            |   |   |
-| NormalMode    | Mixed normal tensor and inference tensor | view       | VariableType(ERROR3!), InplaceOrView, CPU |                                                            |   |   |
-| NormalMode    | Mixed normal tensor and inference tensor | inplace    | VariableType(ERROR3!), InplaceOrView, CPU |                                                            |   |   |
-|               |                                          |            |                                           |                                                            |   |   |
-|               |                                          |            |                                           |                                                            |   |   |
-## additional notes:
-1. ERROR3 means it hits (3) described in implementation section and ERROR4 means it hits (4) in implementation section.
-2. Functional ops on inference tensors might run slower outside InferenceMode than inside.
-   But it's fine that we don't care about perf of this case that much.
+
 
 ## Alternative implementations we've considered and why they don't work:
 1. For NormalMode + All inference tensors + functional op, an alternative behavior we prefer but didn't implement is throwing an error by forcing this op go through VariableType kernel and hit the assert_no_inference_tensor check. But to do that we'll have to add c10::autograd_dispatch_keyset to the globally enabled set, but doing that might accidentally call autograd kernel from a backend that doesn't match tensor input. Thus we allow functional ops run without throwing an error.
-2. Why implementation (1) and (2)?
+2. 
 ```
     // 1. When InferenceMode is enabled, Autograd dispatch keys are excluded
     //    but not InplaceOrView key.
@@ -154,7 +125,7 @@ In this RFC we introduces the following new concepts:
     //     broke our invariant: "Autograd keys must be in excluded set before
     //     reaching InplaceOrView kernel".
 ```
-3.
+
 # Ideal end state
 Ideal end state is that we can link skip VariableType kernel when requires_grad=False which means we don't always go through VariableType kernel in normal mode.
 But this work is currently blocked for the following reason:
