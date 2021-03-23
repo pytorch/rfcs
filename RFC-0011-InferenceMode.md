@@ -73,8 +73,7 @@ In this RFC we introduces the following new concepts:
 
 * **Inference tensor** are tensors that are constructed if and only if inference mode is enabled, with the exception of views on normal tensors. Non-inference tensors are called **normal tensors**. 
     * Q: Why not views on normal tensors? A: Because we guarantee performance on inference tensors, but views on normal tensors require additional safety checks (e.g. normal tensor ----(view)---> ----(inplace)----> this should properly bump version on base which requires view produce a normal tensor).
-    * Setting requires_grad on an inference tensors outside of inference mode raises an error.
-        * NB: Inference tensors and bad normal tensors are leaf tensors.
+    * NB: Inference tensors and bad normal tensors are leaf tensors.
     * Outside of inference mode, the following operations on inference tensors is forbidden:
         * Inplace/view operations (functional operations produce normal tensors), if at least one input tensor is inference mode.
             * Why? In principle, these are safe if they produce inference tensors, but we are trying to maintain the invariant that inference tensors are ONLY created in inference mode.
