@@ -544,6 +544,16 @@ in the meta function, after doing all appropriate allocations, it will
 delegate to the underlying `set_output` in TensorIterator, letting it
 query with `maybe_get_output()` to register any outputs necessary.
 
+## Common error checking code
+
+Some operators do not have out variants, and thus do not make sense
+as structured kernels per se (i.e., cannot do boilerplate reduction
+between out and functional implementations).  However, these operators
+still require meta implementations, and can still usefully have
+error checking code that is shared.
+
+TODO WRITE MORE
+
 ## Piggybacking other improvements
 
 Ports to structured kernels must be done individually by hand.  Because
