@@ -35,7 +35,13 @@ Some goals and non-goals:
 * Goal: `InferenceMode` is semantically equivalent to `NoGradMode`,
   except some operations may not be supported.  (In other words, this is
   a partial equivalence: *if* inference mode does not throw an error,
-  then it behaves the same way as no grad mode).
+  then it behaves the same way as no grad mode).  Caveat: this
+  equivalence does not extend to methods that expose private
+  implementation details; esp., `Tensor._is_view` and `Tensor._base`.
+
+* Goal: It should be possible to run code that allocates parameters
+  (tensors with `requires_grad=True`) unchanged inside of an inference
+  mode block.
 
 * Goal: Don't be a global or compile time flag.  This makes
   `InferenceMode` widely applicable as it can still be used in processes
@@ -49,14 +55,15 @@ Some goals and non-goals:
   that `InferenceMode` is safe.
 
 * Non-goal: Make operations on inference tensors fast outside of
-  `InferenceMode`
+  `InferenceMode`; nor, be maximally expressive with inference
+  tensor outside of `InferenceMode`.
 
 * Non-goal: Avoid performance slowdown for view/inplace operations
   outside of `InferenceMode`.  Benchmarking on popular models reveal
   that a slight slowdown on these operations is acceptable; in our
   case, this slowdown will be due to an extra redispatch in these cases.
 
-# User description
+## User description
 
 `InferenceMode` is an RAII guard which can be enabled for a given block
 of code.  Inside inference mode, all newly allocated (non-view) tensors
@@ -64,9 +71,14 @@ are marked as **inference tensors**; these tensors are guaranteed not to
 alias with tensors that may have been saved for backwards (or are
 otherwise making use of version counters--perhaps more accurately,
 you could call these "non version counter tracked tensors").  Inference
-tensors do not have a version counter, and raise an error if you try
-to read their version (e.g., because you saved this tensor for
-backwards.)
+tensors:
+
+* Do not have a version counter.
+* Raise an error if you try to read their version (e.g., because you
+  saved this tensor for backwards.)
+* Raise an error if you try to mutate them into requiring gradients
+  (e.g., directly set `requires_grad=True` or mutate them with a tensor
+  that `requires_grad=True`.)
 
 A non-view tensor is an inference tensor if and only if it was
 allocated during inference mode.  A view tensor is an inference
@@ -78,14 +90,13 @@ guarantees:
 * All operations do not record `grad_fn`, even if their `requires_grad=True`
   (like `NoGradMode`).  This applies for both inference tensors and
   normal tensors (also like `NoGradMode`).
-* View operations do not do view tracking (like `NoGradMode` after
-  PyTorch 1.9).  This applies for both inference tensors and normal
-  tensors.
+* View operations on inference tensors do not do view tracking; views
+  and base inference tensors are indistinguishable.
 * Inplace operations on inference tensors are guaranteed not to do
   a version counter bump (which is equivalent to an atomic increment).
   Inplace operations on normal tensors still do version counter bumps.
 
-# Implementation description
+## Implementation description
 
 **Dispatcher.**  The dispatcher decides what implementation of a kernel
 to call when an operator is invoked.  The set of possible options is
@@ -150,22 +161,31 @@ default TLS included set.
 **The algorithm.**  At a high level, we would like to skip both the
 Autograd and InplaceOrView kernels while in inference mode, whenever
 it is safe to do so.  Whether or not this is safe is maintained by
-the invariant:
+a pair of invariants:
 
-  **The invariant:** Any inference tensor (tensor whose dispatch key
-  set does not include Autograd nor InplaceOrView) is guaranteed
+  **The no-aliasing invariant:** Inference tensors are guaranteed
   not to alias with any tensor which is saved for backwards (or
-  otherwise depends on accurate version counter tracking).
+  otherwise depends on accurate version counter tracking)
 
-This invariant guarantees that it safe skip version counter bumps on
-inference tensors.
+  **The immutable invariant:** Inference tensors are immutable outside of
+  inference mode.
+
+The no-aliasing invariant guarantees it is safe to skip version counter
+bumps when mutating inference tensors, as the set of tensors affected by
+mutation is precisely the set of aliases to that tensor.  The immutable
+invariant guarantees it is safe to skip view metadata, as view metadata
+is only used to enable inplace updates on tensors that require
+gradients.
 
 **Inference mode** is defined to be the state when:
 
 * Autograd is added to the TLS excluded set
 * InplaceOrView is removed from the TLS included set (recall that by
   default, InplaceOrView is part of the TLS included set)
-* View metadata is not recorded (similar to NoGradMode)
+* If view metadata is recorded (e.g., because a tensor has InplaceOrView
+  directly recorded on it), the creation metadata of the view is
+  set to forbid subsequent inplace modification with
+  `requires_grad=True` tensors (`CreationMeta::NO_GRAD_MODE`)
 
 It is legal for only Autograd to be excluded (this happens during normal
 processing of Autograd kernels), but it is illegal for InplaceOrView to
@@ -185,13 +205,23 @@ that omit these keys) is the result of the following rules:
   this is implemented by propagating the dispatch key set from the
   base tensor to the view tensor.
 
-These rules satisfy the invariant: functional operations are guaranteed
-to have non-aliasing outputs and are safe to mark as inference tensors;
-view operations introducing aliasing relationships, and it is only
-safe for inference tensors to alias other inference tensors.
+These rules guarantee half of the no-aliasing invariant: functional
+operations are guaranteed to have non-aliasing outputs and are safe to
+mark as inference tensors; view operations introducing aliasing
+relationships, and it is only safe for inference tensors to alias other
+inference tensors.
 
-Finally, we must ensure that inference tensors are not saved for
-backwards.  **TODO FINISH ME**
+Furthermore, the following operations on inference tensors are disabled:
+
+* Inplace modifications on inference tensors outside of inference mode
+  (tested at the point we do version counter increments; this code is
+  guaranteed to run outside of inference mode because InplaceOrView is
+  part of default included TLS).  This guarantees the immutability
+  invariant.  (TODO: Also need to prevent `requires_grad` from being
+  explicitly toggled)
+* Saving an inference tensor for backwards (tested in the constructor
+  of SavedVariable).  This guarantees the other half of the no-aliasing
+  invariant.
 
 **Examples.**  Given the rules above, we can describe the behavior
 for each combination of possibilities:
@@ -202,8 +232,9 @@ for each combination of possibilities:
       to InplaceOrView key on the normal tensor)
     * On an inference tensor - no increment
   * View operation...
-    * On a normal tensor - view metadata is not recorded,
-      version counter is propagated, result is a normal tensor
+    * On a normal tensor - view metadata is recorded, creation
+      meta is set to `INFERENCE_MODE`, version counter is propagated,
+      result is a normal tensor
     * On an inference tensor - view metadata is not recorded,
       result is an inference tensor
   * Functional operation...
@@ -211,76 +242,68 @@ for each combination of possibilities:
     * On an inference tensor - produces an inference tensor
 * Outside of inference mode...
   * Inplace operation...
-    * On an inference tensor - allowed, no increment
+    * On an inference tensor - forbidden
   * View operation...
-    * On an inference tensor - allowed, view metadata 
+    * On an inference tensor - allowed, view metadata is not
+      recorded, result is an inference tensor
 
+**Edge case: explicit `requires_grad` setting.**  One might expect that in
+no grad mode that it is impossible to allocate a tensor with
+`requires_grad=True`.  However, this is not true: any tensor that
+is explicitly allocated with `requires_grad=True` preserves this
+property outside of no grad mode:
 
-**TODO EVERYTHING ELSE**
-
-     - Inplace operations on both normal/inference tensors are OK
-        - Inplace operation on inference tensor is guaranteed not to VC bump
-        - NB: if you do an inplace operation on a normal tensor, you WILL get a version counter bump
-     - View operations on both normal/inference tensors are OK
-        -  View operation on inference tensor is guaranteed not to allocate view metadata
-        -  View operation on normal tensor produces a normal tensor(NO_GRAD_FN), behavior is the same as creating a view inside NoGrad mode. 
-
-* **Inference tensor** are tensors that are constructed if and only if inference mode is enabled, with the exception of views on normal tensors. Non-inference tensors are called **normal tensors**. 
-    * Q: Why not views on normal tensors? A: Because we guarantee performance on inference tensors, but views on normal tensors require additional safety checks (e.g. normal tensor ----(view)---> ----(inplace)----> this should properly bump version on base which requires view produce a normal tensor).
-    * NB: Inference tensors and bad normal tensors are leaf tensors.
-    * Outside of inference mode, the following operations on inference tensors is forbidden:
-        * Inplace/view operations (functional operations produce normal tensors), if at least one input tensor is inference mode.
-            * Why? In principle, these are safe if they produce inference tensors, but we are trying to maintain the invariant that inference tensors are ONLY created in inference mode.
-            * Impl: Functional on normal tensors is allowed because we cannot conveniently ban it (VariableType/InplaceOrView kernel are all skipped)
-        * Mixing inference and normal tensors, even for functional operations, is forbidden.
-            * Why? For simplicity of implementation. In particular, if you save the inference tensor in backwards, you’re likely to hit an error in a weird place (better to error early). By forbidding mixed operations, it is impossible for this situation to occur.
-    * Impl: inference tensors are guaranteed to have is_leaf=True. 
-
-
- - **Normal tensor** has both Autograd & InplaceOrView keys. This includes both `requires_grad=true` and `requires_grad=false` tensors. (see [Ideal end state] section for more details).
- - Additional notes:
-   - All Inference tensors are created in inference mode, but not all of the tensors created in inference mode are inference tensors. For example, a view of normal tensor created in inference mode is still a normal tensor (but with special `creation_meta=NO_GRAD_FN`!).
-   - (Autograd & !InplaceOrView) and (!Autogad & InplaceOrView) are invalid states, we don't have such tensors.
-
-
-
-## Alternative implementations we've considered and why they don't work:
-1. For NormalMode + All inference tensors + functional op, an alternative behavior we prefer but didn't implement is throwing an error by forcing this op go through VariableType kernel and hit the assert_no_inference_tensor check. But to do that we'll have to add c10::autograd_dispatch_keyset to the globally enabled set, but doing that might accidentally call autograd kernel from a backend that doesn't match tensor input. Thus we allow functional ops run without throwing an error.
-2. 
 ```
-    // 1. When InferenceMode is enabled, Autograd dispatch keys are excluded
-    //    but not InplaceOrView key.
-    //
-    //    For example:
-    //    torch::Tensor a = torch::ones({1, 2, 3}).set_requires_grad(true);
-    //    torch::Tensor k = a + 2;
-    //    {
-    //      c10::InferenceMode guard(true);
-    //      k.add_(2);
-    //    }
-    //    `k.add_(2)` still need to go through InplaceOrView kernel so that it's
-    //    prepared for future autograd.
-    //  2. When InferenceMode is disabled, InplaceOrView must be added
-    //     to included set.
-    //
-    //     For example:
-    //     torch::Tensor a;
-    //     {
-    //       c10::InferenceMode guard(true);
-    //       torch::Tensor in = torch::ones({2, 2});
-    //       a = in.view({1, 4});
-    //     }
-    //     torch::Tensor c = a.view({4, 1}); // (*)
-    //     If we don't add InplaceOrView to included set, (*) will skip its as_view
-    //     setup entirely, `c` will be a Tensor that is not from Inference mode
-    //     but has potentially wrong view metadata which should be forbidden..
-    //     By going through InplaceOrView kernel, we can throw an error since it
-    //     broke our invariant: "Autograd keys must be in excluded set before
-    //     reaching InplaceOrView kernel".
+>>> with torch.no_grad():
+...   x = torch.empty(2, requires_grad=True)
+...
+>>> x
+tensor([-1.3667e-17,  4.5801e-41], requires_grad=True)
 ```
 
-# Ideal end state
-Ideal end state is that we can link skip VariableType kernel when requires_grad=False which means we don't always go through VariableType kernel in normal mode.
+This can also be achieved by explicitly setting
+`x.requires_grad = True`.  Furthermore, in no grad mode, this requires
+grad setting propagates to views
+
+```
+>>> with torch.no_grad():
+...   x = torch.empty(2)
+...   y = x.view(2)
+...   x.requires_grad = True
+...
+>>> y.requires_grad
+True
+```
+
+This poses a problem for inference mode, which doesn't track view
+metadata and cannot implement this propagation.  Our proposed solution
+is to forbid setting `requires_grad` (but permit tensors to be directly
+constructed with `requires_grad=True`).  This cannot be easily
+implemented today as internally `requires_grad=True` factory is
+implemented by first constructing a tensor, and then setting its
+`requires_grad=True`.
+
+## Future work: skipping Autograd kernels when `requires_grad=False`
+
+As view and inplace handling has been moved out of Autograd kernels, a
+tantalizing possibility is to remove the Autograd dispatch keys from
+tensors with `requires_grad=False`, thus skipping this kernel entirely.
+
 But this work is currently blocked for the following reason:
-- If requires_grad=False skips VariableType kernel, functional ops won't be able to go through `AutoDispatchBelowInplaceOrView` guard which suppresses both autograd and InplaceOrView keys in TLS excluded. Not suppressing InplaceOrView key means unnecessary calls to `as_view/increment_version` if any view/inplace ops are used in the kernel implementation which adds a lot of overhead. To avoid overhead, instead of fallthrough kerenl being backend fallback, we'll want to use a real kernel that suppresses InplaceOrView key. But compared to the current implementation which only adds an extra dispatch for view/inplace ops, it forces all functional ops to have an extra dispatch as well. That's why it's blocked.
-- To unblock it requires some fixes like identifying at:: callsites in backend-specific kernels (static analysis? ) , replacing these with at::native:: should unblock us from linking requires_grad with VariableType kernel.
+
+- If `requires_grad=False` skips Autograd kernel, functional ops won't
+  be able to go through `AutoDispatchBelowInplaceOrView` guard which
+  suppresses both autograd and InplaceOrView keys in TLS excluded. Not
+  suppressing InplaceOrView key means unnecessary calls to
+  `as_view/increment_version` if any view/inplace ops are used in the
+  kernel implementation which adds a lot of overhead. To avoid overhead,
+  instead of fallthrough kerenl being backend fallback, we'll want to
+  use a real kernel that suppresses InplaceOrView key. But compared to
+  the current implementation which only adds an extra dispatch for
+  view/inplace ops, it forces all functional ops to have an extra
+  dispatch as well. That's why it's blocked.
+- To unblock it requires some fixes like identifying `at::` callsites in
+  backend-specific kernels (static analysis? ) , replacing these with
+  `at::native::` should unblock us from linking `requires_grad` with
+  VariableType kernel.  Alternately, do
+  https://github.com/pytorch/pytorch/issues/54614
