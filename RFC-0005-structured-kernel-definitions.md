@@ -170,7 +170,7 @@ namespace native {
   TORCH_IMPL_FUNC(upsample_nearest1d_structured_cpu) (
     const Tensor& self, IntArrayRef output_size, optional<double> scales, const Tensor& out
   );
-  /* macro expands to: void upsample_nearest1d_structured_cpu::impl( */
+  /* macro expands to: void upsample_nearest1d_structured_cuda::impl( */
   TORCH_IMPL_FUNC(upsample_nearest1d_structured_cuda) (
     const Tensor& self, IntArrayRef output_size, optional<double> scales, const Tensor& out
   );
