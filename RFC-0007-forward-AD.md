@@ -17,28 +17,36 @@ This RFC will cover:
 
 ## Timeline
 
-- Implement the design below for a single level and with limited number of formulas: https://github.com/pytorch/pytorch/pull/49097
-- Implement remaining formulas, update testing and ensure no major performance regression
-- Add more usage in the high level autograd API and make it default
+- Done: Implementation for single level in core
+- Done: Add codegen mechanisms for adding more formulas
+- Add gradcheck tools to test both real and complex valued functions
+- Add a limited set of formulas that enable basic use cases
+- Add it as backend for high level autograd API
+- Update OpInfo to natively test forward mode
+- Update custom Function API to allows overwriting forward AD
+
+Follow ups
+- Long running issue to add remaining formulas
 - Decide and implement multi-level version
+
 
 ## Goal of this feature
 
 The main goal is to provide a way to compute Jacobian vector products efficiently by leveraging the forward AD approach.
 This will be achieved by:
 - Use the new engine to compute quantities such as `jvp`, `hvp` and `hessian` within the high level API.
-- Provide an easy to use, python centric API for users to compute forward AD quantities.
+- Provide an easy to use, python-centric API for users to compute forward AD quantities.
 
 ## Quick theorerical introduction
 
 The simple definition for forward AD is that it is computing a Jacobian vector product.
-Indeed, if we define backward mode AD for a function `f` with Jacobian `J`, it is computing the quantity `u^T J` for an arbitrary `u` in an efficient manner.
-Forward mode will allow to compute the quantity `J v` for an arbitrary `v` in an efficient manner as well.
-In both cases, we mean by efficient that the complexity is the same as evaluating the function `f`.
+Indeed, if we define backward mode AD for a function `f` with Jacobian `J`, it is computing the quantity `v^T J` for an arbitrary `v` in an efficient manner.
+Forward mode will allow to compute the quantity `J u` for an arbitrary `u` in an efficient manner as well.
+In both cases, we mean by efficient that the complexity is the same order as evaluating the function `f`.
 
 The AD implementation is done very similarly in both cases where the Jacobian matrix for the full function is re-written as the product of Jacobian matrices for each elementary function used within the function. For example `J = J_3 J_2 J_1` if `f` is composed of 3 component functions: `f(x) = f3(f2(f1(x)))`
 
-The computation done by forward AD is then `J v = (J_3 (J_2 (J_1 v)))`. As you can see, each subproduct is done in the same order as the forward functions and thus the forward mode AD can run at the same time as the forward pass.
+The computation done by forward AD is then `J v = (J_3 (J_2 (J_1 u)))`. As you can see, each sub-product is done in the same order as the forward functions and thus the forward mode AD can run at the same time as the forward pass.
 
 A good way to model this is to introduce dual numbers where the imaginary dimension represent the partial Jacobian vector product while the real part represent the function value.
 
@@ -117,7 +125,7 @@ This is done within the VariableType kernel for now even though it will most lik
 
 Finally, to ensure the strict scoping presented above, we introduce a global state tracking the different levels and which Tensor belongs to which level to ensure that we can clear them properly on exit.
 
-See the PR for more details on these implementations details.
+All of these are now part of core pytorch and was added via these two PRs: https://github.com/pytorch/pytorch/pull/49734 and https://github.com/pytorch/pytorch/pull/56083.
 
 ### View and inplace handling
 
@@ -125,8 +133,8 @@ View and inplace is a key feature of pytorch that we want to preserve for this n
 The semantic that we are looking for here is described in the Appendix of this document and is based on the bidirectional lens idea.
 
 The practical implication of this semantic in this implementation are the following:
-- backward and forward "differentiable" views are two different things: `detach` is backward non-differentiable and forward differentiable while operations like `fwAD.make_dual` is backward differentiable and forward non-differentiable.
-- we need to track differentiable views both for backward and forward AD as in general, their base could be different.
+- backward and forward "differentiable" views are two different things: `detach` is backward non-differentiable and forward differentiable while operations, like `fwAD.make_dual`, are backward differentiable and forward non-differentiable.
+- we need to track differentiable views both for backward and forward AD independently as, in general, their base could be different.
 - for operations that only involve dual Tensors, the semantic from the appendix is easily achieved by ensuring that:
   - view operation forward AD formula generate a dual that is a view of the input's dual
   - inplace operation forward AD formula modify the input's dual inplace
@@ -136,11 +144,14 @@ The practical implication of this semantic in this implementation are the follow
 
 ## Testing
 
-For testing purposed, we can easily update the current `autograd.gradcheck` function to compare numerically computed Jacobian with the one constructed using forward mode AD.
+For testing purposed, we can update the current `autograd.gradcheck` function to compare numerically computed Jacobian with the one constructed using forward mode AD.
 In a similar way the backward mode AD gradcheck reconstruct the full Jacobian matrix row by row, the forward AD can reconstruct the full Jacobian matrix column by column and we can compare the final result with the numerical Jacobian.
 
+The fast mode will also be done similarly to the backward mode implementation where we will use the forward AD to compute `J_f u` with a single forward AD pass. We then compute the full reduction by doing a dot product with `v`.
+For the complex case, we will consider only functions with real-valued inputs and perform the same computation as the finite difference.
+
 The overall testing plan is going to be done in 3 phases:
-- Test of the core implementation and the view semantic (proposed in https://github.com/pytorch/pytorch/pull/49098)
+- Done: Test of the core implementation and the view semantic (proposed in https://github.com/pytorch/pytorch/pull/49098)
 - Once few formulas are added, enable gradcheck for forward by default in our test suite and allow it to silently fail when encountering functions that are not implemented. This allows to easily check the behavior with other components such as the high level API, complex, Modules, etc
 - Once we have most formulas implemented, make gradcheck properly fail when it is not able to verify a forward gradient and audit the test suite to disable forward check for every function that is not supported yet.
 
