@@ -14,8 +14,8 @@ models on TPU), it remains the best and most comprehensive
 implementation of lazy tensors to date on PyTorch.
 
 ## The Prototype
-Alex has been working on a [refactor of torch_xla](https://github.com/fairinternal/nnc_eager/tree/asuhan/lazy_core_only)
-which splits out this core functionality into its own library that has
+Alex has been working on a [Lazy Tensor Core prototype](https://github.com/pytorch/pytorch/tree/lazy_tensor_staging)
+which splits out core tracer functionality and IR from torch-XLA into its own library that has
 no dependency on TensorFlow/XLA, with the intention of publishing it as
 a library that accelerator vendors can use to bootstrap a lazy tensor
 that records a functional IR which they can then feed to their personal
@@ -26,12 +26,12 @@ PyTorch proper.
 Alex Suhan has identified that much of the infrastructure in torch_XLA
 is actually not specific to XLA. In particular, `torch_xla` defines an IR
 *in terms of ATen operators* (not XLA operators; see
-https://github.com/pytorch/xla/tree/master/torch_xla/csrc/ops ), and
+[lazy_tensor_core/csrc/ops](https://github.com/pytorch/pytorch/tree/lazy_tensor_staging/lazy_tensor_core/lazy_tensor_core/csrc/ops) ), and
 first constructs this IR before lowering into HLO IR. This puts the IR
 in the same conceptual space as TorchScript IR, except:
 
 * It is purely functional (no support for mutation or control flow).
-  XLA’s tracing process keeps tracks of aliases and views so that it can
+  The tracing process keeps track of aliases and views so that it can
   extend the IR at all points where a mutation is visible. This is
   contrast to the JIT remove mutation pass, which may refuse to remove
   mutation when it cannot prove it is sound
@@ -40,7 +40,7 @@ in the same conceptual space as TorchScript IR, except:
   mutations don’t being visible at other relevant aliases (not always
   true, see https://github.com/pytorch/pytorch/issues/34538)
 
-* It is specifically designed to be traced every iteration your model is
+* It is specifically designed to trace every iteration of your model as it is
   run, so the IR is designed to be more efficient for this use case:
   e.g., it has separate classes for every ATen operator, rather than a
   dynamically typed dictionary of attributes; it maintains a hash of an
