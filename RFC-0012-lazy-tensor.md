@@ -1,15 +1,6 @@
-# Functional lazy traces (from XLA) to PyTorch
+# Lazy Tensor in PyTorch
 
-**tl;dr** XLA contains a non-XLA specific TorchScript-like IR
-specifically designed for lazy evaluation. Nodes in this IR correspond
-to ATen operations but with mutation complete eliminated at tracing time
-(compared to the incomplete remove mutation pass) and with a distinct
-class per operator node (compared to TorchScript IR which is dynamically
-typed). Alex Suhan makes the case that splitting out this IR from XLA
-and publishing it separately is the fastest way to bring accelerators
-which need lazy tensors online; Edward Yang asks PyTorch composability
-and JIT teams to think about what the best path for this IR to core
-PyTorch is.
+**tl;dr** A Lazy-Tensor tracing system in PyTorch enables a wider range of PyTorch models to get the benefits of fusion or compiler optimization with minimal or no code changes, and a natural 'eager-like' pytorch programming experience.  Torch-XLA provides proof of concept and a fully functional stack for XLA devices, including a lightweight, purely functional IR used for fast DAG construction and hashing, and a lowering step for conversion to native XLA HLO where optimization and codegen occurs.  We propose to generalize this functional trace IR, make lazy tracing and a backend plugin API a part of PyTorch core, and expose it as a self-service path for vendors to integrate accelerators to PyTorch.
 
 ## Background
 
@@ -22,6 +13,16 @@ integration with XLA is imperfect (based on internal work running some
 models on TPU), it remains the best and most comprehensive
 implementation of lazy tensors to date on PyTorch.
 
+## The Prototype
+Alex has been working on a [refactor of torch_xla](https://github.com/fairinternal/nnc_eager/tree/asuhan/lazy_core_only)
+which splits out this core functionality into its own library that has
+no dependency on TensorFlow/XLA, with the intention of publishing it as
+a library that accelerator vendors can use to bootstrap a lazy tensor
+that records a functional IR which they can then feed to their personal
+IR lowerings. He is also interested in eventually merging this code into
+PyTorch proper.
+
+## The Lazy Tensor IR
 Alex Suhan has identified that much of the infrastructure in torch_XLA
 is actually not specific to XLA. In particular, `torch_xla` defines an IR
 *in terms of ATen operators* (not XLA operators; see
@@ -55,13 +56,8 @@ in the same conceptual space as TorchScript IR, except:
   signature resulted in a change in the PyTorch-XLA bridge, but not the
   IR itself).
 
-Alex has been working on a [refactor of torch_xla](https://github.com/fairinternal/nnc_eager/tree/asuhan/lazy_core_only)
-which splits out this core functionality into its own library that has
-no dependency on TensorFlow/XLA, with the intention of publishing it as
-a library that accelerator vendors can use to bootstrap a lazy tensor
-that records a functional IR which they can then feed to their personal
-IR lowerings. He is also interested in eventually merging this code into
-PyTorch proper.
+## The Backend Interface
+Currently, the backend interface exposed in Alex's prototype is new and specific to the Lazy Tensor project. We are actively exploring whether it can be aligned via conversion from Lazy Trace IR to TorchScript IR with existing TorchScript vendor integrations.  This seems ideal from a code maintannence perspective, but needs to be proven out.
 
 ## How to put this in core?
 
