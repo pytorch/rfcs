@@ -117,37 +117,37 @@ Here are the different dimensions that we classify the design space of specifyin
 
 ## Why not parameterize TorchScript tensor types with dtypes?
 
-Our first instinct was indeed to introduce parameterized (e.g., by dtype or shapes) tensor types to the TorchScript langauge (such as `torch.floatTensor`). Why did we abandon this approach? We realized two significant limitations of this approach:
-* Annotating parameterized tensor types at all function interfaces are cumbersome and error-prone. Most TS users assume default types for unannotated tensors, if they want to pass more tensor properties to the captured IR using parameterized tensor types, it means a lot more explicit annotation
-* Many functions cannot be annotated with a specific dtype or shape at its function interface level. Its more refined tensor properties really depends on properties of the input. For example, how does one annotate a more refined tensor type for any of the `torch.nn.xxx` layers? Most of them are designed to work w/ tensors of many types or shapes, so even if users are willing to annotate more refined types, they cannot do so for common codes that can be called by different tensor types.
+Our first instinct was indeed to introduce parameterized (e.g., by `dtype` or `shapes`) tensor types to the TorchScript langauge (such as `torch.floatTensor`). Why did we abandon this approach? We realized two significant limitations of this approach:
+* Annotating parameterized tensor types at all function interfaces are cumbersome and error-prone. Most TS users assume default `Tensor` types for unannotated parameters, if they want to annotate tensors with more refined tensor properties pass, they have to do a lot more explicit annotation;
+* Many functions cannot be annotated with a specific `dtype` or `shape` at its function interface level. The more refined tensor properties really depend on those of the inputs to the model. For example, how does one annotate a more refined tensor type for any of the `torch.nn.` layers? Most of them are designed to work w/ tensors of many types or shapes. So even if users are willing to annotate more tensors with refined properties, they cannot do so for functions from common library codes that are polymorphic in terms of tensor properties by nature.
 
-As such, we decide to choose caller-side annotation, i.e., to annotate types at the call-site of a module and use JIT to propagate the input properties throughout the graph. This way we treat JIT as a specialization engine and did not touch the type system of the TS langauge. Note that TS IR does support more refined tensor properties.
+As such, we decide to choose caller-side annotation, i.e., to annotate types at the call-site of a module and use JIT to propagate the input properties throughout the graph. This way we treat JIT as a specialization engine and did not touch the type system of the TS langauge. Note that the type system of TorchScript IR does support more refined tensor properties and is (to some extent) independent of that of TorchScript language.
 
-## Why not use empty-tensor or meta-tensor
+## Why not using empty or meta tensors to specify tensor properties?
 
-Reusing a wrapper object over either a real empty tensor object or a meta tensor  (i.e., with device=meta)
-
+One of our earlier design is to use empty tensors or meta tensors  (i.e., tensors created with `device=meta`) to specify tensor properties in the input descriptor. Here is one such design
+```
 class TensorDescriptor:
     def __init__(meta: Tuple[Tensor, List[str]]=None, shape_attr: List[int]=None)
-
+```
 where
 
-* meta.first is a tensor (usually an empty tensor is sufficient) where a subset of its attributes are used to describe the input tensor
-* meta.second is a list of attribute names that specify which subset of attributes of meta are used to describe properties of the input tensor. If meta_attrs is None, then all attributes of meta except for tensor values are used to describe input tensors
-    * dtype(), device_type(), requires_grad(), sizes(), dim(), strides()
-* shape_attr specifies symbolic shape information that cannot be expressed by regular tensors. It is represented as a list of integers where a positive integer represents static size of that dimension, and a negative number represents a symbolic dimension. The same negative number used in different dimensions of all input_descriptors specified to one torch.jit.script function represent the same symbolic shape variable. For instance,
-
-* td = TensorDescriptor([torch.empty([100,200], dtype=float, device="cuda"), ["dtype", "sizes", "device_type", "requires_grad"])
+* `meta.first` is a tensor (usually an empty tensor is sufficient) where a subset of its attributes are used to describe the input tensor
+* `meta.second` is a list of attribute names that specify which subset of attributes of meta are used to describe properties of the input tensor. Ifc`meta_attrs` is None, then all attributes of meta except for tensor values are used to describe input tensors
+    * `dtype()`, `device_type()`, `requires_grad()`, `sizes()`, `dim()`, `strides()`
+    * `shape_attr` specifies symbolic shape information that cannot be expressed by regular tensors. It is represented as a list of integers where a positive integer represents static size of that dimension, and a negative number represents a symbolic dimension. The same negative number used in different dimensions of all input_descriptors specified to one `torch.jit.script` function represent the same symbolic shape variable. For instance,
+  ```
+   td = TensorDescriptor([torch.empty([100,200], dtype=float, device="cuda"), ["dtype", "sizes", "device_type", "requires_grad"])
     torch.jit.script(myModel, input_descriptor={"input1":td}
+  ```
 
-*Problems with this design*
-
+This design has the following problems:
 * Empty-tensor still allocates storage
-* Cannot represent symbolic shape information: neither torch.empty nor meta-tensor allow negative numbers in shape dimension (show-stopper)
+* Cannot represent symbolic shape information: neither `torch.empty` nor meta-tensor allow negative numbers in shape dimension
 * Having to specify a subset of attributes in empty/meta-tensors (verbose)
 
 ## How to compare input descriptor and tracing?
 
-Both input descriptor and tracing specializes a model for a particular execution context. For input descriptor, the specialization is guided by a contract and actual arguments to an input-descriptor scripted model are validated against the contract, so input descriptor is safe.
+Both input descriptor and tracing specializes a model for a particular execution context. For input descriptor, the specialization is guided by an explicit contract that is verifiable (i.e., actual arguments to a scripted model is validated against the input-descriptor associated with the scripted model), so input descriptor is safe.
 
-On the other hand, tracing is unsound because the actual arguments to a trace model may not match the properties of the original inputs to produce the model.
+Tracing, on the other hand, is unsound because the actual arguments to a trace model may not match the properties of the original inputs to produce the model.
