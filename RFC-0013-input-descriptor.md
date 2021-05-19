@@ -1,12 +1,10 @@
 # Motivation
 
-Currently TorchScript supports a generic Tensor type that can be of arbitrary shape, dtype, and layout (i.e., generic tensors). Graphs operating on generic tensors are more dynamic but lack important shape, dtype, layout properties for further optimizations. On the other hand, we observe that many properties of generic tensors can be deduced from those of input tensors.
+Currently TorchScript supports a generic Tensor type that can be of arbitrary shape, dtype, and layout. Graphs operating on generic tensors lack important shape, dtype, layout properties for further optimizations. On the other hand, we also observe that many properties of generic tensors can be inferred from those of input tensors.
 
-Since properties of inputs to a scripted model cannot be obtained by analyzing the model, we propose to augment torch.jit.script API with an optional Input Descriptor parameter that describe tensor input properties (e.g., dtype, device, shape, rank, layout) to the model being scripted. Input descriptor (this RFC) combined with a tensor property propagation engine (not part of this RFC) gives the JIT the ability to propagate these input properties throughout the graphs. In essense it gives the JIT the ability to specialize a graph of generic tensors to a graph of tensors with more known properties that would aid many other downstream optimizations such as AMP, control-flow removal, layout optimization, kernel fusion and codegen, tensor type/shape validation, more effective integration of external optimizers that require static graphs.
+We propose to augment torch.jit.script API with an optional Input Descriptor parameter that describe tensor input properties (e.g., dtype, device, shape, rank, layout) to the model being scripted. Input descriptor (this RFC) combined with a property propagation JIT pass (not included in this RFC) allow the JIT to specialize a graph of generic tensors to a graph of tensors with more known properties without adding much burden to user-level type annotation. This ability would aid many other downstream optimizations (e.g., AMP, control-flow removal, layout optimization, kernel fusion and codegen, tensor type/shape validation) as well enable more effective integrations of external optimizers that require static graphs.
 
 # Design: `torch.jit.script` Input Descriptor
-
-We view `ScriptedModule` as a closure over the internal states of a module object, where states of the module object are captured at the time when `torch.jit.script(model)` is invoked. Let’s make a simplifying assumption of a single entry-point to ScriptedModule (e.g., `forward()`). If we can describe properties of input tensors to scripted functions, then these properties can be propagated to the rest of the IR graph by the JIT.
 
 ## User interface
 
@@ -20,20 +18,20 @@ torch.jit.load(...)
 ```
 where
 
-* `input_descriptors` specifies known meta information for certain parameters of the scripted function or method
-* `param_name` is the name of a parameter of a scripted method/function
-* `InputDescriptor` can be
-    * any Python object that matches the type of the parameter it describes, or
-    * a MetaTensorType object (see details next) for any parameter of Tensor type, or
-    * a typing Python object (e.g., `int`, `List[int]`, or `List[MetaTensorType]`)
+* `input_descriptors` specifies known meta information for certain parameters of a scripted function/method
+   * `param_name` is the name of a parameter of a scripted method/function
+   * `InputDescriptor` can be
+      * a `MetaTensorType` object (see next) for any parameter of Tensor type, or
+      * a typing Python object (e.g., `int`, `List[int]`, or `List[MetaTensorType]`), or
+      * any Python object that matches the type of the parameter it describes
 
-Note that when the type of a model input parameter is specified via `InputDescriptor`, this specification takes precedence over the type annotation specified at the signature of the model entry-point. This is because
-- properties specified by `InputDescriptor` are often richer than that provided by TorchScript type annotation;
-- multiple input descriptors can be specified for a model if a model is scripted in different ways.
+Note that when the type of a model input parameter is specified via `InputDescriptor`, this specification takes precedence over the type annotation specified at the signature of the scripted method/function. This is because
+- `InputDescriptor` can specify rich tensor properties (e.g., `dtype`, `shape`) than the `Tensor` type annotation allowed in the TorchScript langauge;
+- Since input descriptors are specified at `torch.jit.script()`, in principle, there can be multiple input descriptors specified for a model if the model is scripted in multiple ways.
 
-## Describing tensor properties using `MetaTensorType` object
+## `MetaTensorType` object
 
-We define the set of attributes in MetaTensorType that is used in scripting. Among those attributes, only the value of non-None attributes are used in input descriptor propagation.
+We use `MetaTensorType` object to describe properties for a parameter of a scripted function/method. The complete set of input properties is not yet finalized (as it depends on the propagation pass implementation). If an attribute (e.g., `dtype`) has a `None` value, it means that no information about the attribute is known.
 ```
 class MetaTensorType:
     def __init__(dtype=None, rank=None, shape:List[int]=None, device=None, requires_grad=None, layout=None, ...):
@@ -58,17 +56,17 @@ Here are some examples of shape representation:
 ["i1", "i2", "i3"] # 3D tensors with 3 independent lengths named as "i1", "i2", "i3"
 ```
 
-## Input-descriptor based specialization w/ explicit checking
+## Using input descriptor
 
-Input descriptor supports three types of specializations:
+Input descriptor combined with a tensor property propagation pass essentially is a specialization engine that generates TorchScript IR graphs with richer tensor property information. Depending on what information is provided by the input descriptor, three types of specializations may happen:
 
 * Type specialization, i.e., input descriptor specifying types
-* Value specialization, i.e., input descriptor specifying values
 * MetaTensorType specialization, i.e., input descriptor specifying tensor meta-properties
+* Value specialization, i.e., input descriptor specifying values
 
-The specialization mechanism is quite powerful. It could specialize any subset of parameters, with any subset of meta tensor properties, or with any real Python value. The specialization is also fully programmable and a model can be specialized multiple times.
+The input descriptor mechanism is quite flexible. One can specify rpoperties for a subset of parameters with a subset of tensor properties. It may also specify a particular parameter with a real Python value (e.g., `True` or `100`). The specialization is fully programmable and a model can be associated with multiple input descriptors, one for each `torch.jit.script()` call sites.
 
-When invoking a scripted method/function with input descriptors, the actual arguments must satisfy the meta properties specified in the input descriptor. This checking is crucial to ensure the correct usage of a scripted model specializd for a given input-descriptor. Since input descriptor is needed for type checking when using a scripted model, they need to be added to serialization and de-serialization support.
+When invoking a scripted method/function with input descriptors, the actual arguments must satisfy properties specified in the input descriptor. This checking is crucial to ensure the correct usage of a scripted model specializd for a given input-descriptor. Since input descriptor is needed for type checking when using a scripted model, they need to be added to serialization and de-serialization support.
 
 Consider the following example. We use input descriptor to describe the shape and dtype properties of parameter `x`, and to specify the value of parameter `y`. The TS graph generated by `torch.jit.script` is specialized to this particular input descriptor.
 ```
@@ -98,13 +96,13 @@ badTensor = torch.ones([100], dtype=float)
 scripted(badTensor, myFlag)
 ```
 
-## "Train" input descriptors from real inputs
+## Extract input descriptors from real inputs
 
-We can provide helper functions to help “train” MetaTensorType out of real inputs. Given a set of example tensors for a particular parameter, we may infer the maximal set of common properties that are true for all the inputs.
+`MetaTensorType` can be manually provided by model users where they have an understanding of the characteristics of model inputs (e.g., the shape and dtype of input tensors). 
 
-The MetaTensorType can be gradually widened. For instance, if a new input fails the current tensor descriptor, it can be added to the example input to relax constraints specified in the tensor descriptor. This is akin to re-train using failed ezamples*.* This feature would make input-descriptor easier to use or to experiment with. It is another example of using profile-guided feedback to lower adoption barrier, but we do so in a safe-way.
+We can provide helper functions to automatically extract `MetaTensorType` out of real inputs. Given a set of example tensors for a particular parameter, we may infer the maximal set of common properties that are true for all the inputs.
 
-Note that the caveat of input-descriptor widening is that it may decrease the information of input descriptors
+`MetaTensorType` can be gradually widened. For instance, if a new input fails the current tensor descriptor, it can be added to the example input to relax constraints specified in the tensor descriptor. This feature would make input-descriptor easier to use or to experiment with. Note that the caveat of input-descriptor widening is that it may decrease the information of input descriptors. But since `MetaTensorType` is a regular Python object, users may manually split a `MetaTensorType` into multiple ones and script a model multiple times, each with a different input descriptor.
 
 # Design Discussions
 
