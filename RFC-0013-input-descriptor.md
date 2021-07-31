@@ -31,30 +31,59 @@ Note that when the type of a model input parameter is specified via `InputDescri
 
 ## `MetaTensorType` object
 
-We use `MetaTensorType` object to describe properties for a parameter of a scripted function/method. The complete set of input properties is not yet finalized (as it depends on the propagation pass implementation). If an attribute (e.g., `dtype`) has a `None` value, it means that no information about the attribute is known.
+We use `MetaTensorType` object to describe properties for a parameter of a scripted function/method. The complete set of input properties is not yet finalized (as it depends on the propagation pass implementation). 
+
+If an attribute (e.g., `dtype`) has a `None` value, it means that no information about the attribute is known.
 ```
 class MetaTensorType:
-    def __init__(dtype=None, rank=None, shape:List[int]=None, device=None, requires_grad=None, layout=None, ...):
+    def __init__(dtype = None, 
+                 rank:Optional[int] = None, 
+                 shape:Optional[List[int]] = None, 
+                 device = None, 
+                 requires_grad:bool = None, 
+                 layout:Tuple[LAYOUT,bool] = (NCHW, False), 
+                 quantized = None,
+                 ...):
         self.dtype = dtype
         self.rank = rank
         self.shape = shape
         self.device = device
         self.requires_grad = requires_grad
         self.layout = layout
+        self.quantized = quantized
         ...
 ```
-Note that shape is represented as a list of integers or strings to specify the (symbolic) length of each dimension.
+where
+* `LAYOUT` is an enum representing `NCHW` and `NHWC` (TODO: there may be more layouts we shall support)
+
+### `shape`
+
+`shape` is represented as a list of integers or strings to specify the (symbolic) length of each dimension.
 
 * The length of the list corresponds to the rank of the tensor.
 * Any non-negative integer number presents actual number of elements along that dimension.
-* Any string represents a symbolic length. The same string represents the same symbolic length within the scope of input descriptors for one `torch.jit.script(...)` call-site.
+* Any string represents a symbolic length. The same string represents the same symbolic length within the scope of input descriptors for one `torch.jit.script(...)` call-site. We use the following naming convention to differentiate two types of symbolic lengths:
+     * Dynamic symbolic length has a name string that starts with `?` (e.g., `?i`), representing a symbolic length whose runtime values may change across runs;
+     * Static symbolic length has a name string w/o starting with `?` (e.g., `i`), representing a symbolic length whose runtime values remain the same across runs 
 
 Here are some examples of shape representation:
 ```
 [100, 200] # 100 by 200 2D tensor
 ["i", "i", 100] # 3D tensor, innermost dimension 100, outer two most dimensions the same
-["i1", "i2", "i3"] # 3D tensors with 3 independent lengths named as "i1", "i2", "i3"
+["i1", "i2", "?i3"] # 3D tensors with 3 independent lengths named as "i1", "i2", "i3", where runtime values of `i1`, `i2` do not change across runs and those of `i3` may change across runs
 ```
+
+### `layout`
+
+Property `layout` is specified by a tuple:
+- The first element of the tuple specifies the layout of the tensor. Possible values of `layout` are specified by `LAYOUT` enum (e.g., `NCHW` or `NHWC`);
+- The second element of the tuple is a boolean, when the boolean is true, the type checker (see later) will convert input tensors to the specified layout if needed be.
+
+Note that, while other properties are default to `None` in `MetaTensorType` constructor, `layout` is default to `(NCHW, False)`, where `NCHW` is the default tensor layout of PyTorch. 
+
+### `quantized`
+
+TODO: add properties required for `quantized`
 
 ## Using input descriptor
 
@@ -85,7 +114,13 @@ meta = MetaTensorType([100,200], dtype=float)
 # Scripted model specialized to the input_descriptor
 scripted = torch.jit.script(MyModel(),input_descriptor={"x":meta, "flag":myFlag})
 ```
-When invoking the input-descriptor specialized model, inputs are checked against the input descriptor as shown below:
+
+### Type Checking and layout conversion
+
+When invoking the input-descriptor specialized model,  properties of inputs are checked against those of the input descriptor. If a non-`layout` property of one input mismatches with that of the corresponding input descriptor, a runtime error may be thrown. When the layout of an input tensor does not match the first element of the `layout` property tuple of the input descriptor and if the second element of the `layout` tuple is `True`, the system will transform the input tensor to match the specified layout.
+
+Consider the following example:
+
 ```
 myTensor = torch.randn([100, 200], dtype=float, device="cuda")
 # Type checking success: myTensor satisfy all properties of meta
