@@ -1,19 +1,5 @@
-
-<p style="color: red; font-weight: bold">>>>>>  gd2md-html alert:  ERRORs: 1; WARNINGs: 2; ALERTS: 3.</p>
-<ul style="color: red; font-weight: bold"><li>See top comment block for details on ERRORs and WARNINGs. <li>In the converted Markdown or HTML, search for inline alerts that start with >>>>>  gd2md-html alert:  for specific instances that need correction.</ul>
-
-<p style="color: red; font-weight: bold">Links to alert messages:</p><a href="#gdcalert1">alert1</a>
-<a href="#gdcalert2">alert2</a>
-<a href="#gdcalert3">alert3</a>
-
-<p style="color: red; font-weight: bold">>>>>> PLEASE check and correct alert issues and delete this message and the inline alerts.<hr></p>
-
-
-
 # PyTorch Operator Versioning
 
-
-# Context
 
 PyTorch’s operators sometimes require changes to maintain the high quality user experience (UX) that PyTorch is known for. These changes can be BC-breaking, where older programs will no longer run as expected on the latest version of PyTorch (an old writer / new reader problem) or FC-breaking, where new programs will not run on older versions of PyTorch (a new writer / old reader problem). BC and FC breaking changes have been challenging to coordinate across PyTorch because there are multiple consumers of PyTorch’s op set and we promise to keep models running in production working as expected.
 
@@ -74,26 +60,24 @@ PyTorch makes the following FC promises today:
 
 
 * **Eager changes**
-    * operator_versions.yaml** and **operator_upgraders.py** are added to register operator upgrades that are BC/FC breaking. **
-
-<p id="gdcalert1" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: undefined internal link (link text: "Example changes"). Did you generate a TOC? </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert2">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
-
-[Example changes](#heading=h.enajdjh00ukn)
+    * `operator_versions.yaml` and `operator_upgraders.py` are added to register operator upgrades that are BC/FC breaking. 
         * Note: this will not cover functional operators
         * The default value is zero
+        * A version bump is also required for FC break only. It's is good for compatibility analysis: if the client is running old runtime, we don't deliver the new model with the un-compatible operator to avoid unexpected crash.
     * **Use a single operator version number for all operators**
         * This number may be shared by the deploy version, but separate from other file format versions
     * **Older versions of operators registration are kept but they should only be matchable with special circumstances**
     * **Newer version of the operator registry must specify an upgrader** that conforms to the older version of the operator schema. Its body is a TorchScript-able function that uses the newer version of operator to implement old semantics.
+        * One upgrader per historic signature. The registry specifies the symbol and the file formats those upgraders are applied to.
     * [Improved BC testing] Tests that the old serialized version of the operator can still be loaded on the new runtime and run as expected need to be easy to add
         * This seems straightforward for Torchscript and Edge testing but I’m not sure how it would work for deploy/package
     * [Improved FC testing] Tests that the new version of the operator can still be loaded on old runtimes and run as expected need to be easy to add 
-        * This might require a new test job, which could be tricky to setup
+        * This might require a new test job, which could be tricky to setup. We have no plans to support this.
 * **Torchscript changes**
     * TorchScript Runtime build contains a table of operators and their corresponding versions
     * Each serialized model contains a table of operators and their corresponding version according to the TorchScript compiler that generated the model
         * Q: will this require a new serialization format?
-        * Yes, but it is easy to make it BC and FC
+        * No. `kProducedFileFormatVersion` would be used as the global operator version number.
     * During loading into the TorchScript compiler, TorchScript needs to match operator schema according to the table of operator versions stored in the package. This would generate IR that conforms to older schema. 
     * Then a TorchScript pass takes IR of older schema and replaces older versions of operator invocations with bodies of upgraders.
     * Out-of-support operator versions (ie. those no longer defined in `native_functions.yaml` with a valid upgrader) need to throw an error
@@ -103,7 +87,8 @@ PyTorch makes the following FC promises today:
     * Unknown operator versions need to throw an error
     * The operator version and upgraders are built into the runtime for BC.
     * Allow for the addition of optional keyword-only arguments without a version bump or FC concern
-    * Since additional operators can be introduced in upgraders, tracing based selective build should also cover upgraders: easier for BC because the new runtimes goes with the upgraders. 
+    * Since additional operators can be introduced in upgraders, tracing based selective build should also cover upgraders: easier for BC because the new runtimes goes with the upgraders.
+    * We should also consider the timeline for mobile to no longer use upgraders by requiring models that are too old update themselves before deployment (SLA time window).
 * **torch.package changes**
     * Each torch.package package contains a table of operators and corresponding version according to PyTorch build used to package the model
         * Q: How does the torch.package scenario for mapping old versions to current PyTorch operators work?
@@ -119,19 +104,19 @@ Note that the proposal does not introduce an explicit version to _all_ PyTorch o
 As an example, there’s a BC/FC breaking update on operator foo.
 
 Before:
-
+```
 foo(Tensor self, Scaler alpha=1, Tensor b, *, Tensor(a!) out) -> Tensor(a!)
-
+```
 After:
-
-foo(Tensor self, **Tensor c**, Scaler alpha=1, Tensor b, *, Tensor(a!) out) -> Tensor(a!)
-
+```
+foo(Tensor self, Tensor c, Scaler alpha=1, Tensor b, *, Tensor(a!) out) -> Tensor(a!)
+```
 In schema, a Tensor argument, c is added. Note that it’s not added as a “tailing default argument”, so that BC/FC cannot be handled automatically.
 
 Accordingly, in the kernel of foo, the implementation is updated based on the new argument c. The pseudo code (it’s in Python format, but can be written in C++ as well) looks like:
 
 
-```
+```python
 def foo(Tensor self, Tensor c, Scaler alpha=1, Tensor b, *, Tensor(a!) out) -> Tensor(a!):
   # The original kernel implementation
   ...
@@ -149,53 +134,53 @@ If there is a BC/FC break with schema change in a PR, a lint error can be automa
 ### Version bump
 
 Update version field in _operator_versions.yaml_.
-
+The current table that torchscript uses should be migrated to _operator_versions.yaml_.
 
 ### BC updates
 
-The developer needs to implement a BC “upgrader” in Python. The upgrader code is put in a centralized python file, _operator_upgraders.py_. 
+The developer needs to implement a BC “upgrader” in Python. The upgrader code is put in a centralized python file, _operator_upgraders.py_, in TorchScript format.
 
+_operator_version.yaml_
+```yaml
+- func: foo
+ version: 10
+ upgrader: foo_upgrader_0_9
+ version: 25
+ upgrader: foo_upgrader_10_24
+```
+_operator_upgraders.py_
+```python
+def foo_upgrader_0_9(Tensor self, Tensor c, Scaler alpha=1, Tensor b, *, Tensor(a!) out):
+  c = at.empty()
+  foo(self, c, alpha, b, out = self) 
 
-
-<p id="gdcalert2" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: inline drawings not supported directly from Docs. You may want to copy the inline drawing to a standalone drawing and export by reference. See <a href="https://github.com/evbacher/gd2md-html/wiki/Google-Drawings-by-reference">Google Drawings by reference</a> for details. The img URL below is a placeholder. </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert3">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
-
-
-![drawing](https://docs.google.com/drawings/d/12345/export/png)
-
-
+def foo_upgrader_10_24(...):
+  ...
+```
 
 * Different from the upgraders defined[ here](https://github.com/pytorch/pytorch/blob/8a094e3270d2fbec6060099b7059898f4a1c104a/torch/csrc/jit/frontend/builtin_functions.cpp#L98), 
-* For some operator updates, it’s not possible to have a BC adapter. In such a case, the operator number could still help to check compatibility and to quickly detect the source of failure with meaningful error. 
+* For some operator updates, it’s not possible to have a BC adapter. If it's FC break, an upgrader is not needed. In such a case, the operator number could still help to check compatibility and to quickly detect the source of failure with meaningful error. 
 * For most of the operator changes, the upgrader code is not expected to be heavy. However, the performance overhead should be observed, especially for edge use cases.
-* If there are multiple upgraders (for example, v2 runtime loading v0 model), the upgraders must be chained: upgrader_0_1, then upgrader_1_2. 
+* If there are multiple upgraders (for example, v20 runtime loading both v0 and v10 models). 
 * If the breakage is hard (there is no upgrader), throw “version not supported” error and suggest to regenerate the model.
 
 
 ### FC updates
 
-
-
-* No FC update is needed for
+* Except for version bump, no FC update is needed for
     * The BC/FC break op is not in the model (using [Dynamic versioning](https://github.com/pytorch/pytorch/pull/40279/files))
     * Server with 2-week FC window
-    * Mobile delivering systems use compatibility analysis to guard FC break models to be delivered to clients. If needed as a temporary hotfix, the downgrader can be used in the backport function shown in the diagram below.
+    * Mobile delivering systems use [compatibility analysis](https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/mobile/model_compatibility.cpp) to guard FC break models to be delivered to clients. 
+    * For internal refactors that an operator may call different transient operators, re-tracing is required for mobile to make sure the inputs of tracing based selective build don't have missing operators. Currently, it's guarded by a CI lint and a command line to retrace.
+      
+If needed as a temporary hotfix, an optional downgrader can be used in the backport function shown in the diagram below. It's not planed in this RFC and the discussion is left in the "Open Questions" session.
 
 
-# How does it handle BC and FC?
+## How does it handle BC and FC?
 
 Aligned with the “Compatibility scenarios” in the [doc of versioning in general](https://docs.google.com/document/d/1nyXmss2O003ZgKrhDmd-kyLNjjMqEXww_2skOXqkks4/edit), we do BC and FC validation at both deploy time and runtime.
 
- 
-
-<p id="gdcalert3" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: inline drawings not supported directly from Docs. You may want to copy the inline drawing to a standalone drawing and export by reference. See <a href="https://github.com/evbacher/gd2md-html/wiki/Google-Drawings-by-reference">Google Drawings by reference</a> for details. The img URL below is a placeholder. </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert4">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
-
-
-![drawing](https://docs.google.com/drawings/d/12345/export/png)
-
-The diagram above is generic for both Torchscript and bytecode for Edge devices. Limitations of edge runtime will be listed below.
-
-
-## BC
+### BC
 
 Deploying a new runtime that needs to execute an existing on-device model. 
 
@@ -208,7 +193,7 @@ Deploying a new runtime that needs to execute an existing on-device model.
     * The new runtime should always be able to run the old model, unless the old model is “retired”. Error out when the runtime’s op min version > the model's op version.
 
 
-## FC
+### FC
 
 Deploying a new model to an existing runtime. 
 
@@ -221,3 +206,18 @@ Deploying a new model to an existing runtime.
     * The “old” runtime can run the “new” model, and errors out at load time:
         * When an unknown op appears.
         * When reaching an op whose minimum runtime version >= current
+    
+# Open Questions
+
+## Use deprecation window to handle backward compatibility
+One future option is to keep both old and new operators, but set a certain deprecation window for old operators. Deprecate the old operator when the window expires. There are some open questions on this option:
+* What would be the window length? Would it be different for different situations (internal vs. external, server vs. mobile, etc.)
+* From user's point of view, the number of operators my bloat, depending on the length of deprecation window. 
+
+## Downgraders for FC
+Dual to upgreaders for BC on client, downgraders can be used for FC on server. There are several options:
+* We set a 2-week (maybe 3 week) FC window. The FC break update is split into two PRs. The first PR with new operator readers is rolled out. After the FC window (supposing all client runtime are updated to be able to read the new operator), the producer of the new operators are turned on to generate models with new operator schema.
+* The 2-week window may not be sufficient for mobile, where the runtime updated cannot be fully controlled. In such a case, we need to "backport" the new model to an old format. 
+    * We save the historical models that were exported in earlier code. If a compatible older model can be found, the older model is delivered to the old runtime.
+    * We could apply a downgrader at the server side: to rewrite the new model in the old format. Since the downgrader happens at model delivery time, it can be done out of the major export flow. 
+* Keep old PyTorch release binaries (for example, PyTorch 1.10). Mobile can backport some operators to PyTorch 1.10 opportunistically. It's more challenging to maintain historical binaries than historical models. 
