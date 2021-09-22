@@ -1,9 +1,15 @@
 # PyTorch Operator Versioning
 
 
-PyTorch’s operators sometimes require changes to maintain the high quality user experience (UX) that PyTorch is known for. These changes can be BC-breaking, where older programs will no longer run as expected on the latest version of PyTorch (an old writer / new reader problem) or FC-breaking, where new programs will not run on older versions of PyTorch (a new writer / old reader problem). BC and FC breaking changes have been challenging to coordinate across PyTorch because there are multiple consumers of PyTorch’s op set and we promise to keep models running in production working as expected.
+PyTorch is a framework that allows creating and executing programs expressed with a set of operators.
 
-This document proposes a new BC and FC policy based on operator versioning. 
+These operators sometimes require changes to maintain the high quality user experience (UX) that PyTorch is known for. These changes are spread out across program representation as well as execution. This poses a challenge since PyTorch programs created at a point in time may need to run in newer implementations of the PyTorch runtime. When this is not possible due to a change in the operator set it is said the change is not backwards compatible (aka BC-breaking). On the opposite direction, it is also possible that PyTorch programs may need to be executed in an older implementation of the PyTorch runtime, and some changes in the operators may break this forward compatibility (aka FC-breaking).
+
+BC and FC breaking changes have been challenging to coordinate across PyTorch because there are multiple consumers of PyTorch’s op set and we promise to keep models running in production working as expected.
+
+We are providing the same Service Level Agreement (SLA) to both internal and external use cases, which is included in the goals to be finalized.
+
+This document proposes a new BC and FC policy based on operator versioning.
 
 
 ## History
@@ -11,46 +17,47 @@ This document proposes a new BC and FC policy based on operator versioning.
 
 ### Backwards Compatibility
 
-Backwards compatibility (BC), the ability for PyTorch to continue running programs from older versions, is important so programs don’t need to be rewritten.
+Backwards compatibility (BC), the ability for PyTorch to continue running programs from older versions, is important so programs don’t need to be forcefully updated to comply with the new runtime implementation.
 
-PyTorch makes the following BC promises today:
+PyTorch current SLA on backwards compatibility:
 
 
 
 * **OSS** — “stable” features will be deprecated for one release before a BC-breaking change is made. [PyTorch OSS BC-breaking policy](https://pytorch.org/docs/master/) 
-* **FB Internal** — we will not break a serialized torchscript program running in production at Facebook
+* **FB Internal** — we will not break a serialized torchscript program running in production at Facebook (to be replaced with a more generic SLA)
 
-BC-breaking operator changes were previously governed by the [Backward-compatibility Breaking Change Review Process](https://fb.quip.com/gydOArylrcKd), but this only covered torchscript and eager.
+BC-breaking operator changes were previously governed by the [Backward-compatibility Breaking Change Review Process](https://fb.quip.com/gydOArylrcKd), but this only covered torchscript and eager. A generic process needs to be visible from OSS.
 
 
 ### Forwards Compatibility
 
-Forwards compatibility (BC), the ability for older versions of PyTorch to run programs from newer versions, is important so users don’t need to update PyTorch.
+Forwards compatibility (FC), the ability for older versions of PyTorch to run programs from newer versions, is important so users don’t need to update PyTorch.
 
-PyTorch makes the following FC promises today:
+PyTorch current SLA on forward compatibility:
 
 
 
 * **OSS** — no promise
 * **FB Internal** — PyTorch commits can run existing PyTorch eager, package/deploy, and serialized torchscript programs for at least two weeks
-    * The addition of a new kwarg-only argument at the end of an op’s parameter list (but before out=, if present) with a default value is FC-compatible for serialized [torchscript](https://fb.workplace.com/groups/pytorch.dev/permalink/909079013003913/) and [edge](https://fb.workplace.com/groups/pytorch.dev/permalink/912379562673858/).
+    * The addition of a new kwarg-only argument at the end of an op’s parameter list (but before out=, if present) with a default value is FC-compatible for serialized [torchscript](https://fb.workplace.com/groups/pytorch.dev/permalink/909079013003913/) and [mobile](https://fb.workplace.com/groups/pytorch.dev/permalink/912379562673858/).
 
 
 ## Goals
 
 
 
-* To support backward and (some) forward compatibility for an arbitrary BC or FC break update (schema, functional, etc) on an operator by [versioning](https://docs.google.com/document/d/1nyXmss2O003ZgKrhDmd-kyLNjjMqEXww_2skOXqkks4/edit). 
-* It’s a systematic flow to prevent BC/FC breakage on both deploy and runtime stages.
-* To provide testing that accurately detects dangerous BC and FC-breaking changes.
-* To support both server and edge use cases, including TorchScript, package/deploy and Edge.
-
+We aim to establish a policy that can support and is consistent across both server and edge use cases, including TorchScript, package/deploy and Edge. More specifically:
+* Support backward and (some) forward compatibility for an arbitrary BC or FC break update (schema, functional, etc) on an operator by [versioning](https://docs.google.com/document/d/1nyXmss2O003ZgKrhDmd-kyLNjjMqEXww_2skOXqkks4/edit).
+* A systematic flow to prevent BC/FC breakage on both deploy and runtime stages.
+* Provide testing that accurately detects dangerous BC and FC-breaking changes.
 
 ## Non-goals
 
 
 
 * It does not mean that models with old operator schema can **always** run successfully on new runtime and vice versa. 
+  * Supporting old model out of BC SLA is not guaranteed 
+  * Using new feature is not supported for old runtimes out of the 2-week server FC SLA
 * It’s not for the “automatic” BC/FC support that can be done without any developer’s manual work (for example, the number of arguments mentioned in the Context). To apply versioning on the updated operator, the author needs to manually add a line in the version table and provide the resolution function for BC. This proposal is for BC/FC breakages that the automatic supports don’t apply. 
 * It does not include the BC/FC for package/deploy itself. The Python-only operators are transparent to TS and Edge clients, with the TS compilation. 
 
@@ -212,7 +219,7 @@ Deploying a new model to an existing runtime.
 ## Use deprecation window to handle backward compatibility
 One future option is to keep both old and new operators, but set a certain deprecation window for old operators. Deprecate the old operator when the window expires. There are some open questions on this option:
 * What would be the window length? Would it be different for different situations (internal vs. external, server vs. mobile, etc.)
-* From user's point of view, the number of operators my bloat, depending on the length of deprecation window. 
+* From user's point of view, the number of operators my bloat, but the old operators out of SLA BC window can be removed.
 
 ## Downgraders for FC
 Dual to upgreaders for BC on client, downgraders can be used for FC on server. There are several options:
