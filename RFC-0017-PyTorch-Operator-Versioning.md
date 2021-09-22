@@ -61,10 +61,18 @@ We aim to establish a policy that can support and is consistent across both serv
 * It’s not for the “automatic” BC/FC support that can be done without any developer’s manual work (for example, the number of arguments mentioned in the Context). To apply versioning on the updated operator, the author needs to manually add a line in the version table and provide the resolution function for BC. This proposal is for BC/FC breakages that the automatic supports don’t apply. 
 * It does not include the BC/FC for package/deploy itself. The Python-only operators are transparent to TS and Edge clients, with the TS compilation. 
 
+# Glossary
+
+* Backwards Compatibility (BC) — The ability to run programs from older versions of PyTorch
+* Version — A number that describes the format of the PyTorch program being read as well as providing partial information about which OpSet is required to run the program properly. (More precisely it counts the number of BC-breaking changes.) (See the dynamic versioning note (https://github.com/pytorch/pytorch/blob/6db8f7a70920f91418078fe09477eed0b0adefdb/caffe2/serialize/versions.h#L11).)
+* Forwards Compatibility (FC)* — The ability to run programs from future versions of PyTorch
+* Operator — A pair of a string (the operator’s “name” or “symbol”) and mathematical function, e.g. (div, /)
+* OpSet — A set of PyTorch operators (including upgraders)
+
 
 # Proposal
 
-
+We propose the operator versioning that works across eager, TorchScript, torch.package and mobile. It uses a version number + corresponding upgraders in torchscript to avoid breakage due to BC/FC breaking operator updates.
 
 * **Eager changes**
     * `operator_versions.yaml` and `operator_upgraders.py` are added to register operator upgrades that are BC/FC breaking. 
