@@ -48,6 +48,7 @@ PyTorch current SLA on forward compatibility:
 
 We aim to establish a policy that can support and is consistent across both server and edge use cases, including TorchScript, package/deploy and Edge. More specifically:
 * Support backward and (some) forward compatibility for an arbitrary BC or FC break update (schema, functional, etc) on an operator by [versioning](https://docs.google.com/document/d/1nyXmss2O003ZgKrhDmd-kyLNjjMqEXww_2skOXqkks4/edit).
+* Update and expansion of our existing SLAs (Service-Level Agreements).
 * A systematic flow to prevent BC/FC breakage on both deploy and runtime stages.
 * Provide testing that accurately detects dangerous BC and FC-breaking changes.
 
@@ -89,10 +90,7 @@ We propose the operator versioning that works across eager, TorchScript, torch.p
     * [Improved FC testing] Tests that the new version of the operator can still be loaded on old runtimes and run as expected need to be easy to add 
         * This might require a new test job, which could be tricky to setup. We have no plans to support this.
 * **Torchscript changes**
-    * TorchScript Runtime build contains a table of operators and their corresponding versions
-    * Each serialized model contains a table of operators and their corresponding version according to the TorchScript compiler that generated the model
-        * Q: will this require a new serialization format?
-        * No. `kProducedFileFormatVersion` would be used as the global operator version number.
+    * Reuse the _version_ record in the model file as the version number for operators. In the code it's `kProducedFileFormatVersion`
     * During loading into the TorchScript compiler, TorchScript needs to match operator schema according to the table of operator versions stored in the package. This would generate IR that conforms to older schema. 
     * Then a TorchScript pass takes IR of older schema and replaces older versions of operator invocations with bodies of upgraders.
     * Out-of-support operator versions (ie. those no longer defined in `native_functions.yaml` with a valid upgrader) need to throw an error
@@ -113,6 +111,8 @@ We propose the operator versioning that works across eager, TorchScript, torch.p
         * To make a BC-breaking change update the version and write a torchscript adaptor and a mobile adaptor
     * e2e FC-breaking guide
         * It’s OK to add new optional keyword-only arguments as long as their default semantic preserve the operator’s current semantics
+* **SLA window**
+    * We are targeting at a certain period length of Service-level agreement. May start from a window of two binary releases (longer than 90 days)
 
 Note that the proposal does not introduce an explicit version to _all_ PyTorch operators. Instead code changes are only required for updated operators with BC/FC breakage, that cannot be handled by automatic BC/FC methods. For other operators, the implicit version is v0.
 
