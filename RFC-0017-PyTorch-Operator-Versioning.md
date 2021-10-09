@@ -120,7 +120,7 @@ As an example, there’s a BC/FC breaking update on operator foo.
 
 Before:
 ```
-foo(Tensor self, Scaler alpha=1, Tensor b, *, Tensor(a!) out) -> Tensor(a!)
+foo(Tensor self, Scaler alpha=1, Tensor b) -> Tensor
 ```
 After:
 ```
@@ -132,7 +132,7 @@ Accordingly, in the kernel of foo, the implementation is updated based on the ne
 
 
 ```python
-def foo(Tensor self, Tensor c, Scaler alpha=1, Tensor b, *, Tensor(a!) out) -> Tensor(a!):
+def foo(Tensor self, Tensor c, Scaler alpha=1, Tensor b) -> Tensor:
   # The original kernel implementation
   ...
   if not c.empty():
@@ -165,9 +165,9 @@ _operator_version.yaml_
 ```
 _operator_upgraders.py_
 ```python
-def foo_upgrader_0_9(Tensor self, Tensor c, Scaler alpha=1, Tensor b, *, Tensor(a!) out):
+def foo_upgrader_0_9(Tensor self, Tensor c, Scaler alpha=1, Tensor b):
   c = at.empty()
-  foo(self, c, alpha, b, out = self) 
+  return foo(self, c, alpha, b) 
 
 def foo_upgrader_10_24(...):
   ...
