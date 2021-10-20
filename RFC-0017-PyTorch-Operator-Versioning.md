@@ -82,7 +82,6 @@ We propose the operator versioning that works across eager, TorchScript, torch.p
         * A version bump is also required for FC break only. It's is good for compatibility analysis: if the client is running old runtime, we don't deliver the new model with the un-compatible operator to avoid unexpected crash.
     * **Use a single operator version number for all operators**
         * This number may be shared by the deploy version, but separate from other file format versions
-    * **Older versions of operators registration are kept but they should only be matchable with special circumstances**
     * **Newer version of the operator registry must specify an upgrader** that conforms to the older version of the operator schema. Its body is a TorchScript-able function that uses the newer version of operator to implement old semantics.
         * One upgrader per historic signature. The registry specifies the symbol and the file formats those upgraders are applied to.
     * [Improved BC testing] Tests that the old serialized version of the operator can still be loaded on the new runtime and run as expected need to be easy to add
@@ -92,7 +91,7 @@ We propose the operator versioning that works across eager, TorchScript, torch.p
 * **Torchscript changes**
     * Reuse the _version_ record in the model file as the version number for operators. In the code it's `kProducedFileFormatVersion`
     * During loading into the TorchScript compiler, TorchScript needs to match operator schema according to the table of operator versions stored in the package. This would generate IR that conforms to older schema. 
-    * Then a TorchScript pass takes IR of older schema and replaces older versions of operator invocations with bodies of upgraders.
+    * TorchScript takes IR of older schema and use upgrader as a builtin function.
     * Out-of-support operator versions (ie. those no longer defined in `native_functions.yaml` with a valid upgrader) need to throw an error
 * **Edge runtime and mobile delivery service changes**
     * Delivery compatibility: communicating operator version table deployed on device and deliver models appropriately
@@ -177,7 +176,6 @@ def foo_upgrader_10_24(...):
 * For some operator updates, it’s not possible to have a BC adapter. If it's FC break, an upgrader is not needed. In such a case, the operator number could still help to check compatibility and to quickly detect the source of failure with meaningful error. 
 * For most of the operator changes, the upgrader code is not expected to be heavy. However, the performance overhead should be observed, especially for edge use cases.
 * If there are multiple upgraders (for example, v20 runtime loading both v0 and v10 models). 
-* If the breakage is hard (there is no upgrader), throw “version not supported” error and suggest to regenerate the model.
 
 
 ### FC updates
