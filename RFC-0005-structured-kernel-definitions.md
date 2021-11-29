@@ -613,7 +613,7 @@ a reference count bump).
 One question is whether or not the existence of CPUTensor means we should
 eliminate the `at::cpu::` namespace (as they serve near equivalent purposes;
 if you have functions which support CPUTensor, simply (unsafely) cast
-your Tensor to a CPUTensor and then utilize the regular API.)  One
+your Tensor to a CPUTensor and then utilize the regular API).  One
 possible argument for retaining the `at::cpu::` namespace is that these
 functions are guaranteed to bypass dispatching, whereas other functions
 may implicitly downcast to `Tensor` and do an optimized call.
