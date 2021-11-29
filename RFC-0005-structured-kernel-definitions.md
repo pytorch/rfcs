@@ -151,7 +151,7 @@ Structured definitions require a different set of functions to be
 written to implement the operator.  In this particular case, the
 functions you have to implement are:
 
-```
+```cpp
 namespace meta {
   /* macro expands to: upsample_nearest1d::upsample_nearest1d( */
   TORCH_META_FUNC(upsample_nearest1d) (
@@ -181,7 +181,7 @@ The code generator then generates the boilerplate code to put these
 functions together.  The boilerplate is somewhat involved, and we will
 explain it below.
 
-```
+```cpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 // Common code
 // Abridged from aten/src/ATen/TensorMeta.h
@@ -364,7 +364,7 @@ backends. This is problematic, so we also generate a separate dispatch
 key handler which will automatically handle shape checking and other
 concerns for backends that are not concerned with performance:
 
-```
+```cpp
 // Name TBD; for this example we will call it DispatchKey::Common, as the
 // functionality here is common to all backends. This is an alias key
 // that resolves CommonXLA/CommonMSNPU/... in the same way as Autograd.
@@ -401,7 +401,7 @@ A backend that would like to fuse this boilerplate into their kernel for
 performance reasons can simply override the Common entry with
 fallthrough:
 
-```
+```cpp
 TORCH_LIBRARY_IMPL(aten, CommonXLA, m) {
   m.impl("upsample_nearest1d", CppFunction::makeFallthrough);
 }
@@ -411,7 +411,7 @@ Finally, structured kernels also implicitly register an implementation
 for the Meta key, which is the API for dry running shape/dtype
 calculations without any kernels involved:
 
-```
+```cpp
 struct upsample_nearest1d_meta final : public meta::upsample_nearest1d {
   void set_output(int64_t output_idx, IntArrayRef sizes, IntArrayRef strides, TensorOptions options, DimnameList names) override {
     outputs_[output_idx] = at::native::empty_strided_meta(sizes, strides, options);
@@ -464,7 +464,7 @@ This class based design permits TensorIterator to work, by
 making TensorIterator itself a subclass of MetaBase.  The modified
 class hierarchy now looks like this:
 
-```
+```cpp
 struct TensorIteratorBase : public MetaBase;
 struct TensorIterator : public TensorIteratorBase;
 
@@ -478,7 +478,7 @@ kernels that are not yet ported to structured kernels.
 TensorIteratorBase contains the bulk of the implementation, but all
 places that previously allocated tensors now call `set_output`:
 
-```
+```cpp
   // allocate memory for output, memory format depends on setup_type
   switch (setup_type) {
     case FastSetupType::CONTIGUOUS:
@@ -521,7 +521,7 @@ implementation class:
 Now you can simply construct it appropriately in your function
 definitions:
 
-```
+```cpp
 TORCH_META_FUNC2(add, Tensor) (
   const Tensor& self, const Tensor& other, Scalar alpha
 ) {
@@ -610,7 +610,7 @@ This would also require the creation of a CPUTensorRef class to ensure
 that CPUTensors can be created from `const Tensor&` without incurring
 a reference count bump).
 
-One question is wheter or not the existence of CPUTensor means we should
+One question is whether or not the existence of CPUTensor means we should
 eliminate the `at::cpu::` namespace (as they serve near equivalent purposes;
 if you have functions which support CPUTensor, simply (unsafely) cast
 your Tensor to a CPUTensor and then utilize the regular API.)  One
