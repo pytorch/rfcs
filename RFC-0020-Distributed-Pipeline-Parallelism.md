@@ -9,6 +9,7 @@ Goal: *Provide a flexible, composable, and reconfigurable interface for pipeline
 * Pipeline parallelism (PP) is used as a lower-communication-volume technique for model parallelism. It is especially applicable when data must be transmitted across comparatively slower interconnects.
 * Several research-oriented frameworks exist that implement PP (e.g. fairscale, megatron, deepspeed), but we would like to provide a production-quality implementation and support contract for PP.
 * The existing PP implementation in PyTorch (`torch.distributed.pipeline.sync`) only supports intra-host pipeline parallelism across GPUs and does not support techniques like 1F1B scheduling. We can deliver inter-host pipelining and other features.
+* `nn.Sequential` requirement creates a huge barrier to users who have models that don't lend easily to be converted to `nn.Sequential`. In particular with models that have dynamic control flow for some large segments (e.g. conditional encoder).
 * Ultimately, we want to use this body of work as a driving force for research in delivering both performance AND usability of parallelism paradigms. We invite developers and researchers to participate in the design and development of this project.
 
 ## Stage 1: Requirements Gathering (2021Q4)
