@@ -144,6 +144,7 @@ Existing approaches/proposals that support this (in no particular order):
 * Sagemaker [model parallelism](https://drive.google.com/file/d/1N2eo5Yr_QOw0EtKv-MYBDWKvyRYxKv2o/view)
 * @zdevito's [sequential-free splitting approach](https://colab.research.google.com/drive/1lGg2NqlvDwVmvBqejzni2yTmYE9rxfdr?usp=sharing)
 * [OneFlow](https://github.com/Oneflow-Inc/oneflow)
+* [Varuna](gttps://github.com/microsoft/varuna) / [paper](https://arxiv.org/abs/2111.04007)
 * [[RFC] Model Partitioning in Pipeline Parallelism](https://github.com/pytorch/rfcs/blob/master/RFC-0022-Model-Partitioning-in-Pipeline-Parallelism.md)
 
 Proposed approach short-list:
