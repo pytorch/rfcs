@@ -53,7 +53,7 @@ HF transformers [wants to](https://github.com/huggingface/transformers/issues/13
 
 An analysis of prior implementations and a proposed technical approach for pipeline parallelism can be seen in [[RFC] Distributed Pipeline Parallel Training Technical Approach](https://github.com/pytorch/rfcs/blob/master/RFC-0021-Distributed-Pipeline-Parallel-Technical.md). In this document, we further split execution into stages and correlate those to the PyTorch external release schedule.
 
-## Stage 2: Ship prototype synchronous multi-node pipeline parallelism (torchgpipe-style) (1.11 Prototype Release)
+## Stage 2: Ship prototype synchronous multi-node pipeline parallelism (torchgpipe-style) (1.12 Prototype Release)
 
 ### P(-1): Implement cross-host support for pipeline parallelism
 
@@ -83,13 +83,11 @@ Proposed approach short-list:
 
 1. Hopefully should just work out of the box with the RPC API, but need to keep it in mind.
 
-### P0: 1.11 Prototype Release and out-of-tree demo on HF Transformers
+### P0: 1.12 Prototype Release and out-of-tree demo on HF Transformers
 
-* Release API as prototype in the 1.11 release to facilitate gathering feedback
+* Release API as prototype in the 1.12 release to facilitate gathering feedback
 * Validation: Out-of-tree demo on HF transformers repo - hack it together to get it to work and pull out work items to improve the API to remove places where code edits are needed
-* 1.11 Release Dates
-    * Feature submission: 11/30 EOD
-    * Branch cut 1/31/2022
+* 1.12 release date sometime in April 2022
 
 
 
@@ -136,7 +134,7 @@ We can interpolate the missing spaces:
 I believe the way to go in the future may be to consolidate on actors for both local and distributed. This may represent lower complexity than the torchgpipe-style execution (at least when I think about it) and can avoid issues with a single driver process being a bottleneck (as evidenced by the fact that `torchgpipe` already uses threads for speed).
 
 
-## Stage 4: Generalize pipeline parallelism interface to allow for more coverage of different techniques in the literature (e.g. async, scheduling, auto-partitioning, composition with tensor parallelism) (2022, OSS releases 1.11-1.15)
+## Stage 4: Generalize pipeline parallelism interface to allow for more coverage of different techniques in the literature (e.g. async, scheduling, auto-partitioning, composition with tensor parallelism) (2022, OSS releases 1.12-1.15)
 
 ### P1: Pipeline parallelism without `nn.Sequential` rewrite
 
