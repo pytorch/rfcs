@@ -130,11 +130,11 @@ We would like to consider the following (lifted from [[RFC] Ceci n'est pas pipel
 
 * **D0 (P-1)** Cross-host pipeline parallel support (table stakes)
 * **D1 (P0)** Support for passing arbitrary data types between stages (table stakes)
-* **D2 (P0)** Support for pipeline parallel schedules (e.g. GPipe fill-drain, 1F1B, or interleaved 1F1B)
+* **D2 (P1)** Support for pipeline parallel schedules (e.g. GPipe fill-drain, 1F1B, or interleaved 1F1B)
     * **P1** Support for arbitrary programmable schedules
 * **D3 (P0)** Composability with other parallelism schemes (Tensor Parallelism, Data Parallelism) in a 3D parallelism scheme
 * **D4 (P1)** Composability with other parallelism schemes in an *arbitrary scheme*
-* **D5 (P1)** Off-the-shelf support for pipelining without manual conversion of a model to `nn.Sequential`
+* **D5 (P0)** Off-the-shelf support for pipelining without manual conversion of a model to `nn.Sequential`
 * **D6 (P2)** Support for asynchronous pipeline parallelism
     * Continuous data loading
     * Weight stashing/Weight prediction
@@ -509,15 +509,13 @@ The implementations for each of these instructions can be referenced from this [
 
 The [SageMaker model parallelism](https://arxiv.org/abs/2111.05972) design uses a single Python-native training loop with a “module-server” architecture. The system divides the model based on the Module hierarchy and assigns each module onto a specific pipeline parallel rank (PP_RANK). During execution, when there is a dispatch to a `Module` that resides on another PP_RANK, a remote request-response RPC is made to run the appropriate forward/backward pass for the Module on the remote PP_RANK.
 
-[Image: req_resp.png]
+![Module-server request-response execution in SageMaker pipeline parallelism](https://i.imgur.com/y9MZJ3b.png)
 
 PP_RANK 0 drives the process by scheduling instances of the training loop function (a UDF annotated by `@smp.step`): two for each micro-batch (one for forward, one for backward). PP_RANK 0 can implement different “schedules” by dispatching these `(micro-batch, phase)` tuples in a given order. The orders that they present are:
 
 
 * Simple pipeline (aka GPipe fill-drain). This is implemented by having PP_RANK 0 dispatch the `phase=forward` tuples for each micro-batch in sequence. Then, dispatching the `phase=backward` tuples for each micro-batch in sequence.
 * “interleaved” pipeline (**NB**: this is not the same as the *interleaved 1F1B* from Narayanan, 2021). PP_RANK 0 will schedule `phase=forward` jobs and opportunistically schedule `phase=backward` jobs *as soon as the forward pass for that micro-batch is done*.
-
-![Module-server request-response execution in SageMaker pipeline parallelism](https://i.imgur.com/y9MZJ3b.png)
 
 **NOTE**: The schedules here do not necessarily run stage in a given order on each stage. Network latency and other affects may change the order of when micro-batches are executed.
 
@@ -629,14 +627,14 @@ We can start analyzing the approaches by these design axes
 * Approach 5: RPC with remote modules and generalized Module-server architecture (SageMaker)
 * Approach 6: SPMD with Program capture/JIT compilation and message passing (OneFlow)
 
-|	|DA1	|DA2	|DA3	|DA4	|DA5	|DA6	|DA7	|DA8	|DA9	|Notes	|
-|---	|---	|---	|---	|---	|---	|---	|---	|---	|---	|---	|
-|Approach 1	|multi	|py	|FF	|local	|manual	|local	|async	|?	|X	|	|
-|Approach 2	|single	|py	|seq	|dist	|dist	|dist	|sync	|X	|X	|	|
-|Approach 3	|single	|py	|seq	|dist	|dist	|dist	|sync	|X	|X	|	|
-|Approach 4	|multi	|interp	|seq	|local?	|manual	|local	|async*	|X	|?	|	|
-|Approach 5	|single*	|py	|FF	|local?	|manual	|local?	|sync?	|X	|X	|Schedules?	|
-|Approach 6	|multi	|interp	|FF	|local?	|manual? (graph?)	|local?	|async?	|X	|X	|	|
+|          |DA1    |DA2   |DA3|DA4   |DA5             |DA6   |DA7   |DA8|DA9|Notes     |
+|---       |---    |---   |---|---   |---             |---   |---   |---|---|---       |
+|Approach 1|multi  |py    |FF |local |manual          |local |async |?  |X  |          |
+|Approach 2|single |py    |seq|dist  |dist            |dist  |sync  |X  |X  |          |
+|Approach 3|single |py    |seq|dist  |dist            |dist  |sync  |X  |X  |          |
+|Approach 4|multi  |interp|seq|local?|manual          |local |async*|X  |?  |          |
+|Approach 5|single*|py    |FF |local?|manual          |local?|sync? |X  |X  |Schedules?|
+|Approach 6|multi  |interp|FF |local?|manual? (graph?)|local?|async?|X  |X  |          |
 
 ### Decision - Approach 3 with Modifications
 
@@ -653,9 +651,9 @@ After deliberation, we want to build the API with the least complexity, at least
 Approach 3 with modifications then looks like:
 
 
-|	|DA1	|DA2	|DA3	|DA4	|DA5	|DA6	|DA7	|DA8	|DA9	|Notes	|
-|---	|---	|---	|---	|---	|---	|---	|---	|---	|---	|---	|
-|Approach 3 with Modifications	|single	|py	|seq	|local	|manual	|dist	|sync	|X	|?	|	|
+|                             |DA1   |DA2|DA3|DA4  |DA5   |DA6 |DA7 |DA8|DA9|Notes|
+|---                          |---   |---|---|---  |---   |--- |--- |---|---|---  |
+|Approach 3 with Modifications|single|py |seq|local|manual|dist|sync|X  |?  |     |
 
 
 **Future Extensibility**
