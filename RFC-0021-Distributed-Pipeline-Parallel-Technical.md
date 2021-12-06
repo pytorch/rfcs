@@ -140,6 +140,8 @@ We would like to consider the following (lifted from [[RFC] Ceci n'est pas pipel
     * Weight stashing/Weight prediction
 * **D7 (P2)** Research: Fits into a unified, highly configurable programming model encompassing all parallelism schemes
 * **D8 (P1)** The user can use an idiomatic Python-based training loop with no or minimal modifications from their “normal” training loop
+* **D9 (P?)** Compatibility with non-monadic topology (e.g. skip connections)
+* **D10 (P?)** Support for dynamic programs, e.g. those with control flow that changes across runs (e.g. conditional encoder)
 
 ## Approach 1: SPMD with Predicated Training Loop and Message Passing
 
@@ -225,6 +227,8 @@ Note that forward and backward stages do not necessarily always run in a given r
 * (**D3, D4, D7**) Composes with SPMD execution model; can likely readily interoperate well with SPMD Tensor Parallelism. Is potentially the basis for converging parallelism on the SPMD model (other alternative is converging parallelism on the Actor model)(needs more research - likely can be the basis for (a) paper(s))
 * (**D5**) Does not require the user to manually partition their model into an `nn.Sequential`
 * (**D6**) There is no concept of a synchronous “call” or “dispatch” into the training loop; this scheme can likely readily support asynchronous pipeline parallelism with continuous data loading and training.
+* (**D9**) Supports arbitrary value connectivity
+* (**D10**) Hypothetically supports dynamic programs
 
 **Con**
 
@@ -341,6 +345,7 @@ As mentioned in stage (B), the DistributedOptimizer will make async RPC calls to
 **Pro**
 
 * (**D8**) Training loop looks pretty close to the original PyTorch code. Training loop runs on a single machine, so user does not need to reason about correctness of their training loop under SPMD, as in Approach 1.
+* (**D10**) Supports dynamic programs within each stage
 
 **Con**
 
@@ -350,6 +355,8 @@ As mentioned in stage (B), the DistributedOptimizer will make async RPC calls to
     * When expanding the torchgpipe single-coordinator scheme to cross-host execution, network latency, jitter, and instability may contribute to front-end-boundedness issues
 * (**D2**) In its current conception, it’s not clear to me if schedules are representable in this scheme due to reliance on distributed autograd execution. GPipe’s fill-drain schedule is implemented via careful data dependency programming in the autograd graph. It’s not clear to me if things like 1F1B, interleaved 1F1B, Varuna scheduling, or other research schedules are (easily) implementable in this scheme.
 * (**D6**) This approach has a strong concept of “synchronous dispatch” into the pipeline. The single coordinator calls into the pipeline with a mini-batch, the execution is scheduled internally to that, and the pipeline returns an RRef to the result value. It’s not clear how continuous, asynchronous training would fit into this without retrofitting an event-driven handler for the training loop to feed another mini-batch in.
+* (**D9**) Will need special handling for things like skip connections
+* (**D10**) Does not support dynamic programs across the stages
 
 ## Approach 3 - RPC with RemoteModule and message passing (fairscale experimental)
 
@@ -421,6 +428,7 @@ The optimizer step uses DistributedOptimizer in the same was as Approach 2. Dist
 * (**D8**) Training loop looks pretty close to the original PyTorch code. Training loop runs on a single machine, so user does not need to reason about correctness of their training loop under SPMD, as in Approach 1.
     * OTOH, some of the set-up in the [example](https://github.com/wayi1/pipeline_experiments/blob/7e0fe6f884edfab026379cce1b5ae03b5c2489cd/BERT/main.py#L200) is pretty hairy and could probably be improved
 * Compared to Approach 2, much less risk of being “front-end bound”. The burden of issuing commands is distributed throughout the ranks, i.e. a rank receives micro-batches and dispatches completed micro-batches to its successor.
+* (**D10**) Supports dynamic programs within each stage
 
 **Con**
 
@@ -429,6 +437,8 @@ The optimizer step uses DistributedOptimizer in the same was as Approach 2. Dist
 * The system may still be “front-end bound” for loss calculation, distributed autograd, and DistributedOptimizer step.
 * (**D2**) In its current conception, it’s not clear to me if schedules are representable in this scheme due to reliance on distributed autograd execution. GPipe’s fill-drain schedule is implemented via careful data dependency programming in the autograd graph. It’s not clear to me if things like 1F1B, interleaved 1F1B, Varuna scheduling, or other research schedules are (easily) implementable in this scheme.
 * (**D6**) This approach has a strong concept of “synchronous dispatch” into the pipeline. The single coordinator calls into the pipeline with a mini-batch, the execution is scheduled internally to that, and the pipeline returns an RRef to the result value. It’s not clear how continuous, asynchronous training would fit into this without retrofitting an event-driven handler for the training loop to feed another mini-batch in.
+* (**D9**) Will need special handling for things like skip connections
+* (**D10**) Does not support dynamic programs across the stages
 
 ## Approach 4 - MPMD with a custom interpreter/instruction format and message passing (DeepSpeed)
 
@@ -484,12 +494,16 @@ The implementations for each of these instructions can be referenced from this [
 * (**D3, D4?**) Usable in 3d parallelism, as detailed by the [blog post](https://www.deepspeed.ai/tutorials/pipeline/).
 * (**D6**) Since data is pulled from the data loader rather than being pushed by a synchronous call in the training loop, this approach could *hypothetically* support async PP.
 * (**D7**) The approach seems to account for many different types of parallelism.
+* (**D10**) Supports dynamic programs within each stage
+
 
 **Con**
 
 * (**D1**) Does not support passing arbitrary data between stages, only supports Tensor and tuple of Tensor (because of `nn.Sequential` front-end)
 * (**D5**) Only supports models fit into an `nn.Sequential`
 * (**D8**) This approach takes control away from the user. The training loop is now implemented by the DeepSpeed engine abstraction, rather than being free-form Python code.
+* (**D9**) I don't think it supports skip connections (it supports tied layers for accumulating gradients but not skip connections, I think)
+* (**D10**) Does not support dynamic programs across the stages
 
 ## Approach 5: RPC with remote modules and generalized Module-server architecture (SageMaker)
 
@@ -516,6 +530,8 @@ PP_RANK 0 drives the process by scheduling instances of the training loop functi
 * (**D3/D4**) Composes with other parallelism schemes
 * (**D5**) Does not require model to be an `nn.Sequential`
 * (**D8**) User’s original training loop is preserved with only slight modifications (`@smp.step` annotation and other things)
+* (**D9**) Supports arbitrary topology
+* (**D10**) Supports fully dynamic programs
 
 **Con**
 
@@ -539,6 +555,8 @@ An example of using OneFlow for pipeline parallelism can be seen in this [tutori
 * (**D5**) `nn.Sequential` not needed, but potentially an `nn.Graph` instance may be needed in some cases
 * (**D6**) Async is probably supportable but not clear. From their presentation, the actor/register model with backpressure can implement on-demand data loading, but I’m not 100% sure what that API looks like
 * (**D7**) Unified programming model that already exists
+* (**D9**) Supports arbitrary topology
+* (**D10**) Supports dynamic programs (via just-in-time program capture)
 
 **Con**
 
@@ -564,6 +582,7 @@ The workflow of Varuna looks like the following:
 
 * (**D2**) Varuna implements scheduling, particularly their [opportunistic scheduling](https://github.com/microsoft/varuna/blob/79aaf45995a2b06bf5186e825b7baf81b9145837/varuna/pipeline.py#L280) policy. See in the "con", I'm not super convinced by this scheme, but the system supports scheduling (and can probably be extended or hacked to support more traditional schedules)
 * (**D5**) The system nominally supports pipeline partitioning without wrapping into a `Sequential`, but see "con" for commentary about the soundness of this approach.
+* (**D10**) Supports dynamic control within stages
 
 
 **Con**
@@ -575,6 +594,8 @@ The workflow of Varuna looks like the following:
 * (**D8**) The extent to which the training loop must be modified ([BERT](https://github.com/microsoft/varuna/blob/ea13ce6a8934bfe829b662a56af4dc29044fcb34/examples/BERT/bert.patch), [megatron](https://github.com/microsoft/varuna/blob/ea13ce6a8934bfe829b662a56af4dc29044fcb34/examples/Megatron-LM/megatron.patch)) to work with Varuna is pretty extreme
 * (**D3/D4/D7**) The system does not seem to compose with tensor parallelism, at least that is not described in the paper or the README.
 * (**D6**) Does not support async
+* (**D9**) Don't believe it supports arbitrary topology for activations (only for weights)
+* (**D10**) Does not support dynamic control between stages
 
 ## Final Analysis
 
@@ -618,6 +639,8 @@ We can start analyzing the approaches by these design axes
 |Approach 6	|multi	|interp	|FF	|local?	|manual? (graph?)	|local?	|async?	|X	|X	|	|
 
 ### Decision - Approach 3 with Modifications
+
+**NOTE**: Based on feedback on this RFC, we are currently reconsidering this design and will update this section accordingly as we hash out the details.
 
 After deliberation, we want to build the API with the least complexity, at least initially. We will modify/build the API in FairScale experimental with a few modifications:
 
