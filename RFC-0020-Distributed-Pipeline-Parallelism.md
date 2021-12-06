@@ -63,6 +63,7 @@ Existing approaches that support this (in no particular order):
 * Sagemaker [model parallelism](https://arxiv.org/abs/2111.05972)
 * [DeepSpeed pipeline parallelism](https://www.deepspeed.ai/tutorials/pipeline/)
 * [OneFlow](https://github.com/Oneflow-Inc/oneflow)
+* [Varuna](https://github.com/microsoft/varuna)[13]
 
 Proposed approach short-list: (all approaches can be seen in [[RFC] Distributed Pipeline Parallel Training Technical Approach](https://github.com/pytorch/rfcs/blob/master/RFC-0021-Distributed-Pipeline-Parallel-Technical.md)
 
@@ -155,7 +156,7 @@ Proposed approach short-list:
 
 These approaches can be composed on top of an existing API that takes an `nn.Sequential`. We may consider in the future to develop a "v2" API that is centered more natively around non-`nn.Sequential` models using technologies from Sagemaker, OneFlow, or other research developments.
 
-### P1: Support arbitrary programmable schedules (e.g. fill-drain, 1F1B, interleaved 1F1B) 
+### P1: Support arbitrary programmable schedules (e.g. fill-drain, 1F1B, interleaved 1F1B)
 
 Existing approaches that support this (in no particular order):
 
@@ -209,3 +210,4 @@ Going into the future, we would like to develop theory and implementation for a 
 11. PipeMare: Asynchronous Pipeline Parallel DNN Training https://arxiv.org/abs/1910.05124
 12. Scaling Language Model Training to a Trillion Parameters Using Megatron
  https://developer.nvidia.com/blog/scaling-language-model-training-to-a-trillion-parameters-using-megatron/
+13. Varuna: Scalable, Low-cost Training of Massive Deep Learning Models https://arxiv.org/abs/2111.04007
