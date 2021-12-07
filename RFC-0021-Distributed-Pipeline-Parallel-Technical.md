@@ -568,7 +568,7 @@ Varuna (https://arxiv.org/abs/2111.04007) proposes a system for large-scale trai
 The workflow of Varuna looks like the following:
 * The user manually annotates their model with [CutPoints](https://github.com/microsoft/varuna/blob/ea13ce6a8934bfe829b662a56af4dc29044fcb34/docs/cutpoint.rst). These are points in the program where the system _may_ place a pipeline stage
 * The user wraps their model in the [Varuna](https://github.com/microsoft/varuna/blob/ea13ce6a8934bfe829b662a56af4dc29044fcb34/docs/varuna.rst#id9) class and configures pipeline parallelism via this interface. This includes parameters like chunk size, installing the optimizer, and informing the system of the rank of the current running instance.
-    * Internally, the system is going to do a roudn of profiling to determine the optimal pipeline balance and choose a subset of the cut-points together to represent the code for different pipeline stages.
+    * Internally, the system is going to do a round of profiling to determine the optimal pipeline balance and choose a subset of the cut-points together to represent the code for different pipeline stages.
 * User calls the `Varuna.step()` method to run the program in pipeline parallel execution (forward, loss, backward)
     * Varuna uses an opportunistic scheduling policy (described in section 3.2 of the paper), which will run ahead and run `forward()` micro-batches if `backward()` micro-batches are not available
 * User applies the optimizer's `step()` method to finally update the parameters give accumulated gradients.
