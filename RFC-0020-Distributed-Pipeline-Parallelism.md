@@ -39,7 +39,7 @@ HF transformers [wants to](https://github.com/huggingface/transformers/issues/13
 * Frontend limitations:
     * **P0**: Cannot pass arbitrary data types between pipeline stages
     * **P0**: Unclear composability in 3d parallelism scheme (data, pipeline, model parallel)
-    * **P1**: User needs to rewrite their model as an `nn.Sequential` instance
+    * **P0**: User needs to rewrite their model as an `nn.Sequential` instance
 * Backend Limitations:
     * **P(-1)**: No cross-host support for PT pipeline parallelism API
     * **P0**: No support off-the-shelf schedules (1F1B or interleaving)
@@ -136,7 +136,7 @@ I believe the way to go in the future may be to consolidate on actors for both l
 
 ## Stage 4: Generalize pipeline parallelism interface to allow for more coverage of different techniques in the literature (e.g. async, scheduling, auto-partitioning, composition with tensor parallelism) (2022, OSS releases 1.12-1.15)
 
-### P1: Pipeline parallelism without `nn.Sequential` rewrite
+### P0: Pipeline parallelism without `nn.Sequential` rewrite
 
 Existing approaches/proposals that support this (in no particular order):
 
@@ -152,7 +152,6 @@ Proposed approach short-list:
 2. @zdevito's [sequential-free splitting approach](https://colab.research.google.com/drive/1lGg2NqlvDwVmvBqejzni2yTmYE9rxfdr?usp=sharing)
 3. Construct a pipeline parallelism API that uses a different approach, such as the one used in SageMaker model parallelism. This introduces trade-offs elsewhere, such as in support for schedules/the requirement for an optimization pass to be applied to implement "true" pipeline parallelism.
 
-These approaches can be composed on top of an existing API that takes an `nn.Sequential`. We may consider in the future to develop a "v2" API that is centered more natively around non-`nn.Sequential` models using technologies from Sagemaker, OneFlow, or other research developments.
 
 ### P1: Support arbitrary programmable schedules (e.g. fill-drain, 1F1B, interleaved 1F1B)
 
