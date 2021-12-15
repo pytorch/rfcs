@@ -75,7 +75,7 @@ the application’s code would look like the following pseudo-code (runtime API 
 while local_attempts < maximum_attempts:
   try:
     dist.init_process_group(
-        backend="nccl" or "gloo",
+        backend="nccl",
         **worker_info.get_pg_parameters(), # rank, world_size, master info
     )
     for epoch in range(state.epoch, state.total_epochs):
