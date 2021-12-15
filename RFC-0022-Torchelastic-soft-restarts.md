@@ -1,4 +1,4 @@
-# torchelastic soft restarts - Enabling training without hard worker restarts
+# torchelastic soft restarts - Enabling training without restarting the world
 
 This RFC proposes a new restart policy to the `torch.distributed.elastic` package.
 We use `torch.distributed.run`, torchelastic and TE interchangeably in this document. 
