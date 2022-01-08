@@ -7,7 +7,7 @@ These operators sometimes require changes to maintain the high quality user expe
 
 BC and FC breaking changes have been challenging to coordinate across PyTorch because there are multiple consumers of PyTorch’s op set and we promise to keep models running in production working as expected.
 
-We are providing the same Service Level Agreement (SLA) to both internal and external use cases, which is included in the goals to be finalized.
+We are providing the same Service Level Agreement (SLA) to both internal and external use cases.
 
 This document proposes a new BC and FC policy based on operator versioning.
 
@@ -19,12 +19,11 @@ This document proposes a new BC and FC policy based on operator versioning.
 
 Backwards compatibility (BC), the ability for PyTorch to continue running programs from older versions, is important so programs don’t need to be forcefully updated to comply with the new runtime implementation.
 
-PyTorch current SLA on backwards compatibility:
+PyTorch SLA on backwards compatibility:
 
 
 
-* **OSS** — “stable” features will be deprecated for one release before a BC-breaking change is made. [PyTorch OSS BC-breaking policy](https://pytorch.org/docs/master/) 
-* **FB Internal** — we will not break a serialized torchscript program running in production at Facebook (to be replaced with a more generic SLA)
+* PyTorch SLA will ensure that models developed using a cerntain version will be supported for *six months* from the version release date. 
 
 BC-breaking operator changes were previously governed by the [Backward-compatibility Breaking Change Review Process](https://fb.quip.com/gydOArylrcKd), but this only covered torchscript and eager. A generic process needs to be visible from OSS.
 
@@ -100,7 +99,6 @@ We propose the operator versioning that works across eager, TorchScript, torch.p
     * The operator version and upgraders are built into the runtime for BC.
     * Allow for the addition of optional keyword-only arguments without a version bump or FC concern
     * Since additional operators can be introduced in upgraders, tracing based selective build should also cover upgraders: easier for BC because the new runtimes goes with the upgraders.
-    * We should also consider the timeline for mobile to no longer use upgraders by requiring models that are too old update themselves before deployment (SLA time window).
 * **torch.package changes**
     * Each torch.package package contains a table of operators and corresponding version according to PyTorch build used to package the model
         * Q: How does the torch.package scenario for mapping old versions to current PyTorch operators work?
@@ -110,8 +108,6 @@ We propose the operator versioning that works across eager, TorchScript, torch.p
         * To make a BC-breaking change update the version and write a torchscript adaptor and a mobile adaptor
     * e2e FC-breaking guide
         * It’s OK to add new optional keyword-only arguments as long as their default semantic preserve the operator’s current semantics
-* **SLA window**
-    * We are targeting at a certain period length of Service-level agreement. May start from a window of two binary releases (longer than 90 days)
 
 Note that the proposal does not introduce an explicit version to _all_ PyTorch operators. Instead code changes are only required for updated operators with BC/FC breakage, that cannot be handled by automatic BC/FC methods. For other operators, the implicit version is v0.
 
@@ -221,11 +217,6 @@ Deploying a new model to an existing runtime.
         * When reaching an op whose minimum runtime version >= current
     
 # Open Questions
-
-## Use deprecation window to handle backward compatibility
-One future option is to keep both old and new operators, but set a certain deprecation window for old operators. Deprecate the old operator when the window expires. There are some open questions on this option:
-* What would be the window length? Would it be different for different situations (internal vs. external, server vs. mobile, etc.)
-* From user's point of view, the number of operators my bloat, but the old operators out of SLA BC window can be removed.
 
 ## Downgraders for FC
 Dual to upgreaders for BC on client, downgraders can be used for FC on server. There are several options:
