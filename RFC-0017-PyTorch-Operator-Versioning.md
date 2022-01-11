@@ -19,11 +19,10 @@ This document proposes a new BC and FC policy based on operator versioning.
 
 Backwards compatibility (BC), the ability for PyTorch to continue running programs from older versions, is important so programs don’t need to be forcefully updated to comply with the new runtime implementation.
 
-PyTorch SLA on backwards compatibility:
+PyTorch current SLA on backwards compatibility:
 
-
-
-* PyTorch SLA will ensure that models developed using a cerntain version will be supported for *six months* from the version release date. 
+* **OSS** — “stable” features will be deprecated for one release before a BC-breaking change is made. [PyTorch OSS BC-breaking policy](https://pytorch.org/docs/master/)
+* **FB Internal** — we will not break a serialized torchscript program running in production at Facebook (to be replaced with a more generic SLA)
 
 BC-breaking operator changes were previously governed by the [Backward-compatibility Breaking Change Review Process](https://fb.quip.com/gydOArylrcKd), but this only covered torchscript and eager. A generic process needs to be visible from OSS.
 
@@ -108,6 +107,8 @@ We propose the operator versioning that works across eager, TorchScript, torch.p
         * To make a BC-breaking change update the version and write a torchscript adaptor and a mobile adaptor
     * e2e FC-breaking guide
         * It’s OK to add new optional keyword-only arguments as long as their default semantic preserve the operator’s current semantics
+* **SLA window**
+    * We are targeting at a certain period length of Service-level agreement: two PyTorch binary releases, or 180 days since the BC-breaking change is made, whichever is later.
 
 Note that the proposal does not introduce an explicit version to _all_ PyTorch operators. Instead code changes are only required for updated operators with BC/FC breakage, that cannot be handled by automatic BC/FC methods. For other operators, the implicit version is v0.
 
