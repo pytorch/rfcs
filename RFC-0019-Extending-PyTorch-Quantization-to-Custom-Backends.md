@@ -17,13 +17,14 @@ Quantize the model
 Note: This design is based on [FX Graph Mode Quantization](https://pytorch.org/docs/stable/quantization.html#quantization-api-summary).
 
 # Reference Quantized Model
-We introduce the concept of a reference pattern which serves as a standard format for all backends, a reference quantized model is a quantized model with these reference pattern. Reference patterns provide a close approximation to backends using fp32 ops and type conversion ops. If a more accurate match is desired, we need emulation operators that accurately model numerics for a backend. A reference model serves two purposes:
+We introduce the concept of a reference pattern which serves as a standard format for quantized operators in all backends, a reference quantized model is a quantized model with these reference pattern. Reference patterns provide a close approximation to backends using fp32 ops and type conversion ops. If a more accurate match is desired, we need emulation operators that accurately model numerics for a backend. A reference quantized model serves two purposes:
 1. Standard format for lowering quantized models
 2. Emulate model numerics with approximate reference operators on a devserver for debugging.
 
 The property of a quantized operator can be decomposed into two dimensions:
   1. Signature
   2. Numerics
+
 Currently PyTorch quantization supports two backends:  fbgemm (server x86 CPU)  and qnnpack (ARM CPU and x86 on mobile) and they (almost) match in both dimensions, however, there might be other backends that differ in signature or numerics than what is provided by PyTorch Quantization right now.
 
 In general, when we have a new backend, there is no guarantee that the quantized operators supported by the new backend would match in either of the dimensions, so we propose to add an extra layer of indirection between the model produced by the quantization flow and the model that’s actually used for execution in the backends.
