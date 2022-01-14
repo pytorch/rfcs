@@ -119,8 +119,8 @@ It is possible that there are different optimal block sizes when using managed m
 
 ## FAQ 
 
-Should we have set_enabled_uvm(bool)? Will there be a use case where the user can set this to false? As of now, UVM will be OFF until it is turned ON. We don’t want to mix the two so there won’t specifically be the ability to turn it OFF. 
+#### Should we have set_enabled_uvm(bool)? Will there be a use case where the user can set this to false? 
+- As of now, UVM will be OFF until it is turned ON. We don’t want to mix the two just yet, so there won’t specifically be the ability to turn it OFF. 
 
-Will this eliminate all calls to cudaMemcpy/hipMemcpy? 
-
-No, copies are still expected in many cases such as when are user assigns a new tensor B to an old tensor A with some modificaitons (dtype, layout, etc). 
+#### Will this eliminate all calls to cudaMemcpy/hipMemcpy? 
+- No, copies are still expected in many cases such as when are user assigns a new tensor B to an old tensor A with some modificaitons (dtype, layout, etc). 
