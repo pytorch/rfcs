@@ -68,15 +68,16 @@ In the UVM model, the managed memory APIs can be relied upon to ensure data and 
 ### UVM Copies vs Traditional
 Currently when PyTorch performs an update to a tensor’s attribute(s), a copy of the tensor is returned to the caller that includes the requested change. In a UVM case, this is potentially suboptimal. For example, when the user only wants to ensure the tensor is transferred to a GPU and issues a tensor.to(device=”cuda”) with a change only to the device attribute, this should not require an additional Block allocation and potential `CudaMallocManaged()` call to accomplish. 
 
-On the other hand, if a conversion of a tensor under UVM changes any other attribute (dtype, layout, etc) the tensor will need to make decisions based on the attributes of the current and requested tensor. This will require a traditional call to the _to_copy function to return the expected object to the user. 
+On the other hand, if a conversion of a tensor under UVM changes any other attribute (dtype, layout, etc) the tensor will need to make decisions based on the attributes of the current and requested tensor. This will require a traditional call to the `_to_copy` function to return the expected object to the user. 
 
 We propose to treat tensor.to(device) as a special case when UVM is enabled and `enabled_uvm_move_on_copy` has been set. Additionally, the behavior of tensor.uvm_to() will match the behavior of tensor.to() when UVM is enabled and  `enabled_uvm_move_on_copy` is True.
 
 ![Existing and proposed allocator usage](https://github.com/pytorch/rfcs/RFC-0020-assets/copy-diagram.jpg)
 
- - `.to`(device) (UVM move instead of copy) 
-   - .to(device) will call `_to_copy` in TensorConversions.cpp 
-     - The current implementation of `_to_copy` will create a new tensor with at::empty based on parameters specified in the to() statement (e.g. device type, dtype). We propose to treat .to(device) as a special case where instead it only creates a new Storage object and DataPtr with the current tensor’s memory address and original allocation context(which is needed for freeing).  Then at at::empty creation time the new Storage object is assigned to the new tensor via the set_() function. This allows the managed API to perform the copy.     - This is true for all common types of copies, regardless of their direction, DtoH, HtoD, DtoD 
+ - `.to(device)` (UVM move instead of copy) 
+   - `.to(device)` will call `_to_copy` in TensorConversions.cpp 
+     - The current implementation of `_to_copy` will create a new tensor with `at::empty` based on parameters specified in the `.to()` statement (e.g. device type, dtype). We propose to treat `.to(device)` as a special case where instead it only creates a new Storage object and DataPtr with the current tensor’s memory address and original allocation context(which is needed for freeing).  Then at `at::empty` creation time the new Storage object is assigned to the new tensor via the `set_()` function. This allows the managed API to perform the copy.
+     - This is true for all common types of copies, regardless of their direction, DtoH, HtoD, DtoD 
    - In aten/src/ATen/native/cuda/Copy.cu::copy_kernel_cuda:
      - No explicit cudaMemcpy in either direction 
      - Set cudaMemPrefetchAsync() 
