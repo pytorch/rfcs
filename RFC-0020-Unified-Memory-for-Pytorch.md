@@ -75,8 +75,8 @@ We propose to treat tensor.to(device) as a special case when UVM is enabled and 
 ![Existing and proposed allocator usage](https://github.com/pytorch/rfcs/RFC-0020-assets/copy-diagram.jpg)
 
  - `.to`(device) (UVM move instead of copy) 
-   - .to(device) will call _to_copy in TensorConversions.cpp 
-     - The current implementation of _to_copy will create a new tensor with at::empty based on parameters specified in the to() statement (e.g. device type, dtype). We propose to treat .to(device) as a special case where instead it only creates a new Storage object and DataPtr with the current tensor’s memory address and original allocation context(which is needed for freeing).  Then at at::empty creation time the new Storage object is assigned to the new tensor via the set_() function. This allows the managed API to perform the copy.     - This is true for all common types of copies, regardless of their direction, DtoH, HtoD, DtoD 
+   - .to(device) will call `_to_copy` in TensorConversions.cpp 
+     - The current implementation of `_to_copy` will create a new tensor with at::empty based on parameters specified in the to() statement (e.g. device type, dtype). We propose to treat .to(device) as a special case where instead it only creates a new Storage object and DataPtr with the current tensor’s memory address and original allocation context(which is needed for freeing).  Then at at::empty creation time the new Storage object is assigned to the new tensor via the set_() function. This allows the managed API to perform the copy.     - This is true for all common types of copies, regardless of their direction, DtoH, HtoD, DtoD 
    - In aten/src/ATen/native/cuda/Copy.cu::copy_kernel_cuda:
      - No explicit cudaMemcpy in either direction 
      - Set cudaMemPrefetchAsync() 
