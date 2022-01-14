@@ -45,7 +45,7 @@ Currently there are different allocators used for CPU (CPUAllocator) , pinned ho
  - This will provide benefits in a few areas. We can continue to develop and improve on Unified memory allocations without the risk of introducing performance degradation, or errors to the existing CUDACachingAllocator. In addition, we expect the behavior of Managed memory to be different than that of traditional discrete GPU/CPU memory. For example, managed memory is available to all GPUs on all streams by default and can move between host and any number of GPUs at will. This will provide intricacies to the caching methodology that may conflict with the existing caching allocators. 
  - When UVM is enabled, `at:Allocator *GetAllocator()` will lazy init and return the CachingManagedAllocator for all CPU and GPU allocator requests. 
 
-![Existing and proposed allocator usage](./RFC-0020-assets/allocator-diagram.jpg)
+![Existing and proposed allocator usage](./RFC-0023-assets/allocator-diagram.jpg)
 
  - Currently, the CUDACachingAllocator/THCCachingAllocator creates one DeviceCachingAllocator for each GPU device that is present at initialization time.  
 
@@ -72,7 +72,7 @@ On the other hand, if a conversion of a tensor under UVM changes any other attri
 
 We propose to treat tensor.to(device) as a special case when UVM is enabled and `enabled_uvm_move_on_copy` has been set. Additionally, the behavior of tensor.uvm_to() will match the behavior of tensor.to() when UVM is enabled and  `enabled_uvm_move_on_copy` is True.
 
-![Existing and proposed allocator usage](./RFC-0020-assets/copy-diagram.jpg)
+![Existing and proposed allocator usage](./RFC-0023-assets/copy-diagram.jpg)
 
  - `.to(device)` (UVM move instead of copy) 
    - `.to(device)` will call `_to_copy` in TensorConversions.cpp 
