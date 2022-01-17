@@ -56,7 +56,7 @@ Currently there are different allocators used for CPU (CPUAllocator) , pinned ho
 ### Empty Tensors
 Changes will be needed for the `at::empty_cpu()` and `at::empty_cuda()` functions. 
 
- - In `at::empty_cpu()`, there is already a switch to determine which cpu allocator to use (pinned vs cpu). When UVM is enabled, this switch will always return the CUDACachingAllocator. As described above, the CUDACachingAllocator will only reference device_allocator[0]. There are likely a few other places (other empties) that get an allocator as well. 
+ - In `at::empty_cpu()`, there is already a switch to determine which cpu allocator to use (pinned vs cpu). When UVM is enabled, this switch will always return the CachingManagedAllocator. There are likely a few other places (other empties) that get an allocator as well.
 
  - Per a find from the FBGEMM team, there is an issue with the context being moved from the device where the memory was allocated, and where it currently resides. We need to keep the original context, so we don’t create new ones unnecessarily on other devices. To account for this, at `at::empty` time, we will create two Storage structs: 
    - RealStorage -- This will be the original context of the device where the CUDAMallocManaged occurred. 
