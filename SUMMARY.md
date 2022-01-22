@@ -4,8 +4,8 @@
 
 ## Building and Debugging PyTorch
 
-* [Building PyTorch](building-and-debugging-pytorch/building-pytorch/README.md)
-  * [Page 1](building-and-debugging-pytorch/building-pytorch/page-1.md)
+* [Building PyTorch](building-and-debugging-pytorch/building-pytorch.md)
+* [Advanced Build Tips](building-and-debugging-pytorch/advanced-build-tips.md)
 * [Meet the Team!](building-and-debugging-pytorch/meet-the-team.md)
 
 ## The Formal Stuff
