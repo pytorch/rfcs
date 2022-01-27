@@ -7,9 +7,9 @@ These operators sometimes require changes to maintain the high quality user expe
 
 BC and FC breaking changes have been challenging to coordinate across PyTorch because there are multiple consumers of PyTorch’s op set and we promise to keep models running in production working as expected.
 
-We are providing the same Service Level Agreement (SLA) to both internal and external use cases.
-
 This document proposes a new BC and FC policy based on operator versioning.
+
+Moving forward, we're not having a difference between Meta internal and Open Source (OSS) guarantees. They would be moving under *the same Service Level Agreement (SLA)* to both internal and external use cases.
 
 
 ## History
@@ -22,7 +22,7 @@ Backwards compatibility (BC), the ability for PyTorch to continue running progra
 PyTorch current SLA on backwards compatibility:
 
 * **OSS** — “stable” features will be deprecated for one release before a BC-breaking change is made. [PyTorch OSS BC-breaking policy](https://pytorch.org/docs/master/)
-* **FB Internal** — we will not break a serialized torchscript program running in production at Facebook (to be replaced with a more generic SLA)
+* **Meta Internal** — we will not break a serialized torchscript program running in production at Meta (to be replaced with a more generic SLA)
 
 BC-breaking operator changes were previously governed by the [Backward-compatibility Breaking Change Review Process](https://fb.quip.com/gydOArylrcKd), but this only covered torchscript and eager. A generic process needs to be visible from OSS.
 
@@ -36,7 +36,7 @@ PyTorch current SLA on forward compatibility:
 
 
 * **OSS** — no promise
-* **FB Internal** — PyTorch commits can run existing PyTorch eager, package/deploy, and serialized torchscript programs for at least two weeks
+* **Meta Internal** — PyTorch commits can run existing PyTorch eager, package/deploy, and serialized torchscript programs for at least two weeks
     * The addition of a new kwarg-only argument at the end of an op’s parameter list (but before out=, if present) with a default value is FC-compatible for serialized [torchscript](https://fb.workplace.com/groups/pytorch.dev/permalink/909079013003913/) and [mobile](https://fb.workplace.com/groups/pytorch.dev/permalink/912379562673858/).
 
 
@@ -108,7 +108,7 @@ We propose the operator versioning that works across eager, TorchScript, torch.p
     * e2e FC-breaking guide
         * It’s OK to add new optional keyword-only arguments as long as their default semantic preserve the operator’s current semantics
 * **SLA window**
-    * We are targeting at a certain period length of Service-level agreement: two PyTorch binary releases, or 180 days since the BC-breaking change is made, whichever is later.
+    * PyTorch SLA will ensure that models developed using a certain version and developed with non-deprecated APIs, will be runnable (with a slight performance regression allowed) for *up to one more release or 180 days* (from the version release date that introduced the BC-breaking change), whichever is later.
 
 Note that the proposal does not introduce an explicit version to _all_ PyTorch operators. Instead code changes are only required for updated operators with BC/FC breakage, that cannot be handled by automatic BC/FC methods. For other operators, the implicit version is v0.
 
