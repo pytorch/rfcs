@@ -17,17 +17,14 @@ We propose adding the following APIs to the python interface to enable and contr
 
 These APIs will be used to set and query unified memory usage in Pytorch. These will be defined in torch/cuda/memory.py. The `set_enabled_uvm()` API will set the enablement flag (enabled_uvm) which will be held in the default global context (`at::globalContext().userEnabledUVM()`). This location should allow us to avoid adding new parameters to functions that need to be modified. 
 
-The default value for enabled_uvm will be False. Setting the value to True, will have two different effects:
-
-1. Newly created tensors will be created as "managed" tensors.
-2. The default value for the proposed "manage" parameter to the `torch.Tensor.to()` function will be True. See below for more details.
+The default value for enabled_uvm will be False. Setting the value to True, will have the effect that newly created tensors will be allocated and marked as "managed" tensors.
 
 ### Usage of `torch.Tensor.to()`
 
-This API performs a Tensor dtype and/or device conversion. Currently this function returns `self` in the special caes when `torch.dtype` and `torch.device` are unchanged. Additionally, a copy can be forced by using the `copy=True` parameter. We propose to expand on this by returning `self` in the additional special case of `torch.dtype` being unchanged, and `torch.device` is changed while the tensor is marked "managed". A copy will still be forced when the `copy=True` parameter is sent.
+This API performs a Tensor dtype and/or device conversion. Currently this function returns `self` in the special caes when `torch.dtype` and `torch.device` are unchanged. Additionally, a copy can be forced by using the `copy=True` parameter. We propose to expand on this special case by returning `self` in the additional case of `torch.dtype` being unchanged, and `torch.device` is changed while the tensor is marked "managed". A copy will still be forced when the `copy=True` parameter is sent.
 
 ### Managed Tensors
-A tensor will be allocated and marked as "managed" if it was created after setting `enabled_uvm=true`. New helper functions will be added. A function is needed to query if a tensor is managed. We propose `Tensor.is_managed()` for this. Additionally, we also propose to add a new function `tensor.manage_memory()`. This follows the usage precident used for pinned memory tensors.
+As described above, a tensor will be allocated and marked as "managed" if it was created after setting `enabled_uvm=true`. New helper functions will also be added. A function is needed to query if a tensor is managed. We propose `Tensor.is_managed()` for this. Additionally, we also propose to add a new function `tensor.manage_memory()` to change an existing standard tensor into a manage tensor. This follows the usage precident for pinned memory tensors. The new function `tensor.unmanage_memory()` will do the reverse and return a standard tensor from a managed tensor input.
 
 Here are some usage examples (assuming the original tensor is on CPU):
 ```
@@ -40,7 +37,16 @@ tensor.unmanage_memory()                                      // copy to unmanag
 ```
 
 ### Additional Notes
-When a managed tensor is sent to a new device, the device attribute of the tensor will be updated, the appropriate managed memory location hints will be sent and a prefetch will be scheduled. In the case where the tensor is sent from a `cuda` device to a `cpu` a device level sync will also be sent. This can be disabled by using the non_blocking=true parameter. In this case, synchronization responsibility falls to the user.
+When a managed tensor is sent to a new device, the device attribute of the tensor will be updated, the appropriate managed memory location hints will be sent and a prefetch will be scheduled. In the case where the tensor is sent from a `cuda` device to a `cpu`, a device level sync will also be sent. This sync can be disabled by using the non_blocking=true parameter in the torch.tensor.to() call. In this case, explicit synchronization responsibility falls to the user.
+
+### Optional addition to `torch.Tensor.to()`
+It might be worth considering adding a 'managed' parameter to the `torch.tensor.to()` function. This would give the ability to change the tensor into a managed tensor will also changing its other attributes, many of which need a copy already. This function is used to change attributes of a tensor and managed would qualify. Parameter additions to `torch.tensor.to()` does require changes to the kwargs list, which would require more pervasive changes than we'd like for this functionality, so we'll make it optional here for discussion. Usage would look like:
+
+```
+tensor.to(device='cuda:0', manage=true)                       // copy to managed if not already managed
+```
+
+The default value for the proposed "manage" parameter would be False. If the enabled_uvm setting was set to true, then the default value for the "manage" parameter is also True.
 
 ### C++
 Additionally, we propose to add a check on the environment for the `PYTORCH_ENABLE_UNIFIED_MEMORY` variable. When set, the same global context enablement flag will be set. 
