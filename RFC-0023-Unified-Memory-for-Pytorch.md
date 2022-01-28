@@ -17,14 +17,14 @@ We propose adding the following APIs to the python interface to enable and contr
 
 These APIs will be used to set and query unified memory usage in Pytorch. These will be defined in torch/cuda/memory.py. The `set_enabled_uvm()` API will set the enablement flag (enabled_uvm) which will be held in the default global context (`at::globalContext().userEnabledUVM()`). This location should allow us to avoid adding new parameters to functions that need to be modified. 
 
-The default value for enabled_uvm will be False. Setting the value to True, will have the effect that newly created tensors will be allocated and marked as "managed" tensors.
+The default value for the `enabled_uvm` flag will be False. Setting the value to True, will have the effect that newly created tensors will be allocated and marked as "managed" tensors.
 
 ### Usage of `torch.Tensor.to()`
 
 This API performs a Tensor dtype and/or device conversion. Currently this function returns `self` in the special caes when `torch.dtype` and `torch.device` are unchanged. Additionally, a copy can be forced by using the `copy=True` parameter. We propose to expand on this special case by returning `self` in the additional case of `torch.dtype` being unchanged, and `torch.device` is changed while the tensor is marked "managed". A copy will still be forced when the `copy=True` parameter is sent.
 
 ### Managed Tensors
-As described above, a tensor will be allocated and marked as "managed" if it was created after setting `enabled_uvm=true`. New helper functions will also be added. A function is needed to query if a tensor is managed. We propose `Tensor.is_managed()` for this. Additionally, we also propose to add a new function `tensor.manage_memory()` to change an existing standard tensor into a manage tensor. This follows the usage precident for pinned memory tensors. The new function `tensor.unmanage_memory()` will do the reverse and return a standard tensor from a managed tensor input.
+As described above, a tensor will be allocated and marked as "managed" if it was created after setting `torch.cuda.set_enabled_uvm(true)`. New helper functions will also be added. A function is needed to query if a tensor is managed. We propose `Tensor.is_managed()` for this. Additionally, we also propose to add a new function `tensor.manage_memory()` to change an existing standard tensor into a manage tensor. This follows the usage precident for pinned memory tensors. The new function `tensor.unmanage_memory()` will do the reverse and return a standard tensor from a managed tensor input.
 
 Here are some usage examples (assuming the original tensor is on CPU):
 ```
