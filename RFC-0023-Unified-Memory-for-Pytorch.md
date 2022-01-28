@@ -40,13 +40,13 @@ tensor.unmanage_memory()                                      // copy to unmanag
 When a managed tensor is sent to a new device, the device attribute of the tensor will be updated, the appropriate managed memory location hints will be sent and a prefetch will be scheduled. In the case where the tensor is sent from a `cuda` device to a `cpu`, a device level sync will also be sent. This sync can be disabled by using the non_blocking=true parameter in the torch.tensor.to() call. In this case, explicit synchronization responsibility falls to the user.
 
 ### Optional addition to `torch.Tensor.to()`
-It might be worth considering adding a 'managed' parameter to the `torch.tensor.to()` function. This would give the ability to change the tensor into a managed tensor will also changing its other attributes, many of which need a copy already. This function is used to change attributes of a tensor and managed would qualify. Parameter additions to `torch.tensor.to()` does require changes to the kwargs list, which would require more pervasive changes than we'd like for this functionality, so we'll make it optional here for discussion. Usage would look like:
+It might be worth considering adding a 'managed' parameter to the `torch.tensor.to()` function. This would give the ability to change the tensor into a managed tensor while also changing its other attributes, many of which already require a copy. The `torch.tensor.to()` function is used to change attributes of a tensor and giving it the ability to change if a tensor is managed or not would fit the usage model. Parameter additions to `torch.tensor.to()` do require changes to the kwargs list, which would require more pervasive changes than we'd like for this functionality, so we'll make it optional here and solicit discussion. Usage would look like:
 
 ```
 tensor.to(device='cuda:0', manage=true)                       // copy to managed if not already managed
 ```
 
-The default value for the proposed "manage" parameter would be False. If the enabled_uvm setting was set to true, then the default value for the "manage" parameter is also True.
+The default value for the proposed "manage" parameter would be False. If the enabled_uvm setting was set to true, then the default value for the "manage" parameter would also be True.
 
 ### C++
 Additionally, we propose to add a check on the environment for the `PYTORCH_ENABLE_UNIFIED_MEMORY` variable. When set, the same global context enablement flag will be set. 
