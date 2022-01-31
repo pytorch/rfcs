@@ -32,7 +32,7 @@ Maintainers also found the RFC process useful because it gave them a sense of wh
 
 ## **Proposed Implementation**
 ### RFC Lifecycle
-![Lifecycle](./RFC-0000-assets/rfc-lifecycle.svg)
+![Lifecycle](./RFC-0024-assets/rfc-lifecycle.svg)
 * All RFCs start as a **draft**. 
 * When it is ready to be discussed, the RFC is in **commenting** stage.
 * If there is no activity, the RFC is **stalled**.
