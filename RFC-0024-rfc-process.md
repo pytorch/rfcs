@@ -37,35 +37,33 @@ Maintainers also found the RFC process useful because it gave them a sense of wh
 * When it is ready to be discussed, the RFC is in **commenting** stage.
 * If there is no activity, the RFC is **stalled**.
 * After the commenting stage, the RFC can enter into a stage of:
-    * **approved** if a decision has been made in the RFC
+    * **accepted** if a decision has been made in the RFC
     * **draft** if the author needs to rework the RFC’s proposal
     * **postponed** if there are no plans to move ahead with the current RFC’s proposal
-* After an approved RFC is implemented and merged into the codebase, it can be **closed**
+* After an accepted RFC is implemented and merged into the codebase, it can be **closed**
 
 ### Platform
 We can easily implement this lifecycle on the existing rfcs repo (https://github.com/pytorch/rfcs) via PR labels. The full workflow looks like:
-* Fork the rfcs repo: https://github.com/pytorch/rfcs
-* Copy `RFC-0000-template.md` to `RFC-0000-my-feature.md`, or write your own open-ended proposal. Put care into the details.
-* Submit a pull request titled `RFC-OOxx-my-feature`. Assign the `commenting` label on the PR to open it for discussions. 
-* Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
-    * If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
-* Once the discussion has settled, assign a new label based on the level of support:
-    * `approved` if a decision has been made in the RFC
-    * `draft` if the author needs to rework the RFC’s proposal
-    * `postponed `if there are no plans to move ahead with the current RFC’s proposal
-* A state of `approved` means that the core team has agreed in principle to the proposal, and it is ready for implementation. 
-* The author (or any interested developer) should next open a tracking issue on Github corresponding to the RFC.
-    * This tracking issue should contain the implementation next steps ([example](https://github.com/pytorch/pytorch/issues/50344)).
-    * Link to this tracking issue on the RFC (in the Resolution > Next Steps section)
-* Once all relevant PRs are merged, the RFC’s status label can be finally updated to `closed`.
+- Fork the rfcs repo: https://github.com/pytorch/rfcs
+- Copy `RFC-0000-template.md` to `RFC-00xx-my-feature.md`, or write your own open-ended proposal. Put care into the details.
+- Submit a pull request titled `RFC-OOxx-my-feature`. Assign the `commenting` label on the PR to open it for discussions. 
+- Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
+    - If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
+- Once the discussion has settled, assign a new label based on the level of support:
+    - `accepted` if a decision has been made in the RFC
+    - `draft` if the author needs to rework the RFC’s proposal
+    - `postponed `if there are no plans to move ahead with the current RFC’s proposal
+- A state of `accepted` means that the core team has agreed in principle to the proposal, and it is ready for implementation. 
+- The author (or any interested developer) should next open a tracking issue on Github corresponding to the RFC.
+    - This tracking issue should contain the implementation next steps. Link to this tracking issue on the RFC (in the Resolution > Next Steps section)
+- Once all relevant PRs are merged, the RFC’s status label can be finally updated to `closed`.
 
 ### Improving Visibility of RFCs
-When an RFC is in `commenting`, we can highlight it in a few ways by cross-posting on:
-* A new RFC category on dev-discuss.pytorch.org (and optionally discuss.pytorch.org)
-* Workplace 
-* A separate webpage on pytorch.org
-* In a biweekly/monthly digest
-* In a biweekly/monthly Twitter thread rollup
+When an RFC is in `commenting`, we can highlight it in a few ways by sharing a weekly/bi-weekly digest on:
+* PyTorch Slack
+* Developer Forums (dev-discuss.pytorch.org)
+* Workplace (Internal groups at Meta)
+* Twitter
 
 ### RFC Template
 The provided [RFC template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md) contains sections to help draft a detailed RFC, and workflow instructions so that contributors don't need to refer to any other place to understand the process.
@@ -87,6 +85,7 @@ Recently, the team introduced a public GDrive folder called ‘PyTorch Design Do
 Each RFC will have a status label in the doc title, like **_[STATUS] RFC #[number] : [Title]_** which helps viewers identify what stage the discussion is in. The RFC author is responsible for updating the status label of the document. 
 
 **Advantages:**
+
 Quoting a post on Workplace:
 
 > Anecdotally, engineers at Meta create GDocs (and formerly Quips) today, and it is difficult to migrate this behavior entirely to the RFC repo. Google docs have a number of advantages: 
@@ -107,7 +106,7 @@ Quoting a post on Workplace:
 
 Many opensource projects maintain an RFC presence on Github (either via a separate RFCs repo, or on the project’s Issues). A GDocs + Github hybrid solution will help the visibility of RFCs in a more familiar way, but at the cost of complicating the process and increasing overheads.
 
-When authors open a new PR on the RFCs repo, they are asked to create a document on the GDrive. The PR serves as the tracking PR and the objective is to improve visibility.  Once they create a new RFC GDoc, they link it in the PR. All subsequent comments and feedback will be directed to the GDoc. When the RFC is **[Approved]** on GDocs, it can be exported to markdown, committed to the tracking PR on Github.
+When authors open a new PR on the RFCs repo, they are asked to create a document on the GDrive. The PR serves as the tracking PR and the objective is to improve visibility.  Once they create a new RFC GDoc, they link it in the PR. All subsequent comments and feedback will be directed to the GDoc. When the RFC is **[Accepted]** on GDocs, it can be exported to markdown, committed to the tracking PR on Github.
 
 
 ## **Open Questions**
@@ -125,6 +124,7 @@ The proposals in this document are inspired by
 
 ## Resolution
 We decided to implement the RFC workflow on the github rfcs repo.
+
 Level of support: 2 (positive feedback)
 
 ### Additional Context
@@ -150,7 +150,7 @@ Level of support: 2 (positive feedback)
 
 
 ## Next Steps
-* Create RFC lifecycle labels and assign them to open RFCs
-* Add RFC template to the repo
-* Add instructions in the repo README
-
+* Update [this section in PyTorch Governance](https://github.com/pytorch/pytorch/blob/master/docs/source/community/governance.rst#controversial-decision-process) to point to this repo.
+* Create RFC lifecycle labels and assign them to existing RFC PRs
+* Create #rfc-chat channel on the dev-discuss forum and PyTorch slack 
+* Automate label assignment with github bots (first label, stalebot)

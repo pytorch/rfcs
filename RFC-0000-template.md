@@ -1,24 +1,24 @@
 
 
-<!----
+<details>
+<summary>Instructions - click to expand</summary>
 
-## Instructions:
+- Fork the rfcs repo: https://github.com/pytorch/rfcs
+- Copy `RFC-0000-template.md` to `RFC-00xx-my-feature.md`, or write your own open-ended proposal. Put care into the details.
+- Submit a pull request titled `RFC-OOxx-my-feature`. Assign the `commenting` label on the PR to open it for discussions. 
+- Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
+    - If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
+- Once the discussion has settled, assign a new label based on the level of support:
+    - `accepted` if a decision has been made in the RFC
+    - `draft` if the author needs to rework the RFC’s proposal
+    - `postponed `if there are no plans to move ahead with the current RFC’s proposal
+- A state of `accepted` means that the core team has agreed in principle to the proposal, and it is ready for implementation. 
+- The author (or any interested developer) should next open a tracking issue on Github corresponding to the RFC.
+    - This tracking issue should contain the implementation next steps. Link to this tracking issue on the RFC (in the Resolution > Next Steps section)
+- Once all relevant PRs are merged, the RFC’s status label can be finally updated to `closed`.
 
-* Fork the rfcs repo: https://github.com/pytorch/rfcs
-* Copy `RFC-0000-template.md` to `RFC-0000-my-feature.md`, or write your own open-ended proposal. Put care into the details.
-* Submit a pull request titled `RFC-OOxx-my-feature`. Assign the `commenting` label on the PR to open it for discussions. 
-* Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
-    * If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
-* Once the discussion has settled, assign a new label based on the level of support:
-    * `approved` if a decision has been made in the RFC
-    * `draft` if the author needs to rework the RFC’s proposal
-    * `postponed `if there are no plans to move ahead with the current RFC’s proposal
-* A state of `approved` means that the core team has agreed in principle to the proposal, and it is ready for implementation. 
-* The author (or any interested developer) should next open a tracking issue on Github corresponding to the RFC.
-    * This tracking issue should contain the implementation next steps ([example](https://github.com/pytorch/pytorch/issues/50344)).
-    * Link to this tracking issue on the RFC (in the Resolution > Next Steps section)
-* Once all relevant PRs are merged, the RFC’s status label can be finally updated to `closed`.
----->
+</details>
+
 
 
 
