@@ -58,6 +58,8 @@ marked as such because we want neither to think about evaluating the proposal
 nor about implementing the described feature until some time in the future, and
 we believe that we can afford to wait until then to do so. 
 
+## Inspiration
+PyTorch's RFC process owes inspiration to the [Rust RFC Process](https://github.com/rust-lang/rfcs) and [React RFC Process](https://github.com/reactjs/rfcs/), and the [Artsy RFC process](https://github.com/artsy/README/blob/main/playbooks/rfcs.md#resolution) for the resolution template.
 
 ## License
 By contributing to rfcs, you agree that your contributions will be licensed under the LICENSE file in the root directory of this source tree.
