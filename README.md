@@ -35,7 +35,7 @@ merged into the RFC repository as a markdown file. At that point the RFC is
 
 
 ## Build consensus
-Before working on an RFC, it might be useful to gauge interest by posting on either [PyTorch Issues](https://github.com/pytorch/pytorch/issues), the [developer forum](https://dev-discuss.pytorch.org/c/rfc-chatter), or the [Slack channel](https://bit.ly/ptslack). Identifying interested stakeholders early on can ease consensus building.
+Before working on an RFC, it might be useful to gauge interest by posting on either [PyTorch Issues](https://github.com/pytorch/pytorch/issues), the [developer forum](https://dev-discuss.pytorch.org/c/rfc-chatter), or the [Slack channel](https://bit.ly/ptslack). Identifying interested stakeholders ([CODEOWNERS](https://github.com/pytorch/pytorch/blob/master/CODEOWNERS)) early on can ease consensus building.
 
 
 ## Implementing an RFC
