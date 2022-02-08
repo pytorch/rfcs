@@ -171,11 +171,30 @@ Some key metrics that should be improved by these changes:
 - Time to rebuild after adding editing a method operator
 - `sccache` miss rate in open source CI
 
+For example, we can compare against a branch with the
+`ATen/native/cpu` and `ATen/native/cuda` folders migrated to
+per-operator headers, and some key files edited to use `TensorBase`.
+Despite only partial migration, the table below shows ~2x speedup in
+incremental build for functional operators and ~1.4x for method
+operators.
+
+| Variant  | Jobs (before) | Jobs (after) | Time (before) | Time (after) |
+|----------|:-------------:|--------------|---------------|--------------|
+| Function |      1403     |      775     |   10 m 00 s   |    4 m 50 s  |
+| Method   |      1403     |     1184     |   10 m 00 s   |    7 m 15 s  |
+
+We can expect even further improvements once all of ATen and torch
+have adopted per-operator headers.
+
 ## **Drawbacks**
 There is no denying that it's more convenient to just include
 `<ATen/ATen.h>` at the top of the file and not have to think about it.
 This will require additional effort on the part of developers to
 maintain the list of operator includes.
+
+C++ users who include internal header files without including
+`ATen/ATen.h` may also find their compilation failing as unnecessary
+includes are trimmed from internal headers.
 
 ## **Alternatives**
 [pytorch/pytorch#61915](https://github.com/pytorch/pytorch/pull/61915)
@@ -202,9 +221,16 @@ Not aware of any relevant prior art.
 ## **How we teach this**
 This change doesn't effect end-users.
 
-For PyTorch developers, documentation should be written on how to
-write code in compliance with the two enforcement macros and linked in
-the corresponding error messages.
+For PyTorch developers, a developer wiki entry should outline the
+motivation from this RFC and describe how to write code in compliance
+with the two enforcement macros:
+- How to include the new per-operator headers
+- Using the include-what-you-use tool
+- Structuring headers to minimize unnecessary dependencies
+- Modifying kernels to be `TORCH_ASSERT_NO_OPERATORS` compliant
+
+This wiki entry should also be linked from the enforcement macro error
+messages to increase visibility.
 
 ## **Unresolved questions**
 - Is it possible/desirable to enforce `TORCH_ASSERT_NO_OPERATORS` automatically?
