@@ -51,7 +51,7 @@ cannot determine if someone else is already working on it, feel free to ask
 (e.g. by leaving a comment on the associated issue).
 
 
-## RFC Postponement
+## RFC Rejection
 Some RFC pull requests are tagged with the "shelved" label when they are
 closed (as part of the rejection process). An RFC closed with "shelved" is
 marked as such because we want neither to think about evaluating the proposal
