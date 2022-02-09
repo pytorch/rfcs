@@ -39,7 +39,7 @@ Maintainers also found the RFC process useful because it gave them a sense of wh
 * After the commenting stage, the RFC can enter into a stage of:
     * **accepted** if a decision has been made in the RFC
     * **draft** if the author needs to rework the RFC’s proposal
-    * **postponed** if there are no plans to move ahead with the current RFC’s proposal
+    * **shelved** if there are no plans to move ahead with the current RFC’s proposal
 * After an accepted RFC is implemented and merged into the codebase, it can be **closed**
 
 ### Platform
@@ -52,7 +52,8 @@ We can easily implement this lifecycle on the existing rfcs repo (https://github
 - Once the discussion has settled, assign a new label based on the level of support:
     - `accepted` if a decision has been made in the RFC
     - `draft` if the author needs to rework the RFC’s proposal
-    - `postponed `if there are no plans to move ahead with the current RFC’s proposal
+    - `shelved` if there are no plans to move ahead with the current RFC’s proposal. We want neither to think about evaluating the proposal
+nor about implementing the described feature until some time in the future.
 - A state of `accepted` means that the core team has agreed in principle to the proposal, and it is ready for implementation. 
 - The author (or any interested developer) should next open a tracking issue on Github corresponding to the RFC.
     - This tracking issue should contain the implementation next steps. Link to this tracking issue on the RFC (in the Resolution > Next Steps section)
