@@ -21,6 +21,8 @@ The essential point of this proposal is that the function schema DSL (which we u
 
 # Overview
 ![codegen drawio](https://user-images.githubusercontent.com/8188269/154173938-baad9ee6-0e3c-40bb-a9d6-649137e3f3f9.png)
+
+
 Currently the lite interpreter (or Edge runtime) registers all ATen ops into the dispatcher and some other ops into the JIT op registry. At model inference time the interpreter will look for the operator name in the JIT op registry first, if not found then it will look into the dispatcher. This proposal **adds a build flavor that moves these ATen ops from dispatcher to JIT op registry** so that it’s easier to optimize (e.g., avoid schema parsing) and can also reduce dependencies. 
 
 The interpreter is looking for a boxed function but our native implementation is unboxed. We need “glue code” to hook up these two. This proposal **extends the capabilities of codegen to generate the unboxing wrappers for operators**, as well as the code to register them into the JIT op registry. The interpreter will call generated unboxing wrappers, inside these wrappers we pop out values from the stack, and delegate to the unboxed API.
