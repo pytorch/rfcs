@@ -1,5 +1,5 @@
 # Context
-With recent developments in PyTorch Edge applications on embedded systems and resource limited devices, the issue of op registration/dispatching runtime overhead and build-time complexity has risen to the fore.
+Currently we rely on `TORCH_LIBRARY` [API](https://pytorch.org/tutorials/advanced/dispatcher.html) to register operators into dispatcher. As PyTorch aims to support a wider set of devices and use cases, the issue of op registration/dispatching static initialization time and runtime overhead as well as build-time complexity has risen to the fore, we see the need for a lighter version of our operator dispatching mechanism.  
 
 We thought about possible solutions:
 * One option is to keep using the torch-library C++ API to register/dispatch ops, but this will necessitate careful cost-cutting for these use cases with more and more intrusive “#ifdef” customizations in the core framework.
@@ -9,33 +9,33 @@ The essential point of this proposal is that the function schema DSL (which we u
 
 # Motivation
 * **Performance**
-  * For recent use cases of Edge interpreter, we need to satisfy more and more strict initialization latency requirements, where analysis shows op registration contributes to a large portion of it.
+  * For recent use cases of mobile interpreter, we need to satisfy more and more strict initialization latency requirements, where analysis shows op registration contributes to a large portion of it.
   * With existing meta-programming based unboxing logic shared between mobile and server, it’s relatively inflexible to introduce optimizations.
   * Also with static dispatch, we don’t have to register all of the ops into the JIT op registry, which saves runtime memory usage and further reduces static initialization time.
   * It is possible to avoid dispatching at runtime.
 * **Modularity and binary size**
-  * Currently the mobile runtime consists of both JIT op registry and c10 dispatcher. This project will make it possible to not depend on the c10 dispatcher, delivering a cleaner runtime library.
+  * Currently the mobile runtime consists of both JIT op registry and c10 dispatcher. This project will make it possible to not depend on the c10 dispatcher (opt-in), delivering a cleaner runtime library.
   * This project creates an opportunity to reduce binary size by getting rid of the dispatcher and enables further size optimization on unboxing wrappers.
 * **Ability to incorporate custom implementation of ATen ops**
-  * For some of the edge use cases, we need to support custom implementations of ATen ops. With an extra op registration path such as codegen unboxing it is easier to hookup ops with custom native functions.
+  * For some of the mobile use cases, we need to support custom implementations of ATen ops. With an extra op registration path such as codegen unboxing it is easier to hookup ops with custom native functions.
 
 # Overview
 ![codegen drawio](https://user-images.githubusercontent.com/8188269/154173938-baad9ee6-0e3c-40bb-a9d6-649137e3f3f9.png)  
 
 
-Currently the lite interpreter (or Edge runtime) registers all ATen ops into the dispatcher and some other ops into the JIT op registry. At model inference time the interpreter will look for the operator name in the JIT op registry first, if not found then it will look into the dispatcher. This proposal **adds a build flavor that moves these ATen ops from dispatcher to JIT op registry** so that it’s easier to optimize (e.g., avoid schema parsing) and can also reduce dependencies. 
+Currently the mobile interpreter registers all ATen ops into the dispatcher and some other ops into the JIT op registry. At model inference time, the interpreter will look for the operator name in the JIT op registry first, if not found then it will look into the dispatcher. This proposal **adds a build flavor that moves these ATen ops from dispatcher to JIT op registry** so that it’s easier to optimize (e.g. avoid schema parsing) and reduce dependencies. 
 
 The interpreter is looking for a boxed function but our native implementation is unboxed. We need “glue code” to hook up these two. This proposal **extends the capabilities of codegen to generate the unboxing wrappers for operators**, as well as the code to register them into the JIT op registry. The interpreter will call generated unboxing wrappers, inside these wrappers we pop out values from the stack, and delegate to the unboxed API.
 
 To avoid hitting the dispatcher from the unboxed API, we will choose static dispatch so that we hit native functions from the unboxed API directly. To make sure we have feature parity as the default build, this proposal **adds support for multiple backends in static dispatch**.
 
-In addition to that, this proposal also supports features critical to Edge, such as **tracing based selective build** and **runtime modularization** work.
+In addition to that, this proposal also supports features critical to mobile use cases, such as **tracing based selective build** and **runtime modularization** work.
 
 # Step by step walkthrough
 
 How will our new codegen unboxing wrapper fit into the picture of op registration and dispatching? For these use cases, we only need per-op codegen unboxing (red box on the left) as well as static dispatch. This way we can avoid all dependencies on c10::Dispatcher. 
 
-We are going to break the project down into three parts, for **step 1 we are going to implement the codegen logic** and generate code based on [native_functions.yaml](https://fburl.com/code/2wkgwyoq), then we are going to verify the flow that we are able to find jit op in the registry and eventually call codegen unboxing wrapper (the red flow on the left). **Step 2 will focus on how to make sure we have feature parity** with the original op registration and dispatch system, with tasks like supporting multiple backends in static dispatch, supporting custom ops as well as custom kernels for ATen ops.For **step 3 we are going to integrate with some target hardware platforms**. These are the problems we need to address in step 3 including: avoiding schema parsing at library init time, supporting tracing based selective build. The goal of step 3 is to make sure per-op codegen unboxing works for our target hardware platforms and is ready to ship to production.
+We are going to break the project down into three parts, for **step 1 we are going to implement the codegen logic** and generate code based on [native_functions.yaml](https://fburl.com/code/2wkgwyoq), then we are going to verify the flow that we are able to find jit op in the registry and eventually call codegen unboxing wrapper (the red flow on the left). **Step 2 will focus on how to make sure we have feature parity** with the original op registration and dispatch system, with tasks like supporting multiple backends in static dispatch, supporting custom ops as well as custom kernels for ATen ops. For **step 3 we are going to integrate with some target hardware platforms** to validate latency and binary size improvements. These are the problems we need to address in step 3 including: avoiding schema parsing at library init time, supporting tracing based selective build. The goal of step 3 is to make sure per-op codegen unboxing works for our target hardware platforms and is ready to ship to production use cases.
 
 
 ### Step 1
@@ -45,15 +45,15 @@ Bring back the unboxing kernel codegen using the new codegen framework. And make
 
 #### Codegen core logic
 
-These tasks will generate C++ code that pops ivalues out from a stack and casts them to their corresponding C++ types. This core logic should be shared across two types of codegens so that it can be covered by all the existing tests on server side.
+These tasks will generate C++ code that pops IValues out from a stack and casts them to their corresponding C++ types. This core logic should be shared across two types of codegens so that it can be covered by all the existing tests on server side.
 
 
 
 * **JIT type -> C++ type**. This is necessary for some of the optional C++ types, e.g., we need to map `int` to `int64_t` for the last argument in the example.
     * This is already done in [types.py](https://github.com/pytorch/pytorch/blob/master/tools/codegen/api/types.py), and we need to integrate it into our new codegen.
 * **JIT type -> IValue to basic type conversion C++ code.** E.g., the first argument of this operator: `Tensor(a) self` needs to be translated to: `(std::move(peek(stack, 0, 4))).toTensor()`
-    * IValue provides APIs to directly convert an ivalue to these basic types. See [ivalue_inl.h](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/core/ivalue_inl.h#L1453-L1493)
-    * Here’s a [list](#bookmark=id.deyvpbsb5yel) of all the JIT types appearing in native_functions.yaml, most of them can be converted using ivalue’s API.
+    * IValue provides APIs to directly convert an IValue to these basic types. See [ivalue_inl.h](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/core/ivalue_inl.h#L1453-L1493)
+    * Here’s a [list](#bookmark=id.deyvpbsb5yel) of all the JIT types appearing in native_functions.yaml, most of them can be converted using IValue’s API.
     * Add a binding function between a JIT type to a piece of C++ code that converts IValue to a specific C++ type.
 * **JIT type -> IValue to ArrayRef type conversion C++ code. **IValue doesn’t provide explicit APIs for these ArrayRef types, but they are widely used in native_functions.yaml. 
     * We can use the meta programming logic ([make_boxed_from_unboxed_functor.h](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/core/boxing/impl/make_boxed_from_unboxed_functor.h#L354)) as reference, convert the ivalue to vector then to ArrayRef.
@@ -72,7 +72,7 @@ With the logic from the previous section, we should be able to wrap the code int
 
 * Wrap generated C++ code in [OperatorGenerator](https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/runtime/operator.h#L221) so that it gets registered into the registry. Generate code for all functions in [native_functions.yaml](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/native_functions.yaml). Code snippet as an example:
 ```cpp
-CodegenUnboxingWrappers.cpp
+RegisterCodegenUnboxedKernels.cpp
 ===================
 RegisterOperators reg({
    OperatorGenerator(
@@ -85,7 +85,7 @@ RegisterOperators reg({
    ),
 ...
 })
-CodegenFunctions.h
+UnboxingFunctions.h
 ===================
 namespace at {
 namespace unboxing {
@@ -95,7 +95,7 @@ TORCH_API at::Tensor get_device(Stack & stack);
 } // namespace unboxing
 } // namespace at
 
-CodegenFunctions.cpp
+UnboxingFunctions.cpp
 =====================
 namespace at {
 namespace unboxing {
@@ -128,7 +128,7 @@ TORCH_API at::Tensor get_device(Stack & stack) {
 * For the scenario of adding a new operator (not to `native_functions.yaml`), we need to provide clear guidance to add it to the JIT op registry as well, otherwise JIT execution will break.
 * We can add tests on the mobile build for the sake of coverage.
 
-For OSS mobile integration, we will need to have a new build flavor to switch between c10 dispatcher vs jit op registry. This new flavor will include codegen source files (`CodegenFunctions.h, CodegenFunctions.cpp, CodegenUnboxingWrappers.cpp`) instead of existing dispatcher related source files: `Operators.cpp`, `RegisterSchema.cpp `etc, similar to the internal build configuration.
+For OSS mobile integration, we will need to have a new build flavor to switch between c10 dispatcher vs jit op registry. This new flavor will include codegen source files (`UnboxingFunctions.h, UnboxingFunctions.cpp, RegisterCodegenUnboxedKernels.cpp`) instead of existing dispatcher related source files: `Operators.cpp`, `RegisterSchema.cpp `etc, similar to the internal build configuration. Again, this will be delivered as a build flavor for user to opt in, the dispatcher will be used by default.
 
 
 
@@ -259,7 +259,7 @@ There are 3 risks:
 
 ## Testing & Tooling Plan
 
-Expand existing tests on lite interpreter to cover codegen logic. Let the cpp test target depending on codegen unboxing library, test if a module forward result from JIT execution equals to the lite interpreter execution. Since JIT execution goes through metaprogramming unboxing and lite interpreter execution goes through codegen unboxing, we can make sure the correctness of codegen unboxing. Example:
+Expand existing tests on the mobile interpreter to cover codegen logic. Let the cpp test target depending on codegen unboxing library, test if a module forward result from JIT execution equals to the mobile interpreter execution. Since JIT execution goes through metaprogramming unboxing and mobile interpreter execution goes through codegen unboxing, we can make sure the correctness of codegen unboxing. Example:
 
 ```cpp
 TEST(LiteInterpreterTest, UpsampleNearest2d) {
@@ -285,7 +285,3 @@ TEST(LiteInterpreterTest, UpsampleNearest2d) {
  ASSERT_TRUE(resd.equal(refd));
 }
 ```
-
-## Appendix
-
-See design doc: [Lightweight operator registration & dispatching](https://docs.google.com/document/d/1XgJDhm0crrBNMRAwm5XXVnGvB7Z73qgsAzJTkt4FjAg/edit)
