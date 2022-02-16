@@ -6,6 +6,7 @@ We thought about possible solutions:
 * The other option (which is what we propose here) is to utilize the function schema yaml file to "declare" ops and then use the codegen framework to generate lightweight code for runtime execution.
 
 The essential point of this proposal is that the function schema DSL (which we use to declare the standard ATen ops) combined with the codegen framework (which we use to generate the registrations, dispatch stubs and other “glue” code for ATen ops) is the bare minimum set of reusable tools for building custom extensions that are compatible with the PyTorch ecosystem.
+
 # Motivation
 * **Performance**
   * For recent use cases of Edge interpreter, we need to satisfy more and more strict initialization latency requirements, where analysis shows op registration contributes to a large portion of it.
@@ -19,7 +20,7 @@ The essential point of this proposal is that the function schema DSL (which we u
   * For some of the edge use cases, we need to support custom implementations of ATen ops. With an extra op registration path such as codegen unboxing it is easier to hookup ops with custom native functions.
 
 # Overview
-  
+![codegen drawio](https://user-images.githubusercontent.com/8188269/154173938-baad9ee6-0e3c-40bb-a9d6-649137e3f3f9.png)
 Currently the lite interpreter (or Edge runtime) registers all ATen ops into the dispatcher and some other ops into the JIT op registry. At model inference time the interpreter will look for the operator name in the JIT op registry first, if not found then it will look into the dispatcher. This proposal **adds a build flavor that moves these ATen ops from dispatcher to JIT op registry** so that it’s easier to optimize (e.g., avoid schema parsing) and can also reduce dependencies. 
 
 The interpreter is looking for a boxed function but our native implementation is unboxed. We need “glue code” to hook up these two. This proposal **extends the capabilities of codegen to generate the unboxing wrappers for operators**, as well as the code to register them into the JIT op registry. The interpreter will call generated unboxing wrappers, inside these wrappers we pop out values from the stack, and delegate to the unboxed API.
@@ -63,11 +64,11 @@ These tasks will generate C++ code that pops ivalues out from a stack and casts 
 
 #### Codegen source file details
 
-With the logic from the previous section, we should be able to wrap the code into a function pointer and register it into [torch::jit::OperatorRegistry](https://fburl.com/code/bxu4rfem). 
+With the logic from the previous section, we should be able to wrap the code into a function pointer and register it into [torch::jit::OperatorRegistry](https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/runtime/operator.cpp#L19). 
 
 
 
-* Wrap generated C++ code in [OperatorGenerator](https://fburl.com/code/rdg601q8) so that it gets registered into the registry. Generate code for all functions in [native_functions.yaml](https://fburl.com/code/5hy194vj). Code snippet as an example:
+* Wrap generated C++ code in [OperatorGenerator](https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/runtime/operator.h#L221) so that it gets registered into the registry. Generate code for all functions in [native_functions.yaml](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/native_functions.yaml). Code snippet as an example:
 ```cpp
 CodegenUnboxingWrappers.cpp
 ===================
@@ -207,7 +208,7 @@ With step 2 finished we should have feature parity as the existing op registrati
 
 #### Avoid schema parsing at runtime
 
-As mentioned in step 1, we are registering an operator into the registry along with a schema string. We realized at the library initialization time we need to spend a lot of resources on schema parsing, according to the [profiling results](https://fburl.com/qdud9ni0) based on our prototype. We also noticed that the required information to instantiate a schema object are all available at codegen time, we can pass these data to the registry directly so that we can save time at runtime. For example:
+As mentioned in step 1, we are registering an operator into the registry along with a schema string. We realized at the library initialization time we need to spend a lot of resources on schema parsing, according to the profiling results based on our prototype. We also noticed that the required information to instantiate a schema object are all available at codegen time, we can pass these data to the registry directly so that we can save time at runtime. For example:
 
 
 ```
@@ -252,7 +253,7 @@ There are 3 risks:
     1. De-risked: from the prototype running on a target platform it is proved to save latency on initial load.
 2. Binary size regression. Need to make sure selective build works.
 3. Mobile use case requires features only available on dispatcher.
-    1. E.g., boxed fallback mechanism for [conj](https://fburl.com/ynkc32k2) operator.
+    1. E.g., boxed fallback mechanism for [conj](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/MathBitsFallback.h#L78) operator.
 
 ## Testing & Tooling Plan
 
