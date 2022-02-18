@@ -21,7 +21,9 @@ merged into the RFC repository as a markdown file. At that point the RFC is
  
 - Fork the rfcs repo: https://github.com/pytorch/rfcs
 - Copy `RFC-0000-template.md` to `RFC-00xx-my-feature.md`, or write your own open-ended proposal. Put care into the details.
-- Submit a pull request titled `RFC-OOxx-my-feature`. Assign the `commenting` label on the PR to open it for discussions. 
+- Submit a pull request titled `RFC-00xx-my-feature`. 
+    - Assign the `draft` label while composing the RFC. You may find it easier to use a WYSIWYG editor (like Google Docs) when working with a few close collaborators; feel free to use whatever platform you like. Ideally this document is publicly visible and is linked to from the PR.
+    - When opening the RFC for general discussion, copy your document into the `RFC-00xx-my-feature.md` file on the PR and assign the `commenting` label.
 - Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
     - If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
 - Once the discussion has settled, assign a new label based on the level of support:
