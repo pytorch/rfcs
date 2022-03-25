@@ -1,3 +1,4 @@
+
 <details>
 <summary>Instructions - click to expand</summary>
 
@@ -96,22 +97,22 @@ True
 ChannelsLast1d feature would benifit such as time series analysis models, deep learning model based on Lidar data, voice model wav2vec, etc.
 
 ## **Proposed Implementation**
-The general implementation principle is as below:
+### **Proposal 1:**
+The general implementation principle of proposal 1 is as below:
 1. ChannelsLast1d will align to the usage habits of ChannelsLast(2d) and ChannelsLast3d to provide consistent use experience;
 2. No extra bits are added in TensorImpl structure;
 3. Does not introduce any overhead for important function refresh_continguous(). It does not affect the computation of any original ChannelsLast(2d) and ChannelsLast3d associated flags;
 4. The feature is transparent to the end users if they don't use it, both in functionality and performance.
 
-
 The details are as follows:
 
-Regarding to 1: Users can use it as below:
+Regarding 1: Users can use it as below:
 ```
 _3d_tensor_cl = _3d_tensor.to(memory_format=torch.channels_last_1d)
 _4d_tensor_cl = _4d_tensor.to(memory_format=torch.channels_last)
 _5d_tensor_cl = _5d_tensor.to(memory_format=torch.channels_last_3d)
 ```
-Regarding to 2 and 3: As is known, for ChannelsLast(2d) and ChannelsLast3d, there are associated flags in TensorImpl structure as below:
+Regarding 2 and 3: As is known, for ChannelsLast(2d) and ChannelsLast3d, there are associated flags in TensorImpl structure as below:
 ```
   bool is_channels_last_ : 1;
   bool is_channels_last_contiguous_ : 1;
@@ -135,6 +136,49 @@ To avoide to introudce extra bits into TensorImpl structure, don't define such a
   }
 ```
 Regarding 4: If users don't use ChannelsLast1d, they don't need do anything. If user want to use ChannelsLast1d, they can get the same user experience as ChannelsLast(2d) and ChannelsLast3d.
+
+### **Proposal 2:**
+Although proposal 1 doesn't introduce extra bits in TensorImpl structure and any overhead for such as function refresh_continguous(), proposal 1 implementation is not smooth and elegant as ChannelsLast(2d) or ChannelsLast3d.
+Besides the overhead for refresh_continguous() is almost negligible. I'll explain it later. First of all, let's focus on proposal 2 implementation.
+1. ChannelsLast1d still align to the usage habits of ChannelsLast(2d) and ChannelsLast3d to provide consistent use experience;
+2. Only 2 extra bits are added in TensorImpl structure;
+3. Update function refresh_continguous() for ChannelsLast1d;
+4. The feature is still transparent to the end users if they don't use it.
+The details are as follows:
+
+Regarding 1: Users still use it as below:
+```
+_3d_tensor_cl = _3d_tensor.to(memory_format=torch.channels_last_1d)
+_4d_tensor_cl = _4d_tensor.to(memory_format=torch.channels_last)
+_5d_tensor_cl = _5d_tensor.to(memory_format=torch.channels_last_3d)
+```
+Regarding 2 : only add 2 extra bits in TensorImpl structure as below:
+```
+  bool is_channels_last_1d_ : 1; //<----------------
+  bool is_channels_last_1d_contiguous_ : 1; //<-----
+  bool is_channels_last_ : 1;
+  bool is_channels_last_contiguous_ : 1;
+  bool is_channels_last_3d_ : 1;
+  bool is_channels_last_3d_contiguous_ : 1;
+```
+Regarding 3: The key code snippet is as below:
+![image](https://user-images.githubusercontent.com/20220399/160040021-87d2bfbf-d55d-4ce7-a2a7-d1ec8213ceee.png)
+
+Let's carefully look at refresh_contiguous(). New added functions compute_channels_last_contiguous_1d() and compute_strides_like_channels_last_1d() for channels last 1d would not introduce additional computation for channels last 2d(4D tensor) or channels last 3d(5D tensor) in refresh_contiguous(). E.g.: suppose that we create a new 5D tensor to trigger refresh_contiguous() function, the call tree is as below:
+![image](https://user-images.githubusercontent.com/20220399/160042631-f3849565-fe68-49ac-97b5-e45643195254.png)
+
+**Although we call compute_channels_last_contiguous_1d() in refresh_contiguous for 5D tensor, it would not do any additional computation and directly return false(illustrated by red arrow above. dim == 5 would fall into default pass);**
+
+**Although we call compute_strides_like_channels_last_1d() in refresh_contiguous for 5D tensor, it would not do any additional computation and directly return false (illustrated by green arrow above. dim == 5 would fall into default pass).**
+
+Regarding 4: If users don't use ChannelsLast1d, they still don't need do anything. If user want to use ChannelsLast1d, they can get the same user experience as ChannelsLast(2d) and ChannelsLast3d.
+
+The 2 proposals are compared in the table below：
+
+|                |User friendly| TensorImpl modification|overhead of refresh_contiguous|implementation                   |
+|----------------|-------------|------------------------|------------------------------|---------------------------------|
+|Proposal 1      |Yes          |No                      |No                            |ugly                             |
+|Proposal 2      |Yes          |Yes, but only 2 bits    |No                            |elegant, align to ChannelsLast3d |
 
 
 ## **Metrics **
