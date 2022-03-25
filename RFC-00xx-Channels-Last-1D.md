@@ -187,7 +187,7 @@ As is known, channels last format has better performance than channels first for
 
 
 ## **Alternatives**
-We have considered to add such as ```bool is_channels_last_1d_ : 1; bool is_channels_last_1d_contiguous_ : 1;``` into TensorImpl, and update their values by refresh_contiguous() function, however, refresh_contiguous() is used to create all new tensors, even when people aren't interested in channels-last 1d support. This alternative implementation may introduce overhead for Pytorch.
+See Proposal 2.
 
 
 ## **How we teach this**
