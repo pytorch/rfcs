@@ -141,7 +141,7 @@ Regarding 4: If users don't use ChannelsLast1d, they don't need do anything. If 
 Although proposal 1 doesn't introduce extra bits in TensorImpl structure and any overhead for such as function refresh_continguous(), proposal 1 implementation is not smooth and elegant as ChannelsLast(2d) or ChannelsLast3d.
 Besides the overhead for refresh_continguous() is almost negligible. I'll explain it later. First of all, let's focus on proposal 2 implementation.
 1. ChannelsLast1d still align to the usage habits of ChannelsLast(2d) and ChannelsLast3d to provide consistent use experience;
-2. Only 2 extra bits are added in TensorImpl structure;
+2. Only 2 extra bits are added in TensorImpl structure; (Note: There are 11 bit fields before. Although 2 extra bit fields are added, 11 bit fields and 13 (11+2) bit fields demand the same number of bytes. In other words, these 2 bit fields actually don’t add more bytes to the TensorImpl. There is no impact from adding two bit fields at all.)
 3. Update function refresh_continguous() for ChannelsLast1d;
 4. The feature is still transparent to the end users if they don't use it.
 The details are as follows:
