@@ -1,43 +1,46 @@
-# PyTorch RFCs
+This page contains instructions on how to propose and implement feature changes to PyTorch.
 
-The RFC (request for comments) is a structured document that allows community members 
-to propose an idea to everyone before it is implemented. RFCs enable stakeholders 
-to be aware and confident about the direction PyTorch is evolving in.
+# Proposing a Feature to Pytorch
 
-Many changes, including bug fixes and documentation improvements can be
+To propose a new feature, you’ll submit a Request For Comments (RFC).  This RFC is basically a design proposal where you can share a detailed description of what change you want to make, why it’s needed, and how you propose to implement it.
+
+It’s easier to make changes while your feature is in the ideation phase vs the PR phase, and this doc gives core maintainers an opportunity to suggest refinements before you start code.  For example, they may know of other planned efforts that your work would otherwise collide with, or they may suggest implementation changes that make your feature more broadly usable.
+
+Smaller changes, including bug fixes and documentation improvements can be
 implemented and reviewed via the normal GitHub pull request workflow on the main PyTorch repo.
 
 RFCs are more suitable for design proposals that are too large to discuss on a feature-request issue, 
 like adding a new abstraction, or if a discussion about the tradeoffs involved in a new addition are non-trivial.
 
-If you are unsure whether something should be an RFC or a feature-request issue, 
-please open an issue in the main PyTorch repository first to discuss.
+If you are unsure whether something should be an RFC or a feature-request issue, you can ask by 
+opening an issue in the main PyTorch/PyTorch repository.
 
+# The Request for Comments
 
-## What the process is
-In short, to get a major feature added to PyTorch, one must first get the RFC
-merged into the RFC repository as a markdown file. At that point the RFC is
-"active" and may be implemented with the goal of eventual inclusion into PyTorch.
- 
-- Fork the rfcs repo: https://github.com/pytorch/rfcs
-- Copy `RFC-0000-template.md` to `RFC-00xx-my-feature.md`, or write your own open-ended proposal. Put care into the details.
-- Submit a pull request titled `RFC-00xx-my-feature`. 
-    - Assign the `draft` label while composing the RFC. You may find it easier to use a WYSIWYG editor (like Google Docs) when working with a few close collaborators; feel free to use whatever platform you like. Ideally this document is publicly visible and is linked to from the PR.
-    - When opening the RFC for general discussion, copy your document into the `RFC-00xx-my-feature.md` file on the PR and assign the `commenting` label.
-- Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
-    - If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
-- Once the discussion has settled, assign a new label based on the level of support:
-    - `accepted` if a decision has been made in the RFC
-    - `draft` if the author needs to rework the RFC’s proposal
-    - `shleved `if there are no plans to move ahead with the current RFC’s proposal
-- A state of `accepted` means that the core team has agreed in principle to the proposal, and it is ready for implementation. 
-- The author (or any interested developer) should next open a tracking issue on Github corresponding to the RFC.
-    - This tracking issue should contain the implementation next steps. Link to this tracking issue on the RFC (in the Resolution > Next Steps section)
-- Once all relevant PRs are merged, the RFC’s status label can be finally updated to `closed`.
+## Step 1: Create an RFC
+RFCs are located in their own repository.  
 
+To create one:
 
-## Build consensus
-Before working on an RFC, it might be useful to gauge interest by posting on either [PyTorch Issues](https://github.com/pytorch/pytorch/issues), the [developer forum](https://dev-discuss.pytorch.org/c/rfc-chatter), or the [Slack channel](https://bit.ly/ptslack). Identifying interested stakeholders ([CODEOWNERS](https://github.com/pytorch/pytorch/blob/master/CODEOWNERS)) early on can ease consensus building.
+1. For the https://github.com/pytorch/rfcs repository
+2. Copy the template file `RFC-0000-template.md` to `RFC-00xx-your-feature.md` and fill it out with your proposal. The template is a guideline, feel free to add sections as appropriate
+3. You may also have the template simply link to another editor, like a Google Docs file, but please ensure that the document is publicly visible.  This can make the template easier to add edit, but commenting doesn’t scale very well, so please use this option with caution.
+
+## Step 2: Get Feedback on the RFC
+1. Submit a pull request titled `RFC-00xx-your-feature.md`
+2. Before your PR is ready for review, give it the draft label.
+3. Once it’s ready for review, remove the draft label and give it the `commenting` label
+4. File an issue against the https://github.com/pytorch/pytorch repository to review your proposal.
+5. In the description, include a short summary of your feature and a link to your RFC PR
+6. Pytorch Triage review will route your issue to core contributors with the appropriate expertise.
+7. Build consensus. Those core contributors will review your PR and offer feedback. Revise your proposal as needed until everyone agrees on a path forward. Additional forums you can share the proposal on include the [developer forum](https://dev-discuss.pytorch.org/c/rfc-chatter), and the [Slack channel](https://bit.ly/ptslack). Tagging interested stakeholders (identifiable via [CODEOWNERS](https://github.com/pytorch/pytorch/blob/master/CODEOWNERS)) can help with consensus building.
+
+_(Note: A proposal may get rejected if it comes with unresolvable drawbacks or if it’s against the long term plans of the pytorch maintiners)_
+
+## Step 3: Implement your Feature
+1. If your RFC PR is accepted, you can merge it into the [pytorch/rfcs](https://github.com/pytorch/rfcs) repository and begin working on the implementation.
+2. When you submit PRs to implement your proposal, remember to link to your RFC to help reviewers catch up on the context.
+
 
 
 ## Implementing an RFC
