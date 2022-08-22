@@ -1,46 +1,48 @@
 # RFC: PyTorch DistributedTensor
 
-We proposed distributed tensor primitives to allow easier distributed computation authoring in SPMD manner, the primitives are simple but powerful to express tensor distributions with both sharding and replication strategies. This could empower native PyTorch Tensor Parallelism and advanced parallelism explorations. For example, to shard a big tensor across devices with 3 lines of code:
+We propose distributed tensor primitives to allow easier distributed computation authoring in SPMD(Single Program Multiple Devices) paradigm. The primitives are simple but powerful when used to express tensor distributions with both sharding and replication parallelism strategies. This could empower native Tensor parallelism among other advanced parallelism explorations. For example, to shard a big tensor across devices with 3 lines of code:
 
 ```python
 import torch  
 from torch.distributed import DeviceMesh, Shard, distribute_tensor  
   
+# Create a mesh topology with the available devices.
 mesh = DeviceMesh("cuda", list(range(world_size)))  
 big_tensor = torch.randn(100000, 88)  
+# Shard this tensor over the mesh by sharding `big_tensor`'s 0th dimension over the 0th dimension of `mesh`.
 distribute_tensor(big_tensor, mesh, [Shard(dim=0)])
 ```
 
-To see a complete design doc for this proposal, please refer to https://docs.google.com/document/d/1nFeJ8NSFNhNlCkNgWK31ZGRqm1L9rd0i_XN_RprphaI/edit#heading=h.6sovjqv9jiqn
+To see a complete design doc for this proposal, please refer to this [doc](https://docs.google.com/document/d/1nFeJ8NSFNhNlCkNgWK31ZGRqm1L9rd0i_XN_RprphaI/edit#heading=h.6sovjqv9jiqn)
 
 ## Motivation
 
-Today there are mainly three ways to scale up distributed training: Data Parallel, Tensor Parallel and Pipeline Parallel. Each of them works on a separate dimension where solutions have been built independently (i.e. PyTorch DDP, FSDP, ShardedTensor, PiPPy, etc.). When training really large models, users would like to use these technologies together (i.e. 3-D Parallelism), while the interoperability of the existing solutions are not great and often hard to use (i.e. users might want arbitrary combinations of the data parallel, tensor parallel and pipeline parallel). This is becoming an issue for users and one of the biggest reasons is that there’s no common abstractions that build the bridge between different parallel strategies.
+Today there are mainly three ways to scale up distributed training: Data Parallel, Tensor Parallel and Pipeline Parallel. Each of them works on a separate dimension where solutions have been built independently (i.e. PyTorch DDP, FSDP, ShardedTensor, PiPPy, etc.). When training really large models, users would like to use these technologies together (i.e. 3-D Parallelism), while the interoperability of the existing solutions are not great and often hard to use (i.e. users might want arbitrary combinations of the data parallel, tensor parallel and pipeline parallel). This is becoming an issue for users and one of the biggest reasons is that there’s no common abstractions that build the bridge between different parallelism strategies.
 
 An ideal scenario is that users could just build their models like in a single node/device, without worrying about how to do distributed training in a cluster, and our solutions could help them run distributed training in an efficient manner. For example, researchers just need to build their big transformer model, and PyTorch Distributed automatically figures out how to split the model and run pipeline parallel across different nodes, how to run data parallel and tensor parallel within each node. In order to achieve this, we need to translate a single device model into a distributed version and train/serve it with our runtime. To represent the distributed version of the model and facilitate translations, we need some common abstractions to represent distribution and computation.
   
-There're many recent works that working on tensor level parallelism to provide common abstractions, see the `Related Works` in the last section for more details. Inspired by [GSPMD](https://arxiv.org/pdf/2105.04663.pdf), [Oneflow](https://arxiv.org/pdf/2110.15032.pdf) and [TF’s DTensor](https://www.tensorflow.org/guide/dtensor_overview), we introduce a DistributedTensor concept to represent generic data distributions across hosts. DistributedTensor is the next evolution of ShardedTensor and provides basic abstractions to distribute storage and compute. It serves as one of the basic building blocks for distributed program translations and describes the layout of a distributed training program. With the DistributedTensor abstraction, we can build different parallelism strategies in a easy way, including generic tensor parallelism, or DDP/FSDP parallelism patterns.
+There're many recent works that working on tensor level parallelism to provide common abstractions, see the `Related Works` in the last section for more details. Inspired by [GSPMD](https://arxiv.org/pdf/2105.04663.pdf), [Oneflow](https://arxiv.org/pdf/2110.15032.pdf) and [TF’s DTensor](https://www.tensorflow.org/guide/dtensor_overview), we introduce a DistributedTensor concept to represent generic data distributions across hosts. DistributedTensor is the next evolution of ShardedTensor and provides basic abstractions to distribute storage and compute. It serves as one of the basic building blocks for distributed program translations and describes the layout of a distributed training program. With the DistributedTensor abstraction, we can seamlessly build parallelism strategies such as tensor parallelism, DDP and FSDP.
 
 ## Value Propsition
 
-The primary value of DistributedTensor includes:
--   Offers a uniform way to save/load state dict during checkpointing, even when there’re complex data distribution strategies
--   DistributedTensor could natively offer Tensor Parallelism solution in eager mode, just like our current ShardedTensor solution. Moreover, it gives additional flexibility for advanced users who want to mix sharding and replication.
--   DistributedTensor could be used as a basic building block of a compiler based solution to do distributed training    
+DistributedTensor primarily:
+-   Offers a uniform way to save/load state dict during checkpointing, even when there’re complex data distribution strategies such as combing tensor parallelism with parameter sharding in FSDP.
+-   Could natively offer Tensor Parallelism solution in eager mode, just like our current ShardedTensor solution. Moreover, it gives additional flexibility for advanced users who want to mix sharding and replication.
+-   Could be used as a basic building block of a compiler based solution to do distributed training    
 -   DistributedTensor could act as a SPMD programming model entry point for ML System Engineers, providing good UX to mix up different types of parallelism.
 
-## PyTorch Distributed Tensor
+## PyTorch DistributedTensor
 
 ### DistributedTensor API
 
-We offer both lower level DistributedTensor API and module level API to create nn.Module with “distributed” parameters.
+We offer both a lower level DistributedTensor API and a module level API to create a `nn.Module` with “distributed” parameters.
 
 #### Basic DistributedTensor API Examples
 
-Here are some basic DistributedTensor level API examples that showcase: 
-1.  How to construct a DistributedTensor directly, to represent different types of sharding, replication, sharding + replication
-2. How to create DistributedTensor from a local torch.Tensor
-3. How to “reshard” an existing DistributedTensor to a different DistributedTensor with different placement strategy, or world size.
+Here are some basic DistributedTensor API examples that showcase: 
+1. How to construct a DistributedTensor directly, to represent different types of sharding, replication, sharding + replication strategies.
+2. How to create DistributedTensor from a local `torch.Tensor`.
+3. How to “reshard” an existing DistributedTensor to a different DistributedTensor with modified placement strategy or world size.
 
 ```python
 import torch  
