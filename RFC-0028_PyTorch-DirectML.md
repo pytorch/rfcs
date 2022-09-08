@@ -1,31 +1,3 @@
-
-
-<details>
-<summary>Instructions - click to expand</summary>
-
-- Fork the rfcs repo: https://github.com/pytorch/rfcs
-- Copy `RFC-0000-template.md` to `RFC-00xx-my-feature.md`, or write your own open-ended proposal. Put care into the details.
-- Submit a pull request titled `RFC-00xx-my-feature`. 
-    - Assign the `draft` label while composing the RFC. You may find it easier to use a WYSIWYG editor (like Google Docs) when working with a few close collaborators; feel free to use whatever platform you like. Ideally this document is publicly visible and is linked to from the PR.
-    - When opening the RFC for general discussion, copy your document into the `RFC-00xx-my-feature.md` file on the PR and assign the `commenting` label.
-- Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
-    - If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
-- Once the discussion has settled, assign a new label based on the level of support:
-    - `accepted` if a decision has been made in the RFC
-    - `draft` if the author needs to rework the RFC’s proposal
-    - `shelved` if there are no plans to move ahead with the current RFC’s proposal. We want neither to think about evaluating the proposal
-nor about implementing the described feature until some time in the future.
-- A state of `accepted` means that the core team has agreed in principle to the proposal, and it is ready for implementation. 
-- The author (or any interested developer) should next open a tracking issue on Github corresponding to the RFC.
-    - This tracking issue should contain the implementation next steps. Link to this tracking issue on the RFC (in the Resolution > Next Steps section)
-- Once all relevant PRs are merged, the RFC’s status label can be finally updated to `closed`.
-
-</details>
-
-
-
-
-
 # DirectML Backend for PyTorch on Windows and Windows Subsystem for Linux
 
 **Authors:**
@@ -64,8 +36,7 @@ The PyTorch dispatcher routes ATen functions to registered DirectML kernels when
 The registration for DirectML supported operators is performed using the torchgen/gen_backend_stubs.py utility.
 The resulting generated registrations are built into the backend using the torch.utils.cppextension (https://pytorch.org/tutorials/advanced/cpp_extension.html).
 Currently 330 operators have been implemented in our pre-releases.
-See the “Currently supported operators” section for more information about current support.
-See the “Release Plan” section for the roadmap to reaching 100% operator compliance.
+
 
 ### Device Enumeration
 Since DirectML works on a wide spectrum of hardware, we will also offer enumeration APIs to help users pick the appropriate device for training. 
@@ -108,7 +79,7 @@ Hardware (Support any DX12 capable device, but test the following IHV configurat
 - Qualcomm Adreno 680
 
 ## Documentation
-Currently, we have documentation pages for Windows and WSL here. We would like to have a documentation page on pytorch.org similar to the XLA page. 
+Currently, we have documentation pages for Windows and WSL here (https://docs.microsoft.com/en-us/windows/ai/directml/gpu-pytorch-windows). We would like to have a documentation page on pytorch.org similar to the XLA page. 
 
 ## Release Plan
 The PyTorch+DirectML backend will be distributed as torch_directml, a single python package on PyPI.
