@@ -1,8 +1,8 @@
 # DirectML Backend for PyTorch on Windows and Windows Subsystem for Linux
 
 **Authors:**
-* @nickname
-* @nickname 
+* @Adele101
+* @smk2007 
 
 
 ## Background
