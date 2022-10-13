@@ -247,12 +247,22 @@ corresponding Python signature on the right.
 #### Warning APIs
 
 **`TORCH_WARN(...)`** - `torch.warn(*args)`
-  - C++ warning: `c10::Warning`
+  - C++ warning: `c10::UserWarning`
   - Python warning: `UserWarning`
 
 **`TORCH_WARN_ONCE(...)`** - `torch.warn_once(*args)`
-  - C++ warning: `c10::Warning`
+  - C++ warning: `c10::UserWarning`
   - Python warning: `UserWarning`
+  - For a given callsite, the warning is emitted only upon the first time it is
+    called.
+
+**`TORCH_WARN_DEPRECATION(...)`** - `torch.warn_deprecation(*args)`
+  - C++ warning: `c10::DeprecationWarning`
+  - Python warning: `UserWarning`
+
+**`TORCH_WARN_DEPRECATION_ONCE(...)`** - `torch.warn_deprecation_once(*args)`
+  - C++ warning: `c10::DeprecationWarning`
+  - Python warning: `DeprecationWarning`
   - For a given callsite, the warning is emitted only upon the first time it is
     called.
 
