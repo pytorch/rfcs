@@ -46,6 +46,8 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.log10
   * torch.log1p
   * torch.log2
+  * torch.xlog1py
+  * torch.xlogy
 * Trigonometric Functions
   * torch.sin
   * torch.cos
