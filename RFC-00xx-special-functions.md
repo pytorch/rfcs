@@ -36,18 +36,15 @@ There’s no formal definition of a “special function.” Colloquially, and fo
 
 Unlike “special functions,”  “elementary functions” have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing a function as an elementary function if the function is one of the following functions:
 
-* Arithmetic
-* Greatest Common Divisor
-* Hyperbolic
-* Inverse Hyperbolic
-* Inverse Trigonometric
-* Least Common Multiple
-* Logarithmic
-* Logical
-* Partitions
-* Power
+* Power Functions
+* Exponential Functions
+* Logarithmic Functions
+* Trigonometric Functions
+* Inverse Trigonometric Functions
+* Hyperbolic Functions
+* Inverse Hyperbolic Functions
+* Greatest Common Divisor and Least Common Multiple
 * Rounding and Congruence Functions
-* Trigonometric
 
 ## Special Function Policies
 
