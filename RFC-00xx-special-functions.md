@@ -80,7 +80,7 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.asech
 * Product Logarithms
 * Roots
-  * *See the `torch.root` section for the proposed operator*
+  * `torch.root` *See the “Polynomial Root” section for the proposed operator*
 * Maximum and Minimum
   * torch.max
   * torch.min
