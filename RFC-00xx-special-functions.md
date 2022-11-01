@@ -96,6 +96,7 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.remainder
   * torch.round
 * Partitions
+  * `torch.partition_p` *See the “Partition Function” section for the proposed operator*
 * Tensorial Functions
   * `torch.dirac_delta` *See the “Dirac Delta” section for the proposed operator*
   * `torch.kronecker_delta` *See the “Kronecker Delta” section for the proposed operator*
