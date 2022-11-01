@@ -15,7 +15,7 @@ This RFC proposes:
 * a coherent philosophy for PyTorch’s special functions module ([torch.special](https://pytorch.org/docs/stable/special.html)) that clearly distinguishes PyTorch’s elementary from special functions; and
 * a set of new [torch](https://pytorch.org/docs/stable/torch.html) and [torch.special](https://pytorch.org/docs/stable/special.html) operators that provide a robust numerical foundation for PyTorch and adhere to the aforementioned philosophy.
 
-This feature has two audiences:
+## Motivation
 
 PyTorch users:
 
@@ -26,8 +26,6 @@ PyTorch maintainers:
 * provides much needed standardization to committing future operators to PyTorch.
 * provides an extremely useful set of operators that can and should be used for tricky numerical problems (e.g., implementing challenging distribution functions and gradients) and useful decomposition targets.
  
-## Motivation
-
 ### Special Functions
 
 There’s no formal definition of a *special function*. Colloquially, and for the purpose of this RFC, a special function is a non-elementary function that has an established name and notation due to its importance and ubiquity.
