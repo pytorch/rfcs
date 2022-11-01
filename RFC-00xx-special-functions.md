@@ -6,6 +6,291 @@ _Author’s note—This RFC is a work-in-progress._
 
 * Allen Goodman (@0x00b1)
 
+## Table of Contents
+
+* [Summary](#summary)
+* [Motivation](#motivation)
+* [Special Functions](#special-functions-1)
+  + [Elementary Functions](#elementary-functions)
+  + [Special Functions](#special-functions-2)
+    - [Naming Policy](#naming-policy)
+* [Implementation](#implementation)
+  + [c10](#c10)
+    - [Constants](#constants)
+    - [Functions](#functions)
+      * [Lanczos Approximation](#lanczos-approximation)
+      * [Spouge’s approximation](#spouge-s-approximation)
+      * [Stirling’s Approximation](#stirling-s-approximation)
+  + [ATen](#aten)
+    - [CPU](#cpu)
+    - [CUDA](#cuda)
+  + [torch](#torch)
+* [C++ API](#c---api)
+* [Python API](#python-api)
+  + [Factorials](#factorials)
+    - [Factorial](#factorial)
+    - [Natural Logarithm of Factorial](#natural-logarithm-of-factorial)
+    - [Double Factorial](#double-factorial)
+    - [Natural Logarithm of Double Factorial](#natural-logarithm-of-double-factorial)
+    - [Rising Factorial](#rising-factorial)
+    - [Natural Logarithm of Rising Factorial](#natural-logarithm-of-rising-factorial)
+    - [Falling Factorial](#falling-factorial)
+    - [Natural Logarithm of Falling Factorial](#natural-logarithm-of-falling-factorial)
+  + [Combinatorial Numbers and Functions](#combinatorial-numbers-and-functions)
+    - [Binomial Coefficient](#binomial-coefficient)
+    - [Natural Logarithm of Binomial Coefficient](#natural-logarithm-of-binomial-coefficient)
+    - [Catalan Number](#catalan-number)
+    - [Stirling Number of the First Kind](#stirling-number-of-the-first-kind)
+    - [Stirling Number of the Second Kind](#stirling-number-of-the-second-kind)
+    - [Bell Number](#bell-number)
+    - [Delannoy Number](#delannoy-number)
+    - [Motzkin Number](#motzkin-number)
+    - [Narayana Number](#narayana-number)
+    - [Schröder Number](#schr-der-number)
+  + [Gamma and Related Functions](#gamma-and-related-functions)
+    - [Gamma Function](#gamma-function)
+    - [Reciprocal Gamma Function](#reciprocal-gamma-function)
+    - [Polygamma Function](#polygamma-function)
+    - [Digamma Function](#digamma-function)
+    - [Trigamma Function](#trigamma-function)
+    - [Natural Logarithm of the Gamma Function](#natural-logarithm-of-the-gamma-function)
+    - [Sign of the Gamma Function](#sign-of-the-gamma-function)
+    - [Beta Function](#beta-function)
+    - [Natural Logarithm of the Beta Function](#natural-logarithm-of-the-beta-function)
+  + [Exponential and Logarithmic Integrals](#exponential-and-logarithmic-integrals)
+    - [Exponential Integral, $\operatorname{Ein}$](#exponential-integral----operatorname-ein--)
+    - [Exponential Integral, $\operatorname{Ei}$](#exponential-integral----operatorname-ei--)
+    - [Exponential Integral, $E_{1}$](#exponential-integral---e--1--)
+    - [Exponential Integral, $E_{n}$](#exponential-integral---e--n--)
+    - [Logarithmic Integral](#logarithmic-integral)
+  + [Error and Related Functions](#error-and-related-functions)
+    - [Error Function](#error-function)
+    - [Complementary Error Function](#complementary-error-function)
+    - [Imaginary Error Function](#imaginary-error-function)
+    - [Inverse Error Function](#inverse-error-function)
+    - [Inverse Complementary Error Function](#inverse-complementary-error-function)
+  + [Dawson and Fresnel Integrals](#dawson-and-fresnel-integrals)
+    - [Dawson’s Integral](#dawson-s-integral)
+    - [Sine Fresnel Integral](#sine-fresnel-integral)
+    - [Cosine Fresnel Integral](#cosine-fresnel-integral)
+  + [Trigonometric and Hyperbolic Integrals](#trigonometric-and-hyperbolic-integrals)
+    - [Sine Integral ($operatorname{Sin}$)](#sine-integral---operatorname-sin---)
+    - [Sine Integral ($\operatorname{Si}$)](#sine-integral----operatorname-si---)
+    - [Cosine Integral ($\operatorname{Cin}$)](#cosine-integral----operatorname-cin---)
+    - [Cosine Integral ($\operatorname{Ci}$)](#cosine-integral----operatorname-ci---)
+    - [Hyperbolic Sine Integral](#hyperbolic-sine-integral)
+    - [Hyperbolic Cosine Integral](#hyperbolic-cosine-integral)
+  + [Incomplete Gamma and Related Functions](#incomplete-gamma-and-related-functions)
+    - [Incomplete Gamma Function ($\gamma$)](#incomplete-gamma-function----gamma--)
+    - [Incomplete Gamma Function ($\Gamma$)](#incomplete-gamma-function----gamma--)
+    - [Incomplete Beta Function](#incomplete-beta-function)
+  + [Airy Functions](#airy-functions)
+    - [Airy Function of the First Kind](#airy-function-of-the-first-kind)
+    - [Airy Function of the Second Kind](#airy-function-of-the-second-kind)
+    - [Derivative of the Airy Function of the First Kind](#derivative-of-the-airy-function-of-the-first-kind)
+    - [Derivative of the Airy Function of the Second Kind](#derivative-of-the-airy-function-of-the-second-kind)
+    - [Exponentially Scaled Airy Function of the First Kind](#exponentially-scaled-airy-function-of-the-first-kind)
+    - [Exponentially Scaled Airy Function of the Second Kind](#exponentially-scaled-airy-function-of-the-second-kind)
+    - [Exponentially Scaled Derivative of the Airy Function of the First Kind](#exponentially-scaled-derivative-of-the-airy-function-of-the-first-kind)
+    - [Exponentially Scaled Derivative of the Airy Function of the Second Kind](#exponentially-scaled-derivative-of-the-airy-function-of-the-second-kind)
+  + [Bessel Functions](#bessel-functions)
+    - [Bessel Function of the First Kind](#bessel-function-of-the-first-kind)
+    - [Bessel Function of the First Kind of Order 0](#bessel-function-of-the-first-kind-of-order-0)
+    - [Bessel Function of the First Kind of Order 1](#bessel-function-of-the-first-kind-of-order-1)
+    - [Bessel Function of the Second Kind](#bessel-function-of-the-second-kind)
+    - [Bessel Function of the Second Kind of Order 0](#bessel-function-of-the-second-kind-of-order-0)
+    - [Bessel Function of the Second Kind of Order 1](#bessel-function-of-the-second-kind-of-order-1)
+  + [Hankel Functions](#hankel-functions)
+    - [Hankel Function of the First Kind](#hankel-function-of-the-first-kind)
+    - [Hankel Function of the Second Kind](#hankel-function-of-the-second-kind)
+  + [Modified Bessel Functions](#modified-bessel-functions)
+    - [Modified Bessel Function of the First Kind](#modified-bessel-function-of-the-first-kind)
+    - [Modified Bessel Function of the First Kind of Order 0](#modified-bessel-function-of-the-first-kind-of-order-0)
+    - [Modified Bessel Function of the First Kind of Order 1](#modified-bessel-function-of-the-first-kind-of-order-1)
+    - [Modified Bessel Function of the Second Kind](#modified-bessel-function-of-the-second-kind)
+    - [Modified Bessel Function of the Second Kind of Order 0](#modified-bessel-function-of-the-second-kind-of-order-0)
+    - [Modified Bessel Function of the Second Kind of Order 1](#modified-bessel-function-of-the-second-kind-of-order-1)
+  + [Spherical Bessel Functions](#spherical-bessel-functions)
+    - [Spherical Bessel Function of the First Kind](#spherical-bessel-function-of-the-first-kind)
+    - [Spherical Bessel Function of the First Kind of Order 0](#spherical-bessel-function-of-the-first-kind-of-order-0)
+    - [Spherical Bessel Function of the First Kind of Order 1](#spherical-bessel-function-of-the-first-kind-of-order-1)
+    - [Spherical Bessel Function of the Second Kind](#spherical-bessel-function-of-the-second-kind)
+    - [Spherical Bessel Function of the Second Kind of Order 0](#spherical-bessel-function-of-the-second-kind-of-order-0)
+    - [Spherical Bessel Function of the Second Kind of Order 1](#spherical-bessel-function-of-the-second-kind-of-order-1)
+  + [Spherical Hankel Functions](#spherical-hankel-functions)
+    - [Spherical Hankel Function of the First Kind](#spherical-hankel-function-of-the-first-kind)
+    - [Spherical Hankel Function of the Second Kind](#spherical-hankel-function-of-the-second-kind)
+  + [Modified Spherical Bessel Functions](#modified-spherical-bessel-functions)
+    - [Modified Spherical Bessel Function of the First Kind](#modified-spherical-bessel-function-of-the-first-kind)
+    - [Modified Spherical Bessel Function of the First Kind of Order 0](#modified-spherical-bessel-function-of-the-first-kind-of-order-0)
+    - [Modified Spherical Bessel Function of the First Kind of Order 1](#modified-spherical-bessel-function-of-the-first-kind-of-order-1)
+    - [Modified Spherical Bessel Function of the Second Kind](#modified-spherical-bessel-function-of-the-second-kind)
+    - [Modified Spherical Bessel Function of the Second Kind of Order 0](#modified-spherical-bessel-function-of-the-second-kind-of-order-0)
+    - [Modified Spherical Bessel Function of the Second Kind of Order 1](#modified-spherical-bessel-function-of-the-second-kind-of-order-1)
+  + [Kelvin Functions](#kelvin-functions)
+    - [Kelvin Function of the First Kind ($\operatorname{ber}$)](#kelvin-function-of-the-first-kind----operatorname-ber---)
+    - [Kelvin Function of the First Kind ($\operatorname{bei}$)](#kelvin-function-of-the-first-kind----operatorname-bei---)
+    - [Kelvin Function of the Second Kind ($\operatorname{kei}$)](#kelvin-function-of-the-second-kind----operatorname-kei---)
+    - [Kelvin Function of the Second Kind ($\operatorname{ker}$)](#kelvin-function-of-the-second-kind----operatorname-ker---)
+  + [Struve and Modified Struve Functions](#struve-and-modified-struve-functions)
+    - [Struve Function](#struve-function)
+    - [Modified Struve Function](#modified-struve-function)
+  + [Lommel Functions](#lommel-functions)
+    - [Lommel Function of the First Kind](#lommel-function-of-the-first-kind)
+    - [Lommel Function of the Second Kind](#lommel-function-of-the-second-kind)
+  + [Anger and Weber Functions](#anger-and-weber-functions)
+    - [Anger Function](#anger-function)
+    - [Weber Function](#weber-function)
+  + [Parabolic Cylinder Function](#parabolic-cylinder-function)
+  + [Confluent Hypergeometric Functions](#confluent-hypergeometric-functions)
+    - [Confluent Hypergeometric Function of the First Kind](#confluent-hypergeometric-function-of-the-first-kind)
+    - [Confluent Hypergeometric Function of the Second Kind](#confluent-hypergeometric-function-of-the-second-kind)
+  + [Whittaker Functions](#whittaker-functions)
+    - [Whittaker Function ($M_{\kappa, \mu}$)](#whittaker-function---m---kappa---mu---)
+    - [Whittaker Function ($W_{\kappa, \mu}$)](#whittaker-function---w---kappa---mu---)
+  + [Legendre Functions](#legendre-functions)
+    - [Legendre Function of the First Kind](#legendre-function-of-the-first-kind)
+    - [Legendre Function of the Second Kind](#legendre-function-of-the-second-kind)
+  + [Associated Legendre Functions](#associated-legendre-functions)
+    - [Associated Legendre Function of the First Kind](#associated-legendre-function-of-the-first-kind)
+    - [Associated Legendre Function of the Second Kind](#associated-legendre-function-of-the-second-kind)
+  + [Ferrers Functions](#ferrers-functions)
+    - [Ferrers Function of the First Kind](#ferrers-function-of-the-first-kind)
+    - [Ferrers Function of the Second Kind](#ferrers-function-of-the-second-kind)
+  + [Appell Functions](#appell-functions)
+    - [Appell Function $\left(F_{1}\right)$](#appell-function---left-f--1--right--)
+    - [Appell Function $\left(F_{2}\right)$](#appell-function---left-f--2--right--)
+    - [Appell Function $\left(F_{3}\right)$](#appell-function---left-f--3--right--)
+    - [Appell Function $\left(F_{4}\right)$](#appell-function---left-f--4--right--)
+  + [$q$-Hypergeometric and Related Functions](#-q--hypergeometric-and-related-functions)
+    - [$q$-Factorial](#-q--factorial)
+    - [$q$-Binomial Coefficient](#-q--binomial-coefficient)
+    - [$q$-Gamma Function](#-q--gamma-function)
+    - [$q$-Digamma Function](#-q--digamma-function)
+    - [$q$-Polygamma Function](#-q--polygamma-function)
+  + [Chebyshev Polynomials](#chebyshev-polynomials)
+    - [Chebyshev Polynomial of the First Kind](#chebyshev-polynomial-of-the-first-kind)
+    - [Chebyshev Polynomial of the Second Kind](#chebyshev-polynomial-of-the-second-kind)
+    - [Chebyshev Polynomial of the Third Kind](#chebyshev-polynomial-of-the-third-kind)
+    - [Chebyshev Polynomial of the Fourth Kind](#chebyshev-polynomial-of-the-fourth-kind)
+  + [Shifted Chebyshev Polynomials](#shifted-chebyshev-polynomials)
+    - [Shifted Chebyshev Polynomial of the First Kind](#shifted-chebyshev-polynomial-of-the-first-kind)
+    - [Shifted Chebyshev Polynomial of the Second Kind](#shifted-chebyshev-polynomial-of-the-second-kind)
+    - [Shifted Chebyshev Polynomial of the Third Kind](#shifted-chebyshev-polynomial-of-the-third-kind)
+    - [Shifted Chebyshev Polynomial of the Fourth Kind](#shifted-chebyshev-polynomial-of-the-fourth-kind)
+  + [Hermite Polynomials](#hermite-polynomials)
+    - [Probabilist’s Hermite Polynomial](#probabilist-s-hermite-polynomial)
+    - [Physicist’s Hermite Polynomial](#physicist-s-hermite-polynomial)
+  + [Legendre Forms of Elliptic Integrals](#legendre-forms-of-elliptic-integrals)
+    - [Elliptic Integral of the First Kind](#elliptic-integral-of-the-first-kind)
+    - [Elliptic Integral of the Second Kind](#elliptic-integral-of-the-second-kind)
+    - [Elliptic Integral of the Third Kind](#elliptic-integral-of-the-third-kind)
+  + [Legendre Forms of Complete Elliptic Integrals](#legendre-forms-of-complete-elliptic-integrals)
+    - [Complete Elliptic Integral of the First Kind](#complete-elliptic-integral-of-the-first-kind)
+    - [Complete Elliptic Integral of the Second Kind](#complete-elliptic-integral-of-the-second-kind)
+    - [Complete Elliptic Integral of the Third Kind](#complete-elliptic-integral-of-the-third-kind)
+  + [Carlson Symmetric Forms of Elliptic Integrals](#carlson-symmetric-forms-of-elliptic-integrals)
+    - [Carlson Elliptic Integral $\left(R_{C}\right)$](#carlson-elliptic-integral---left-r--c--right--)
+    - [Carlson Elliptic Integral $\left(R_{D}\right)$](#carlson-elliptic-integral---left-r--d--right--)
+    - [Carlson Elliptic Integral $\left(R_{E}\right)$](#carlson-elliptic-integral---left-r--e--right--)
+    - [Carlson Elliptic Integral $\left(R_{F}\right)$](#carlson-elliptic-integral---left-r--f--right--)
+    - [Carlson Elliptic Integral $\left(R_{G}\right)$](#carlson-elliptic-integral---left-r--g--right--)
+    - [Carlson Elliptic Integral $\left(R_{J}\right)$](#carlson-elliptic-integral---left-r--j--right--)
+    - [Carlson Elliptic Integral $\left(R_{K}\right)$](#carlson-elliptic-integral---left-r--k--right--)
+    - [Carlson Elliptic Integral $\left(R_{M}\right)$](#carlson-elliptic-integral---left-r--m--right--)
+  + [Theta Functions](#theta-functions)
+    - [Theta Function $\left(\theta_{1}\right)$](#theta-function---left--theta--1--right--)
+    - [Theta Function $\left(\theta_{2}\right)$](#theta-function---left--theta--2--right--)
+    - [Theta Function $\left(\theta_{3}\right)$](#theta-function---left--theta--3--right--)
+    - [Theta Function $\left(\theta_{4}\right)$](#theta-function---left--theta--4--right--)
+  + [Jacobi Elliptic and Related Functions](#jacobi-elliptic-and-related-functions)
+    - [Jacobi Amplitude Function](#jacobi-amplitude-function)
+    - [Jacobi Elliptic Function $\left(\operatorname{sn}\right)$](#jacobi-elliptic-function---left--operatorname-sn--right--)
+    - [Jacobi Elliptic Function $\left(\operatorname{cn}\right)$](#jacobi-elliptic-function---left--operatorname-cn--right--)
+    - [Jacobi Elliptic Function $\left(\operatorname{dn}\right)$](#jacobi-elliptic-function---left--operatorname-dn--right--)
+    - [Jacobi Elliptic Function $\left(\operatorname{sd}\right)$](#jacobi-elliptic-function---left--operatorname-sd--right--)
+    - [Jacobi Elliptic Function $\left(\operatorname{cd}\right)$](#jacobi-elliptic-function---left--operatorname-cd--right--)
+    - [Jacobi Elliptic Function $\left(\operatorname{sc}\right)$](#jacobi-elliptic-function---left--operatorname-sc--right--)
+  + [Inverse Jacobi Elliptic Functions](#inverse-jacobi-elliptic-functions)
+    - [Inverse Jacobi Elliptic Function $\left(\operatorname{sn}\right)$](#inverse-jacobi-elliptic-function---left--operatorname-sn--right--)
+    - [Inverse Jacobi Elliptic Function $\left(\operatorname{cn}\right)$](#inverse-jacobi-elliptic-function---left--operatorname-cn--right--)
+    - [Inverse Jacobi Elliptic Function $\left(\operatorname{dn}\right)$](#inverse-jacobi-elliptic-function---left--operatorname-dn--right--)
+    - [Inverse Jacobi Elliptic Function $\left(\operatorname{sd}\right)$](#inverse-jacobi-elliptic-function---left--operatorname-sd--right--)
+    - [Inverse Jacobi Elliptic Function $\left(\operatorname{cd}\right)$](#inverse-jacobi-elliptic-function---left--operatorname-cd--right--)
+    - [Inverse Jacobi Elliptic Function $\left(\operatorname{sc}\right)$](#inverse-jacobi-elliptic-function---left--operatorname-sc--right--)
+  + [Weierstrass Elliptic Functions](#weierstrass-elliptic-functions)
+    - [Weierstrass Elliptic Function (p)](#weierstrass-elliptic-function--p-)
+    - [Weierstrass Elliptic Function (\zeta)](#weierstrass-elliptic-function---zeta-)
+    - [Weierstrass Elliptic Function (\sigma)](#weierstrass-elliptic-function---sigma-)
+  + [Modular Functions](#modular-functions)
+    - [Elliptic Function (\lambda)](#elliptic-function---lambda-)
+    - [Klein’s Complete Invariant Function](#klein-s-complete-invariant-function)
+  + [Bernoulli Number and Polynomial](#bernoulli-number-and-polynomial)
+    - [Bernoulli Number](#bernoulli-number)
+    - [Bernoulli Polynomial](#bernoulli-polynomial)
+  + [Euler Number and Polynomial](#euler-number-and-polynomial)
+    - [Euler Number](#euler-number)
+    - [Euler Polynomial](#euler-polynomial)
+  + [Zeta and Related Functions](#zeta-and-related-functions)
+    - [Riemann Zeta Function](#riemann-zeta-function)
+    - [Hurwitz Zeta Function](#hurwitz-zeta-function)
+    - [Polylogarithm](#polylogarithm)
+    - [Lerch Zeta Function](#lerch-zeta-function)
+    - [Lerch Transcendent](#lerch-transcendent)
+    - [Dirichlet L-Function](#dirichlet-l-function)
+    - [Dirichlet Beta Function](#dirichlet-beta-function)
+    - [Dirichlet Eta Function](#dirichlet-eta-function)
+    - [Dirichlet Lambda Function](#dirichlet-lambda-function)
+    - [Stieltjes Constant](#stieltjes-constant)
+  + [Multiplicative Number Theoretic Functions](#multiplicative-number-theoretic-functions)
+    - [Prime Number](#prime-number)
+    - [Euler’s Totient Function](#euler-s-totient-function)
+    - [Divisor Function](#divisor-function)
+    - [Jordan’s Totient Function](#jordan-s-totient-function)
+    - [Möbius Function](#m-bius-function)
+    - [Liouville Function](#liouville-function)
+  + [Matthieu Characteristic Values](#matthieu-characteristic-values)
+    - [Matthieu Characteristic Value $\left(a\right)$](#matthieu-characteristic-value---left-a-right--)
+    - [Matthieu Characteristic Value $\left(b\right)$](#matthieu-characteristic-value---left-b-right--)
+  + [Angular Matthieu Functions](#angular-matthieu-functions)
+    - [Angular Matthieu Function ($\operatorname{ce}$)](#angular-matthieu-function----operatorname-ce---)
+    - [Angular Matthieu Function ($\operatorname{se}$)](#angular-matthieu-function----operatorname-se---)
+  + [Radial Mathieu Functions](#radial-mathieu-functions)
+    - [Radial Matthieu Function ($\operatorname{M}c$)](#radial-matthieu-function----operatorname-m-c--)
+    - [Radial Matthieu Function ($\operatorname{M}s$)](#radial-matthieu-function----operatorname-m-s--)
+  + [Lamé Functions](#lam--functions)
+    - [Lamé Function $\left(Ec_{n}^{j}\right)$](#lam--function---left-ec--n---j--right--)
+    - [Derivative of the Lamé Function $\left(Ec_{n}^{j}\right)$](#derivative-of-the-lam--function---left-ec--n---j--right--)
+    - [Lamé Function $\left(Es_{n}^{j}\right)$](#lam--function---left-es--n---j--right--)
+    - [Derivative of the Lamé Function $\left(Es_{n}^{j}\right)$](#derivative-of-the-lam--function---left-es--n---j--right--)
+  + [Heun Functions](#heun-functions)
+    - [Heun Function](#heun-function)
+    - [Derivative of the Heun Function](#derivative-of-the-heun-function)
+    - [Confluent Heun Function](#confluent-heun-function)
+    - [Derivative of the Confluent Heun Function](#derivative-of-the-confluent-heun-function)
+    - [Doubly-Confluent Heun Function](#doubly-confluent-heun-function)
+    - [Derivative of the Doubly-Confluent Heun Function](#derivative-of-the-doubly-confluent-heun-function)
+    - [Bi-Confluent Heun Function](#bi-confluent-heun-function)
+    - [Derivative of the Bi-Confluent Heun Function](#derivative-of-the-bi-confluent-heun-function)
+    - [Tri-Confluent Heun Function](#tri-confluent-heun-function)
+    - [Derivative of the Tri-Confluent Heun Function](#derivative-of-the-tri-confluent-heun-function)
+  + [Coulomb Wave Functions](#coulomb-wave-functions)
+    - [Coulomb Wave Function](#coulomb-wave-function)
+    - [Irregular Coulomb Wave Function](#irregular-coulomb-wave-function)
+    - [Outgoing Irregular Coulomb Wave Function](#outgoing-irregular-coulomb-wave-function)
+    - [Incoming Irregular Coulomb Wave Function](#incoming-irregular-coulomb-wave-function)
+* [Prior Art](#prior-art)
+    + [Cephes Mathematical Library](#cephes-mathematical-library)
+    + [specfun](#specfun)
+    + [Wolfram Language](#wolfram-language)
+    + [MATLAB](#matlab)
+    + [International Mathematics and Statistics Library (IMSL)](#international-mathematics-and-statistics-library--imsl-)
+    + [NAG Numerical Library](#nag-numerical-library)
+    + [GNU Octave](#gnu-octave)
+    + [GNU Scientific Library (GSL)](#gnu-scientific-library--gsl-)
+    + [SciPy](#scipy)
+
+
 ## Summary
 
 This proposal concerns adding new operators to PyTorch's special functions module (i.e., `torch.special`). The proposed operators have a wide range of use in scientific computing and numerical methods.
@@ -26,7 +311,7 @@ PyTorch maintainers:
 * provides much needed standardization to committing future operators to PyTorch.
 * provides an extremely useful set of operators that can and should be used for tricky numerical problems (e.g., implementing challenging distribution functions and gradients) and useful decomposition targets.
  
-### Special Functions
+## Special Functions
 
 There’s no formal definition of a *special function*. Colloquially, and for the purpose of this RFC, a special function is a non-elementary function that has an established name and notation due to its importance and ubiquity.
 
@@ -95,27 +380,76 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.floor_divide
   * torch.remainder
   * torch.round
-* Partitions
-  * `torch.partition_p` *See the “Partition Function” section for the proposed operator*
-* Tensorial Functions
-  * `torch.dirac_delta` *See the “Dirac Delta” section for the proposed operator*
-  * `torch.kronecker_delta` *See the “Kronecker Delta” section for the proposed operator*
-  * `torch.levi_civita` *See the “Levi-Civita Symbol” section for the proposed operator*
 * Discontinuous Functions
 * Functions with Singular Support
 
-## Special Function Policies
+### Special Functions
 
-PyTorch’s mathematical operators should be categorized as either “elementary” or “special.” An elementary function is a mathematical function whose corresponding operator is available from the `torch` module. A special function is a mathematical function whose corresponding operator is available from the `torch.special` module. Regardless of whether an operator implements an elementary or special function, each operator must share the following properties:
+PyTorch’s mathematical operators are categorized as either “elementary” or “special.” 
+
+An elementary function is a mathematical function whose corresponding operator is available from the `torch` module. A special function is a mathematical function whose corresponding operator is available from the `torch.special` module. Regardless of whether an operator implements an elementary or special function, users should expect that each operator share the following properties:
 
 * A name that adheres to the naming policy.
-* A docstring that clearly communicates the following:
-  * A primary definition
-  * Real and complex domains
-  * Real and complex graphs
+* CPU and CUDA implementations
+* C++ and Python function documentation that state a function’s:
+  * common mathematical definition;
+  * real and complex domains;
+  * real and complex graphs; and, if relevant,
+  * mathematical and scientific applications.
 * If differentiable, derivtatives for each variable.
 
+#### Naming Policy
+
+## Implementation
+
+### c10
+
+#### Constants
+
+To ease implementation, c10 will provide the following lookup tables (LUTs):
+
+* factorial, $n!$, where $n = 1, 2, \cdots, 170;$
+* natural logarithm of factorial, $\ln{\left(n!\right)}$, where $n = 1, 2, \cdots, 300;$
+* double factorial, $n!!$, where $n = -1,000, -999, \cdots, 300;$
+* natural logarithm of double factorial, $\ln{\left(n!!\right)}$, where $n = -1,000, -999, \cdots, 300;$ and
+* prime number, $p\left(n\right)$, where $n = 1, 2, \cdots, 10,000.$
+
+#### Functions
+
+To ease implementation, c10 will provide the following numerical approximations:
+
+* Lanczos approximation;
+* Spouge’s approximation; and
+* Stirling’s approximation.
+
+##### Lanczos Approximation
+
+Numerical method for computing the gamma function. It exhibits faster convergence than Spouge’s approximation.
+
+##### Spouge’s approximation
+
+Numerical method for computing the gamma function. Its coefficients are faster to compute than Lanczos approximation coefficients.
+
+##### Stirling’s Approximation
+
+Numerical method for computing factorials.
+
+### ATen
+
+Each special function has a corresponding ATen operator.
+
+#### CPU
+
+#### CUDA
+
+### torch
+
+## C++ API
+
 ## Python API
+
+<details>
+<summary>Factorials</summary>
 
 ### Factorials
 
@@ -326,6 +660,10 @@ $\operatorname{ln}{(z_{n})}$ is defined for all real and complex $z$.
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Combinatorial Numbers and Functions</summary>
 
 ### Combinatorial Numbers and Functions
 
@@ -556,6 +894,10 @@ $$r_{n} = D(n, n) - D(n + 1, n - 1).$$
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Gamma and Related Functions</summary>
 
 ### Gamma and Related Functions
 
@@ -745,6 +1087,10 @@ ln_beta(
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Exponential and Logarithmic Integrals</summary>
 
 ### Exponential and Logarithmic Integrals
 
@@ -860,6 +1206,10 @@ $$\operatorname{li}(z)=\int_{0}^{z}{\frac{1}{\ln{(t)}}}dt.$$
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Error and Related Functions</summary>
 
 ### Error and Related Functions
 
@@ -964,6 +1314,10 @@ error_inverse_erfc(
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Dawson and Fresnel Integrals</summary>
 
 ### Dawson and Fresnel Integrals
 
@@ -1032,6 +1386,10 @@ $$\operatorname{C}(z)=\int_{0}^{x}\cos{t^{2}}dt.$$
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Trigonometric and Hyperbolic Integrals</summary>
 
 ### Trigonometric and Hyperbolic Integrals
 
@@ -1170,6 +1528,10 @@ where $\gamma$ is the Euler–Mascheroni constant.
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Incomplete Gamma and Related Functions</summary>
 
 ### Incomplete Gamma and Related Functions
 
@@ -1240,6 +1602,10 @@ incomplete_beta(
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Airy Functions</summary>
 
 ### Airy Functions
 
@@ -1438,6 +1804,10 @@ $\exp{(\operatorname{Bi}'(z))}$ is defined for all real and complex values.
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Bessel Functions</summary>
 
 ### Bessel Functions
 
@@ -1586,6 +1956,10 @@ $Y_{1}(z)$ is defined for $\\{z \in \mathbb{R} \mid z > 0\\}$ and $\\{z \in \mat
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Hankel Functions</summary>
 
 ### Hankel Functions
 
@@ -1642,6 +2016,10 @@ where $J_{n}(z)$ is the Bessel function of the first kind, $i$ is the imaginary 
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Modified Bessel Functions</summary>
 
 ### Modified Bessel Functions
 
@@ -1784,6 +2162,10 @@ $K_{1}(z)$ is defined for $\\{z \in \mathbb{R} \mid z > 0\\}$ and $\\{z \in \mat
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Spherical Bessel Functions</summary>
 
 ### Spherical Bessel Functions
 
@@ -1932,6 +2314,10 @@ where $n = 1$.
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Spherical Hankel Functions</summary>
 
 ### Spherical Hankel Functions
 
@@ -1988,6 +2374,10 @@ where $H_{n}^{2}$ is the Hankel function of the second kind.
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Modified Spherical Bessel Functions</summary>
 
 ### Modified Spherical Bessel Functions
 
@@ -2106,6 +2496,10 @@ modified_spherical_bessel_k_1(
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Kelvin Functions</summary>
 
 ### Kelvin Functions
 
@@ -2194,6 +2588,10 @@ kelvin_ker(
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Struve and Modified Struve Functions</summary>
 
 ### Struve and Modified Struve Functions
 
@@ -2250,12 +2648,20 @@ where $\Gamma(z)$ is the gamma function.
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Lommel Functions</summary>
 
 ### Lommel Functions
 
 #### Lommel Function of the First Kind
 
 #### Lommel Function of the Second Kind
+</details>
+
+<details>
+<summary>Anger and Weber Functions</summary>
 
 ### Anger and Weber Functions
 
@@ -2308,6 +2714,10 @@ $$\mathbf{E}_{n}(z)={\frac{1}{\pi}}\int_{0}^{\pi}\sin(n\theta-z\sin \theta )d\th
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Parabolic Cylinder Function</summary>
 
 ### Parabolic Cylinder Function
 
@@ -2325,6 +2735,10 @@ Parabolic cylinder function:
 $$D_{n}(z) = \sqrt{\pi} 2^{\tfrac{n}{2}} e^{-\frac{z^2}{4}} \left(\frac{ _1F_1(-\frac{n }{2}; \frac{1}{2}; \frac{z^2}{2})}{\Gamma (\frac{1-n }{2})}-\frac{\sqrt{2} z  _1F_1(\frac{1-n }{2};\frac{3}{2};\frac{z^2}{2})}{\Gamma (-\frac{n }{2})} \right),$$
 
 where $_1F_1$ is the confluent hypergeometric function of the first kind and $\Gamma$ is the gamma function.
+</details>
+
+<details>
+<summary>Confluent Hypergeometric Functions</summary>
 
 ### Confluent Hypergeometric Functions
 
@@ -2347,6 +2761,10 @@ $$_{1}{F}_{1}(a; b; z) = \sum_{k = 0}^{\infty} \frac{a_{k}}{b_{k}} \frac{z^{k}}{
 where $a_{k}$ and $b_{k}$ are rising factorials.
 
 #### Confluent Hypergeometric Function of the Second Kind
+</details>
+
+<details>
+<summary>Whittaker Functions</summary>
 
 ### Whittaker Functions
 
@@ -2403,32 +2821,44 @@ $${\displaystyle W_{\kappa ,\mu }(z)=\exp (-z/2)z^{\mu +{\tfrac {1}{2}}}U(\mu -\
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Legendre Functions</summary>
 
 ### Legendre Functions
 
 #### Legendre Function of the First Kind
 
 #### Legendre Function of the Second Kind
+</details>
+
+<details>
+<summary>Associated Legendre Functions</summary>
 
 ### Associated Legendre Functions
 
 #### Associated Legendre Function of the First Kind
 
 #### Associated Legendre Function of the Second Kind
+</details>
+
+<details>
+<summary>Ferrers Functions</summary>
 
 ### Ferrers Functions
 
 #### Ferrers Function of the First Kind
 
 #### Ferrers Function of the Second Kind
+</details>
 
-### Spherical and Spheroidal Harmonics
-
-### Generalized Hypergeometric and Related Functions
+<details>
+<summary>Appell Functions</summary>
 
 ### Appell Functions
 
-#### Appell Function ($F_{1}$)
+#### Appell Function $\left(F_{1}\right)$
 
 ```Python
 appell_f_1(
@@ -2465,7 +2895,7 @@ $$F_{1}(a; b, c; d; x, y) = \sum_{m, n=0}^{\infty}{\frac{a_{m + n}b_{m}c_{n}}{d_
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Appell Function ($F_{2}$)
+#### Appell Function $\left(F_{2}\right)$
 
 ```Python
 appell_f_2(
@@ -2501,7 +2931,7 @@ appell_f_2(
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Appell Function ($F_{3}$)
+#### Appell Function $\left(F_{3}\right)$
 
 ```Python
 appell_f_3(
@@ -2537,7 +2967,7 @@ appell_f_3(
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Appell Function ($F_{4}$)
+#### Appell Function $\left(F_{4}\right)$
 
 ```Python
 appell_f_4(
@@ -2569,6 +2999,10 @@ appell_f_4(
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>$q$-Hypergeometric and Related Functions</summary>
 
 ### $q$-Hypergeometric and Related Functions
 
@@ -2581,6 +3015,10 @@ appell_f_4(
 #### $q$-Digamma Function
 
 #### $q$-Polygamma Function
+</details>
+
+<details>
+<summary>Chebyshev Polynomials</summary>
 
 ### Chebyshev Polynomials
 
@@ -2675,6 +3113,10 @@ Chebyshev polynomial of the fourth kind, $W_{n}(x).$
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Shifted Chebyshev Polynomials</summary>
 
 ### Shifted Chebyshev Polynomials
 
@@ -2769,6 +3211,10 @@ Shifted Chebyshev polynomial of the fourth kind, $W_{n}^{\ast}(x).$
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Hermite Polynomials</summary>
 
 ### Hermite Polynomials
 
@@ -2817,8 +3263,10 @@ Physicist’s Hermite polynomial:
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
 
-### Orthogonal Polynomials
+<details>
+<summary>Legendre Forms of Elliptic Integrals</summary>
 
 ### Legendre Forms of Elliptic Integrals
 
@@ -2899,6 +3347,10 @@ The incomplete elliptic integral is defined in terms of the parameter $m$ instea
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Legendre Forms of Complete Elliptic Integrals</summary>
 
 ### Legendre Forms of Complete Elliptic Integrals
 
@@ -2976,10 +3428,14 @@ The complete elliptic integral is defined in terms of the parameter $m$ instead 
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Carlson Symmetric Forms of Elliptic Integrals</summary>
 
 ### Carlson Symmetric Forms of Elliptic Integrals
 
-#### Carlson Elliptic Integral ($R_{C}$)
+#### Carlson Elliptic Integral $\left(R_{C}\right)$
 
 ```Python
 carlson_elliptic_integral_r_c(
@@ -3000,7 +3456,7 @@ carlson_elliptic_integral_r_c(
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Carlson Elliptic Integral ($R_{D}$)
+#### Carlson Elliptic Integral $\left(R_{D}\right)$
 
 ```Python
 carlson_elliptic_integral_r_d(
@@ -3024,7 +3480,7 @@ carlson_elliptic_integral_r_d(
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Carlson Elliptic Integral ($R_{E}$)
+#### Carlson Elliptic Integral $\left(R_{E}\right)$
 
 ```Python
 carlson_elliptic_integral_r_e(
@@ -3034,7 +3490,7 @@ carlson_elliptic_integral_r_e(
 ) -> Tensor
 ```
 
-#### Carlson Elliptic Integral ($R_{F}$)
+#### Carlson Elliptic Integral $\left(R_{F}\right)$
 
 ```Python
 carlson_elliptic_integral_r_f(
@@ -3058,7 +3514,7 @@ carlson_elliptic_integral_r_f(
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Carlson Elliptic Integral ($R_{G}$)
+#### Carlson Elliptic Integral $\left(R_{G}\right)$
 
 ```Python
 carlson_elliptic_integral_r_g(
@@ -3082,7 +3538,7 @@ carlson_elliptic_integral_r_g(
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Carlson Elliptic Integral ($R_{J}$)
+#### Carlson Elliptic Integral $\left(R_{J}\right)$
 
 ```Python
 carlson_elliptic_integral_r_j(
@@ -3107,7 +3563,7 @@ carlson_elliptic_integral_r_j(
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Carlson Elliptic Integral ($R_{K}$)
+#### Carlson Elliptic Integral $\left(R_{K}\right)$
 
 ```Python
 carlson_elliptic_integral_r_k(
@@ -3117,7 +3573,7 @@ carlson_elliptic_integral_r_k(
 ) -> Tensor
 ```
 
-#### Carlson Elliptic Integral ($R_{M}$)
+#### Carlson Elliptic Integral $\left(R_{M}\right)$
 
 ```Python
 carlson_elliptic_integral_r_m(
@@ -3126,14 +3582,19 @@ carlson_elliptic_integral_r_m(
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
+</details>
+
+<details>
+<summary>Theta Functions</summary>
 
 ### Theta Functions
 
-#### Theta Function ($\theta_{1}$)
+#### Theta Function $\left(\theta_{1}\right)$
 
 ```Python
 theta_1(
-    n: Tensor, 
+    z: Tensor,
+    t: Tensor,
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
@@ -3141,43 +3602,82 @@ theta_1(
 
 ##### Parameters
 
-**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+
+**t** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Theta Function ($\theta_{2}$)
+#### Theta Function $\left(\theta_{2}\right)$
 
 ```Python
 theta_2(
-    n: Tensor, 
+    z: Tensor,
+    t: Tensor,
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
 
-#### Theta Function ($\theta_{3}$)
+##### Parameters
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+
+**t** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Theta Function $\left(\theta_{3}\right)$
 
 ```Python
 theta_3(
-    n: Tensor, 
+    z: Tensor,
+    t: Tensor,
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
 
-#### Theta Function ($\theta_{4}$)
+##### Parameters
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+
+**t** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Theta Function $\left(\theta_{4}\right)$
 
 ```Python
 theta_4(
-    n: Tensor, 
+    z: Tensor,
+    t: Tensor,
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
 
-### Jacobi Elliptic Functions
+##### Parameters
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+
+**t** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Jacobi Elliptic and Related Functions</summary>
+
+### Jacobi Elliptic and Related Functions
 
 #### Jacobi Amplitude Function
 
@@ -3189,7 +3689,7 @@ jacobi_amplitude_am(
 ) -> Tensor
 ```
 
-#### Jacobi Elliptic Function ($\operatorname{sn}$)
+#### Jacobi Elliptic Function $\left(\operatorname{sn}\right)$
 
 ```Python
 jacobi_elliptic_sn(
@@ -3201,7 +3701,7 @@ jacobi_elliptic_sn(
 
 $$\operatorname{sn}(z \mid m) = \sin(\operatorname{am}(z \mid m))$$
 
-#### Jacobi Elliptic Function ($\operatorname{cn}$)
+#### Jacobi Elliptic Function $\left(\operatorname{cn}\right)$
 
 ```Python
 jacobi_elliptic_cn(
@@ -3213,7 +3713,7 @@ jacobi_elliptic_cn(
 
 $$\operatorname{cn}(z \mid m) = \cos(\operatorname{am}(z \mid m))$$
 
-#### Jacobi Elliptic Function ($\operatorname{dn}$)
+#### Jacobi Elliptic Function $\left(\operatorname{dn}\right)$
 
 ```Python
 jacobi_elliptic_dn(
@@ -3223,7 +3723,7 @@ jacobi_elliptic_dn(
 ) -> Tensor
 ```
 
-#### Jacobi Elliptic Function ($\operatorname{sd}$)
+#### Jacobi Elliptic Function $\left(\operatorname{sd}\right)$
 
 ```Python
 jacobi_elliptic_sd(
@@ -3233,7 +3733,7 @@ jacobi_elliptic_sd(
 ) -> Tensor
 ```
 
-#### Jacobi Elliptic Function ($\operatorname{cd}$)
+#### Jacobi Elliptic Function $\left(\operatorname{cd}\right)$
 
 ```Python
 jacobi_elliptic_cd(
@@ -3245,7 +3745,7 @@ jacobi_elliptic_cd(
 
 $$\operatorname{cd}(z \mid m) = \frac{\operatorname{cn}(z \mid m)}{\operatorname{dn}(z \mid m)}$$
 
-#### Jacobi Elliptic Function ($\operatorname{sc}$)
+#### Jacobi Elliptic Function $\left(\operatorname{sc}\right)$
 
 ```Python
 jacobi_elliptic_sc(
@@ -3254,10 +3754,14 @@ jacobi_elliptic_sc(
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
+</details>
+
+<details>
+<summary>Inverse Jacobi Elliptic Functions</summary>
 
 ### Inverse Jacobi Elliptic Functions
 
-#### Inverse Jacobi Elliptic Function ($\operatorname{sn}$)
+#### Inverse Jacobi Elliptic Function $\left(\operatorname{sn}\right)$
 
 ```Python
 inverse_jacobi_elliptic_sn(
@@ -3267,7 +3771,7 @@ inverse_jacobi_elliptic_sn(
 ) -> Tensor
 ```
 
-#### Inverse Jacobi Elliptic Function ($\operatorname{cn}$)
+#### Inverse Jacobi Elliptic Function $\left(\operatorname{cn}\right)$
 
 ```Python
 inverse_jacobi_elliptic_cn(
@@ -3277,7 +3781,7 @@ inverse_jacobi_elliptic_cn(
 ) -> Tensor
 ```
 
-#### Inverse Jacobi Elliptic Function ($\operatorname{dn}$)
+#### Inverse Jacobi Elliptic Function $\left(\operatorname{dn}\right)$
 
 ```Python
 inverse_jacobi_elliptic_dn(
@@ -3287,7 +3791,7 @@ inverse_jacobi_elliptic_dn(
 ) -> Tensor
 ```
 
-#### Inverse Jacobi Elliptic Function ($\operatorname{sd}$)
+#### Inverse Jacobi Elliptic Function $\left(\operatorname{sd}\right)$
 
 ```Python
 inverse_jacobi_elliptic_sd(
@@ -3297,7 +3801,7 @@ inverse_jacobi_elliptic_sd(
 ) -> Tensor
 ```
 
-#### Inverse Jacobi Elliptic Function ($\operatorname{cd}$)
+#### Inverse Jacobi Elliptic Function $\left(\operatorname{cd}\right)$
 
 ```Python
 inverse_jacobi_elliptic_cd(
@@ -3307,7 +3811,7 @@ inverse_jacobi_elliptic_cd(
 ) -> Tensor
 ```
 
-#### Inverse Jacobi Elliptic Function ($\operatorname{sc}$)
+#### Inverse Jacobi Elliptic Function $\left(\operatorname{sc}\right)$
 
 ```Python
 inverse_jacobi_elliptic_sc(
@@ -3316,6 +3820,10 @@ inverse_jacobi_elliptic_sc(
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
+</details>
+
+<details>
+<summary>Weierstrass Elliptic Functions</summary>
 
 ### Weierstrass Elliptic Functions
 
@@ -3324,12 +3832,20 @@ inverse_jacobi_elliptic_sc(
 #### Weierstrass Elliptic Function (\zeta)
 
 #### Weierstrass Elliptic Function (\sigma)
+</details>
+
+<details>
+<summary>Modular Functions</summary>
 
 ### Modular Functions
 
 #### Elliptic Function (\lambda)
 
 #### Klein’s Complete Invariant Function
+</details>
+
+<details>
+<summary>Bernoulli Number and Polynomial</summary>
 
 ### Bernoulli Number and Polynomial
 
@@ -3375,6 +3891,10 @@ Bernoulli polynomial, $B_{n}(x)$.
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Euler Number and Polynomial</summary>
 
 ### Euler Number and Polynomial
 
@@ -3420,6 +3940,10 @@ Euler polynomial, $E_{n}(x)$.
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Zeta and Related Functions</summary>
 
 ### Zeta and Related Functions
 
@@ -3437,6 +3961,14 @@ Riemann zeta function:
 
 $$\zeta(s)=\sum _{n=1}^{\infty}{\frac{1}{n^{s}}}.$$
 
+##### Parameters
+
+**s** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – input.
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
 #### Hurwitz Zeta Function
 
 ```Python
@@ -3451,6 +3983,16 @@ hurwitz_zeta(
 Hurwitz zeta function:
 
 $$\zeta(s, a) = \sum _{n = 0}^{\infty}{\frac{1}{(n + a)^{s}}}.$$
+
+##### Parameters
+
+**s** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
 #### Polylogarithm
 
@@ -3467,6 +4009,16 @@ Polylogarithm:
 
 $$\operatorname{Li}_{s + 1}(z ) = \int_{0}^{z}{\frac{\operatorname{Li}_{s}(t)}{t}}dt.$$
 
+##### Parameters
+
+**s** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
 #### Lerch Zeta Function
 
 ```Python
@@ -3479,9 +4031,25 @@ lerch_zeta_l(
 ) -> Tensor
 ```
 
+##### Parameters
+
+**l** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
 #### Lerch Transcendent
 
 #### Dirichlet L-Function
+</details>
+
+<details>
+<summary>Multiplicative Number Theoretic Functions</summary>
 
 ### Multiplicative Number Theoretic Functions
 
@@ -3499,61 +4067,662 @@ $n^{\text{th}}$ prime number, $p(n)$.
 
 #### Euler’s Totient Function
 
+```Python
+euler_totient_phi(
+    n: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
 #### Divisor Function
 
 #### Jordan’s Totient Function
 
 #### Möbius Function
 
+```Python
+mobius_mu(
+    n: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
 #### Liouville Function
+
+```Python
+liouville_lambda(
+    n: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+</details>
+
+<details>
+<summary>Matthieu Characteristic Values</summary>
 
 ### Matthieu Characteristic Values
 
-#### Matthieu Characteristic Value ($a$)
+#### Matthieu Characteristic Value $\left(a\right)$
 
-#### Matthieu Characteristic Value ($b$)
+```Python
+matthieu_characteristic_a(
+    r: Tensor,
+    q: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+#### Matthieu Characteristic Value $\left(b\right)$
+
+```Python
+matthieu_characteristic_b(
+    r: Tensor,
+    q: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+</details>
+
+<details>
+<summary>Angular Matthieu Functions</summary>
 
 ### Angular Matthieu Functions
 
 #### Angular Matthieu Function ($\operatorname{ce}$)
 
 #### Angular Matthieu Function ($\operatorname{se}$)
+</details>
+
+<details>
+<summary>Radial Mathieu Functions</summary>
 
 ### Radial Mathieu Functions
 
 #### Radial Matthieu Function ($\operatorname{M}c$)
 
 #### Radial Matthieu Function ($\operatorname{M}s$)
+</details>
+
+<details>
+<summary>Lamé Functions</summary>
 
 ### Lamé Functions
 
-### Spherodial Wave Functions
+#### Lamé Function $\left(Ec_{n}^{j}\right)$
+
+```Python
+lame_ec(
+    n: Tensor,
+    j: Tensor,
+    z: Tensor,
+    m: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+##### Parameters
+
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**j** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**m** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Derivative of the Lamé Function $\left(Ec_{n}^{j}\right)$
+
+```Python
+lame_ec_prime(
+    n: Tensor,
+    j: Tensor,
+    z: Tensor,
+    m: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+##### Parameters
+
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**j** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**m** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Lamé Function $\left(Es_{n}^{j}\right)$
+
+```Python
+lame_es(
+    n: Tensor,
+    j: Tensor,
+    z: Tensor,
+    m: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+##### Parameters
+
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**j** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**m** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Derivative of the Lamé Function $\left(Es_{n}^{j}\right)$
+
+```Python
+lame_es_prime(
+    n: Tensor,
+    j: Tensor,
+    z: Tensor,
+    m: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+##### Parameters
+
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**j** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+**m** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Heun Functions</summary>
 
 ### Heun Functions
 
 #### Heun Function
 
+```Python
+heun(
+    p: Tensor,
+    q: Tensor,
+    a: Tensor,
+    b: Tensor,
+    g: Tensor,
+    d: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Heun function:
+
+##### Parameters
+
+**p** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**b** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Derivative of the Heun Function
+
+```Python
+heun_prime(
+    p: Tensor,
+    q: Tensor,
+    a: Tensor,
+    b: Tensor,
+    g: Tensor,
+    d: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Derivative of the Heun function:
+
+##### Parameters
+
+**p** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**b** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
 #### Confluent Heun Function
+
+```Python
+confluent_heun(
+    q: Tensor,
+    a: Tensor,
+    g: Tensor,
+    d: Tensor,
+    e: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Confluent Heun function:
+
+##### Parameters
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Derivative of the Confluent Heun Function
+
+```Python
+confluent_heun_prime(
+    q: Tensor,
+    a: Tensor,
+    g: Tensor,
+    d: Tensor,
+    e: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Derivative of the confluent Heun function:
+
+##### Parameters
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
 #### Doubly-Confluent Heun Function
 
+```Python
+confluent_heun(
+    q: Tensor,
+    a: Tensor,
+    g: Tensor,
+    d: Tensor,
+    e: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Doubly-confluent Heun function:
+
+##### Parameters
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Derivative of the Doubly-Confluent Heun Function
+
+```Python
+confluent_heun_prime(
+    q: Tensor,
+    a: Tensor,
+    g: Tensor,
+    d: Tensor,
+    e: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Derivative of the doubly-confluent Heun function:
+
+##### Parameters
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
 #### Bi-Confluent Heun Function
+
+```Python
+biconfluent_heun(
+    q: Tensor,
+    a: Tensor,
+    g: Tensor,
+    d: Tensor,
+    e: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Bi-confluent Heun function:
+
+##### Parameters
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Derivative of the Bi-Confluent Heun Function
+
+```Python
+biconfluent_heun_prime(
+    q: Tensor,
+    a: Tensor,
+    g: Tensor,
+    d: Tensor,
+    e: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Derivative of the bi-confluent Heun function:
+
+##### Parameters
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
 #### Tri-Confluent Heun Function
 
-### Painlevé Transcendents
+```Python
+triconfluent_heun(
+    q: Tensor,
+    a: Tensor,
+    g: Tensor,
+    d: Tensor,
+    e: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
 
-### Coulomb Wave Functions
+Tri-confluent Heun function:
 
-#### Coulomb Wave Function (F)
+##### Parameters
 
-#### Coulomb Wave Function (G)
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
 
-## Metrics
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
 
-## Drawbacks
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
 
-## Alternatives
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Derivative of the Tri-Confluent Heun Function
+
+```Python
+triconfluent_heun_prime(
+    q: Tensor,
+    a: Tensor,
+    g: Tensor,
+    d: Tensor,
+    e: Tensor,
+    z: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Derivative of the tri-confluent Heun function:
+
+##### Parameters
+
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**a** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**g** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**d** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Coulomb Wave Functions</summary>
+
+#### Coulomb Wave Function
+
+```Python
+coulomb_f(
+    l: Tensor,
+    e: Tensor,
+    r: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+##### Parameters
+
+**l** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**r** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Irregular Coulomb Wave Function
+
+```Python
+coulomb_g(
+    l: Tensor,
+    e: Tensor,
+    r: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+##### Parameters
+
+**l** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**r** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Outgoing Irregular Coulomb Wave Function
+
+```Python
+coulomb_h_positive(
+    l: Tensor,
+    e: Tensor,
+    r: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+##### Parameters
+
+**l** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**r** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Incoming Irregular Coulomb Wave Function
+
+```Python
+coulomb_h_negative(
+    l: Tensor,
+    e: Tensor,
+    r: Tensor,
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+##### Parameters
+
+**l** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**e** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**r** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
 
 ## Prior Art
 
