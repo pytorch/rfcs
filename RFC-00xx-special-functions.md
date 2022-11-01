@@ -39,8 +39,13 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.sqrt
 * Exponential Functions
   * torch.exp
+  * torch.exp2
+  * torch.expm1
 * Logarithmic Functions
   * torch.log
+  * torch.log10
+  * torch.log1p
+  * torch.log2
 * Trigonometric Functions
   * torch.sin
   * torch.cos
