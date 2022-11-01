@@ -35,17 +35,52 @@ There’s no formal definition of a *special function*. Colloquially, and for th
 Unlike special functions,  *elementary functions* have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing the following functions as elementary:
 
 * Power Functions
+  * torch.pow
+  * torch.sqrt
 * Exponential Functions
+  * torch.exp
 * Logarithmic Functions
+  * torch.log
 * Trigonometric Functions
-* Inverse Trigonometric Functions
+  * torch.sin
+  * torch.cos
+  * torch.tan
+  * torch.cot
+  * torch.csc
+  * torch.sec
+* Inverse Trigonometric Functions 
+  * torch.asin
+  * torch.acos
+  * torch.atan
+  * torch.atan
+  * torch.acot
+  * torch.acsc
+  * torch.asec
 * Hyperbolic Functions
+  * torch.sinh
+  * torch.cosh
+  * torch.tanh
+  * torch.coth
+  * torch.csch
+  * torch.sech
 * Inverse Hyperbolic Functions
+  * torch.asinh
+  * torch.acosh
+  * torch.atanh
+  * torch.atanh
+  * torch.acoth
+  * torch.acsch
+  * torch.asech
 * Product Logarithms
 * Roots
 * Maximum and Minimum
+  * torch.max
+  * torch.min
 * Cardinal Functions
-* Greatest Common Divisor and Least Common Multiple
+  * torch.sinc
+* Greatest Common Divisor (GCD) and Least Common Multiple (LCM)
+  * torch.gcd
+  * torch.lcm
 * Rounding and Congruence Functions
 
 ## Special Function Policies
