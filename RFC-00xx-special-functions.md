@@ -36,22 +36,17 @@ There’s no formal definition of a “special function.” Colloquially, and fo
 
 Unlike “special functions,”  “elementary functions” have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing a function as an elementary function if the function belongs to the following families of functions:
 
-* Cardinal Functions
-* Dirac delta
-* Euler Number
-* Exponential
-* Fibonaci Number
-* Greatest common divisor
+* Arithmetic
+* Greatest Common Divisor
 * Hyperbolic
 * Inverse Hyperbolic
 * Inverse Trigonometric
-* Kronecker delta
-* Least common multiple
+* Least Common Multiple
 * Logarithmic
+* Logical
 * Partitions
 * Power
 * Rounding and Congruence Functions
-* Tensorial Functions
 * Trigonometric
 
 ## Special Function Policies
