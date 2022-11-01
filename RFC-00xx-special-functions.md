@@ -34,7 +34,7 @@ There’s no formal definition of a “special function.” Colloquially, and fo
 
 ### Elementary Functions
 
-Unlike “special functions,”  “elementary functions” have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing a function as an elementary function if the function is one of the following functions or belongs to the following families of functions:
+Unlike “special functions,”  “elementary functions” have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing a function as an elementary function if the function belongs to the following families of functions:
 
 * Cardinal Functions
 * Dirac delta
