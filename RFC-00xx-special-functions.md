@@ -80,7 +80,7 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.asech
 * Product Logarithms
 * Roots
-  * *See the proposed torch.root operator subsection*
+  * *See the `torch.root` section for the proposed operator*
 * Maximum and Minimum
   * torch.max
   * torch.min
@@ -97,6 +97,9 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.round
 * Partitions
 * Tensorial Functions
+  * *See the `torch.dirac_delta` section for the proposed operator*
+  * *See the `torch.kronecker_delta` section for the proposed operator*
+  * *See the `torch.levi_civita` section for the proposed operator*
 
 ## Special Function Policies
 
