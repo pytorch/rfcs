@@ -32,7 +32,7 @@ There’s no formal definition of a *special function*. Colloquially, and for th
 
 ### Elementary Functions
 
-Unlike special functions,  *elementary functions* have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing the following functions as elementary:
+Unlike special functions,  *elementary functions* have a rigorous definition but, for simplicity, this RFC uses a simplified definition, categorizing the following functions as elementary:
 
 * Power Functions
   * torch.pow
@@ -89,9 +89,9 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
 * Rounding and Congruence Functions
   * torch.ceil
   * torch.floor
-  * torch.round
   * torch.floor_divide
   * torch.remainder
+  * torch.round
 
 ## Special Function Policies
 
