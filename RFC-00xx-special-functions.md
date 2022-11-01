@@ -101,6 +101,8 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * `torch.dirac_delta` *See the “Dirac Delta” section for the proposed operator*
   * `torch.kronecker_delta` *See the “Kronecker Delta” section for the proposed operator*
   * `torch.levi_civita` *See the “Levi-Civita Symbol” section for the proposed operator*
+* Discontinuous Functions
+* Functions with Singular Support
 
 ## Special Function Policies
 
