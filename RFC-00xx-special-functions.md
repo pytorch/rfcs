@@ -87,6 +87,11 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.gcd
   * torch.lcm
 * Rounding and Congruence Functions
+  * torch.ceil
+  * torch.floor
+  * torch.round
+  * torch.floor_divide
+  * torch.remainder
 
 ## Special Function Policies
 
