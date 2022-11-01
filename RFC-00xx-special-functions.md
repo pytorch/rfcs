@@ -30,7 +30,7 @@ PyTorch maintainers:
 
 ### Special Functions
 
-There’s no formal definition of a “special function.” Colloquially, and for the purpose of this RFC, a special function is a mathematical function that has an established name and notation due to its importance and ubiquity.
+There’s no formal definition of a “special function.” Colloquially, and for the purpose of this RFC, a special function is a non-elementary function that has an established name and notation due to its importance and ubiquity.
 
 ### Elementary Functions
 
