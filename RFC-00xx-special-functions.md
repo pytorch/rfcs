@@ -95,6 +95,8 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.floor_divide
   * torch.remainder
   * torch.round
+* Partitions
+* Tensorial Functions
 
 ## Special Function Policies
 
