@@ -3549,46 +3549,13 @@ $n^{\text{th}}$ prime number, $p(n)$.
 
 #### Coulomb Wave Function (G)
 
-### 3-j, 6-j, and 9-j Symbols
-
-#### 3-j Symbol
-
-#### 6-j Symbol
-
-#### 9-j Symbol
-
 ## Metrics
-
-<details>
-What are the main metrics to measure the value of this feature?
-</details>
 
 ## Drawbacks
 
-<details>
-Are there any reasons why we should not do this? Here we aim to evaluate risk and check ourselves.
-
-Please consider:
-* is it a breaking change?
-* Impact on UX
-* implementation cost, both in terms of code size and complexity
-* integration of this feature with other existing and planned features
-</details>
-
 ## Alternatives
 
-<details>
-What other designs have been considered? What is the impact of not doing this?
-</details>
-
 ## Prior Art
-
-<details>
-Discuss prior art (both good and bad) in relation to this proposal:
-* Does this feature exist in other libraries? What experience has their community had?
-* What lessons can be learned from other implementations of this feature?
-* Published papers or great posts that discuss this
-</details>
 
 ### Cephes Mathematical Library
 
@@ -3611,62 +3578,3 @@ General-purpose, commercial, multi-paradigm programming language written and mai
 ### SciPy
 
 SciPy is a free and open-source Python package for scientific computing. It contains modules for linear algebra, integration, optimization, etc. SciPy also contains a robust suite of special functions. Most of the special function implementations rely on third-party packages, many featured elsewhere in this subsection (e.g., Cephes and specfun).
-
-## How we teach this
-
-<details>
-* What names and terminology work best for these concepts and why? How is this idea best presented?
-* Would the acceptance of this proposal mean the PyTorch documentation must be re-organized or altered?
-* How should this feature be taught to existing PyTorch users?
-</details>
-
-## Unresolved questions
-
-<details>
-* What parts of the design do you expect to resolve through the RFC process before this gets merged?
-* What parts of the design do you expect to resolve through the implementation of this feature before stabilization?
-* What related issues do you consider out of scope for this RFC that could be addressed in the future independently of the solution that comes out of this RFC?
-</details>
-
-## Resolution
-
-<details>
-We decided to do it. X% of the engineering team actively approved of this change.
-</details>
-
-### Level of Support
-
-<details>
-Choose one of the following:
-* 1: Overwhelming positive feedback.
-* 2: Positive feedback.
-* 3: Majority Acceptance, with conflicting Feedback.
-* 4: Acceptance, with Little Feedback.
-* 5: Unclear Resolution.
-* 6: RFC Rejected.
-* 7: RFC Rejected, with Conflicting Feedback.
-</details>
-
-#### Additional Context
-
-<details>
-Some people were in favor of it, but some people didn’t want it for project X.
-</details>
-
-### Next Steps
-
-<details>
-Will implement it.
-</details>
-
-#### Tracking issue
-
-<details>
-<github issue URL>
-</details>
-
-#### Exceptions
-
-<details>
-Not implementing on project X now. Will revisit the decision in 1 year.
-</details>
