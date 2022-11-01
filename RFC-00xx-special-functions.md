@@ -97,9 +97,9 @@ Unlike special functions,  *elementary functions* have a rigorous definition but
   * torch.round
 * Partitions
 * Tensorial Functions
-  * `torch.dirac_delta` *See the section for the proposed operator*
-  * `torch.kronecker_delta` *See the section for the proposed operator*
-  * `torch.levi_civita` *See the section for the proposed operator*
+  * `torch.dirac_delta` *See the “Dirac Delta” section for the proposed operator*
+  * `torch.kronecker_delta` *See the “Kronecker Delta” section for the proposed operator*
+  * `torch.levi_civita` *See the “Levi-Civita Symbol” section for the proposed operator*
 
 ## Special Function Policies
 
