@@ -1,25 +1,3 @@
-<details>
-<summary>Instructions - click to expand</summary>
-
-- Fork the rfcs repo: https://github.com/pytorch/rfcs
-- Copy `RFC-0000-template.md` to `RFC-00xx-my-feature.md`, or write your own open-ended proposal. Put care into the details.
-- Submit a pull request titled `RFC-00xx-my-feature`.
-    - Assign the `draft` label while composing the RFC. You may find it easier to use a WYSIWYG editor (like Google Docs) when working with a few close collaborators; feel free to use whatever platform you like. Ideally this document is publicly visible and is linked to from the PR.
-    - When opening the RFC for general discussion, copy your document into the `RFC-00xx-my-feature.md` file on the PR and assign the `commenting` label.
-- Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
-    - If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
-- Once the discussion has settled, assign a new label based on the level of support:
-    - `accepted` if a decision has been made in the RFC
-    - `draft` if the author needs to rework the RFC’s proposal
-    - `shelved` if there are no plans to move ahead with the current RFC’s proposal. We want neither to think about evaluating the proposal
-      nor about implementing the described feature until some time in the future.
-- A state of `accepted` means that the core team has agreed in principle to the proposal, and it is ready for implementation.
-- The author (or any interested developer) should next open a tracking issue on Github corresponding to the RFC.
-    - This tracking issue should contain the implementation next steps. Link to this tracking issue on the RFC (in the Resolution > Next Steps section)
-- Once all relevant PRs are merged, the RFC’s status label can be finally updated to `closed`.
-
-</details>
-
 # Special Functions
 
 _Author’s note—This RFC is a work-in-progress._
@@ -47,29 +25,16 @@ PyTorch maintainers:
 
 * provides much needed standardization to committing future operators to PyTorch.
 * provides an extremely useful set of operators that can and should be used for tricky numerical problems (e.g., implementing challenging distribution functions and gradients) and useful decomposition targets.
-
-## Table of Contents
-      
+ 
 ## Motivation
 
-### What’s a special function?
+### Special Functions
 
 There’s no formal definition of a “special function.” Colloquially, and for the purpose of this RFC, a special function is a mathematical function that has an established name and notation due to its importance and ubiquity.
 
-## Special Function Policies
-
-PyTorch’s mathematical operators should be categorized as either “elementary” or “special.” An elementary function is a mathematical function whose corresponding operator is available from the `torch` module. A special function is a mathematical function whose corresponding operator is available from the `torch.special` module. Regardless of whether an operator implements an elementary or special function, each operator must share the following properties:
-
-* A name that adheres to the naming policy.
-* A docstring that clearly communicates the following:
-  * A primary definition
-  * Real and complex domains
-  * Real and complex graphs
-* If differentiable, derivtatives for each variable.
-
 ### Elementary Functions
 
-Unlike “special functions,”  “elementary functions” have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing a function as an elementary function if the function is a mathematical function of a single variable (i.e., a unary operator) and the function is one of the following functions or belongs to the following families of functions:
+Unlike “special functions,”  “elementary functions” have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing a function as an elementary function if the function is one of the following functions or belongs to the following families of functions:
 
 * Cardinal Functions
 * Dirac delta
@@ -88,6 +53,19 @@ Unlike “special functions,”  “elementary functions” have a rigorous defi
 * Rounding and Congruence Functions
 * Tensorial Functions
 * Trigonometric
+
+## Special Function Policies
+
+PyTorch’s mathematical operators should be categorized as either “elementary” or “special.” An elementary function is a mathematical function whose corresponding operator is available from the `torch` module. A special function is a mathematical function whose corresponding operator is available from the `torch.special` module. Regardless of whether an operator implements an elementary or special function, each operator must share the following properties:
+
+* A name that adheres to the naming policy.
+* A docstring that clearly communicates the following:
+  * A primary definition
+  * Real and complex domains
+  * Real and complex graphs
+* If differentiable, derivtatives for each variable.
+
+
 
 ## Proposed Implementation
 
