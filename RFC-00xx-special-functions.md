@@ -30,11 +30,11 @@ PyTorch maintainers:
 
 ### Special Functions
 
-There’s no formal definition of a “special function.” Colloquially, and for the purpose of this RFC, a special function is a non-elementary function that has an established name and notation due to its importance and ubiquity.
+There’s no formal definition of a *special function*. Colloquially, and for the purpose of this RFC, a special function is a non-elementary function that has an established name and notation due to its importance and ubiquity.
 
 ### Elementary Functions
 
-Unlike “special functions,”  “elementary functions” have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing a function as an elementary function if the function is one of the following functions:
+Unlike special functions,  *elementary functions* have a rigorous definition but, for simplicity, PyTorch uses a simplified definition, categorizing a function as an elementary function if the function is one of the following functions:
 
 * Power Functions
 * Exponential Functions
