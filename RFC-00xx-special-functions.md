@@ -43,6 +43,10 @@ Unlike “special functions,”  “elementary functions” have a rigorous defi
 * Inverse Trigonometric Functions
 * Hyperbolic Functions
 * Inverse Hyperbolic Functions
+* Product Logarithms
+* Roots
+* Maximum and Minimum
+* Cardinal Functions
 * Greatest Common Divisor and Least Common Multiple
 * Rounding and Congruence Functions
 
