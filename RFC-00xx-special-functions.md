@@ -2372,7 +2372,7 @@ where $\Gamma(z)$ is the gamma function.
 
 Functions defined as the solutions to the Lommel differential equation:
 
-$$z^{2}{\frac {d^{2}y}{dz^{2}}}+z{\frac {dy}{dz}}+(z^{2}-\nu ^{2})y=z^{\mu +1}.$$
+$$z^{2}{\frac{d^{2}y}{dz^{2}}}+z{\frac{dy}{dz}}+(z^{2}-n^{2})y=z^{m+1}.$$
 
 #### Lommel Function of the First Kind
 
