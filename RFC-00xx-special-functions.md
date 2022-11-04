@@ -2655,15 +2655,15 @@ Associated Legendre function of the second kind:
 </details>
 
 <details>
-<summary>Ferrers Functions</summary>
-
-<details>
 <summary>Legendre Polynomial</summary>
 
 ### Legendre Polynomial
 
 #### Legendre Polynomial
 </details>
+
+<details>
+<summary>Ferrers Functions</summary>
 
 ### Ferrers Functions
 
