@@ -2834,6 +2834,8 @@ appell_f_4(
 ### Orthogonal Polynomials
 
 #### Legendre Polynomial
+
+#### Laguerre Polynomial
 </details>
 
 <details>
