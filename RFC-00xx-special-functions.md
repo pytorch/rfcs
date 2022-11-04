@@ -2575,7 +2575,7 @@ Legendre function of the second kind:
 
 $$Q_{n}(z)=Q_{n}^0(z),$$
 
-where $Q_{n}^0$ is the
+where $Q_{n}^m$ is the associated Legendre of the second kind.
 </details>
 
 <details>
