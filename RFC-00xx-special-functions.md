@@ -2438,7 +2438,9 @@ $$\mathbf{E}_{n}(z)={\frac{1}{\pi}}\int_{0}^{\pi}\sin(n\theta-z\sin \theta )d\th
 <details>
 <summary>Parabolic Cylinder Function</summary>
 
-### Parabolic Cylinder Function
+### Parabolic Cylinder Functions
+
+#### Parabolic Cylinder Function
 
 ```Python
 parabolic_cylinder_d(
