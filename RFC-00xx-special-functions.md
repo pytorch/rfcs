@@ -2657,6 +2657,14 @@ Associated Legendre function of the second kind:
 <details>
 <summary>Ferrers Functions</summary>
 
+<details>
+<summary>Legendre Polynomial</summary>
+
+### Legendre Polynomial
+
+#### Legendre Polynomial
+</details>
+
 ### Ferrers Functions
 
 #### Ferrers Function of the First Kind
