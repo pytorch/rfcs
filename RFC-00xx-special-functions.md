@@ -3662,6 +3662,16 @@ inverse_jacobi_elliptic_sc(
 </details>
 
 <details>
+<summary>Inverse Weierstrass Elliptic Functions</summary>
+
+### Inverse Weierstrass Elliptic Functions
+
+#### Inverse Weierstrass Elliptic Function (p)
+
+#### Inverse Weierstrass Elliptic Function (q)
+</details>
+
+<details>
 <summary>Modular Functions</summary>
 
 ### Modular Functions
