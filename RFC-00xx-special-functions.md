@@ -2605,7 +2605,53 @@ where $Q_{n}^m$ is the associated Legendre function of the second kind.
 
 #### Associated Legendre Function of the First Kind
 
+```Python
+associated_legendre_p(
+    n: Tensor,
+    z: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Associated Legendre function of the first kind:
+
+##### Parameters
+
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**m** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – 
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
 #### Associated Legendre Function of the Second Kind
+
+```Python
+associated_legendre_q(
+    n: Tensor,
+    z: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Associated Legendre function of the second kind:
+
+##### Parameters
+
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**m** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) –
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – 
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 </details>
 
 <details>
