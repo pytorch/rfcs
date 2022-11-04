@@ -2767,13 +2767,13 @@ $$T_n(z)=\frac{\delta _{n,0}}{2}+\frac{1}{2} n \sum _{k=1}^{\left\lfloor\frac{n}
 ```Python
 chebyshev_polynomial_u(
     n: Tensor, 
-    x: Tensor, 
+    z: Tensor, 
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
 
-Chebyshev polynomial of the second kind:
+Chebyshev polynomial of the second kind, if, and only if $n \in \mathbb{Z} \wedge n \geq 0$:
 
 $$U_n(z)=\sum _{k=0}^{\left\lfloor \frac{n}{2}\right\rfloor } \frac{(-1)^k (n-k)! (2 z)^{n-2 k}}{k! (n-2 k)!}.$$
 
@@ -2781,7 +2781,7 @@ $$U_n(z)=\sum _{k=0}^{\left\lfloor \frac{n}{2}\right\rfloor } \frac{(-1)^k (n-k)
 
 **n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
 
-**x** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
 
 ##### Keyword Arguments
 
