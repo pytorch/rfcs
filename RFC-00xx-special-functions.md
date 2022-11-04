@@ -2350,7 +2350,7 @@ struve_l(
 
 Modified Struve function:
 
-$$\mathbf {L} _{n }(z)=\sum _{m=0}^{\infty }{\frac {1}{\Gamma (m+{\frac {3}{2}})\Gamma (m+n +{\frac {3}{2}})}}({\frac {z}{2}})^{2m+n +1}.$$
+$$\mathbf{L}_{n}(z)=\left(\frac{z}{2}\right)^{n+1} \sum _{k=0}^{\infty } \frac{\left(\frac{z}{2}\right)^{2 k}}{\Gamma \left(k+\frac{3}{2}\right) \Gamma \left(k+n+\frac{3}{2}\right)},$$
 
 where $\Gamma(z)$ is the gamma function.
 
