@@ -2329,9 +2329,9 @@ where $\Gamma(z)$ is the gamma function.
 
 ##### Parameters
 
-**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – order. If $z$ is a number, $n$ must be a tensor.
 
-**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – input. If $z$ is a number, $n$ must be a tensor.
 
 ##### Keyword Arguments
 
@@ -2340,7 +2340,7 @@ where $\Gamma(z)$ is the gamma function.
 #### Modified Struve Function
 
 ```Python
-struve_l(
+modified_struve_l(
     n: Tensor, 
     z: Tensor, 
     *, 
@@ -2356,9 +2356,9 @@ where $\Gamma(z)$ is the gamma function.
 
 ##### Parameters
 
-**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – order. If $z$ is a number, $n$ must be a tensor.
 
-**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – input. If $z$ is a number, $n$ must be a tensor.
 
 ##### Keyword Arguments
 
