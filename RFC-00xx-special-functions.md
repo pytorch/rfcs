@@ -2545,7 +2545,32 @@ $${\displaystyle W_{\kappa ,\mu }(z)=\exp (-z/2)z^{\mu +{\tfrac {1}{2}}}U(\mu -\
 
 #### Legendre Function of the First Kind
 
+```Python
+legendre_p(
+    n: Tensor,
+    z: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Legendre function of the first kind:
+
+$$P_{n}(z)=_{2}F_{1}\left(-n,n+1;1;\frac{1-z}{2}\right).$$
+
 #### Legendre Function of the Second Kind
+
+```Python
+legendre_q(
+    n: Tensor,
+    z: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
+Legendre function of the second kind:
+
 </details>
 
 <details>
