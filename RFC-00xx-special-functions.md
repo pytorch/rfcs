@@ -2571,6 +2571,7 @@ legendre_q(
 
 Legendre function of the second kind:
 
+$$Q_{n}(z)=Q_{n}^0(z).$$
 </details>
 
 <details>
