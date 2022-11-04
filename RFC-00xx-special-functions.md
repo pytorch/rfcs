@@ -2323,7 +2323,7 @@ struve_h(
 
 Struve function:
 
-$$\mathbf{H}_{n}(z)=\left(\frac{z}{2}\right)^{n+1} \sum _{k=0}^{\infty } \frac{(-1)^k \left(\frac{z}{2}\right)^{2 k}}{\Gamma \left(k+\frac{3}{2}\right) \Gamma \left(k+\nu +\frac{3}{2}\right)},$$
+$$\mathbf{H}_{n}(z)=\left(\frac{z}{2}\right)^{n+1} \sum _{k=0}^{\infty } \frac{(-1)^k \left(\frac{z}{2}\right)^{2 k}}{\Gamma \left(k+\frac{3}{2}\right) \Gamma \left(k+n+\frac{3}{2}\right)},$$
 
 where $\Gamma(z)$ is the gamma function.
 
