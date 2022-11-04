@@ -2370,6 +2370,10 @@ where $\Gamma(z)$ is the gamma function.
 
 ### Lommel Functions
 
+Functions defined as the solutions to the Lommel differential equation:
+
+$$z^{2}{\frac {d^{2}y}{dz^{2}}}+z{\frac {dy}{dz}}+(z^{2}-\nu ^{2})y=z^{\mu +1}.$$
+
 #### Lommel Function of the First Kind
 
 #### Lommel Function of the Second Kind
