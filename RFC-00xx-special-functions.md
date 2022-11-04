@@ -2556,7 +2556,9 @@ legendre_p(
 
 Legendre function of the first kind:
 
-$$P_{n}(z)=\operatorname{_2F_2}\left(-n,n+1;1;\frac{1-z}{2}\right).$$
+$$P_{n}(z)=\operatorname{_2F_2}\left(-n,n+1;1;\frac{1-z}{2}\right),$$
+
+where $\operatorname{_2F_2}$ is the
 
 #### Legendre Function of the Second Kind
 
@@ -2571,7 +2573,9 @@ legendre_q(
 
 Legendre function of the second kind:
 
-$$Q_{n}(z)=Q_{n}^0(z).$$
+$$Q_{n}(z)=Q_{n}^0(z),$$
+
+where $Q_{n}^0$ is the
 </details>
 
 <details>
