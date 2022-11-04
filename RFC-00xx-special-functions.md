@@ -2655,14 +2655,6 @@ Associated Legendre function of the second kind:
 </details>
 
 <details>
-<summary>Legendre Polynomial</summary>
-
-### Legendre Polynomial
-
-#### Legendre Polynomial
-</details>
-
-<details>
 <summary>Ferrers Functions</summary>
 
 ### Ferrers Functions
@@ -2834,6 +2826,14 @@ appell_f_4(
 #### $q$-Digamma Function
 
 #### $q$-Polygamma Function
+</details>
+
+<details>
+<summary>Legendre Polynomial</summary>
+
+### Legendre Polynomial
+
+#### Legendre Polynomial
 </details>
 
 <details>
