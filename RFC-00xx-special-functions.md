@@ -2748,7 +2748,7 @@ chebyshev_polynomial_t(
 ) -> Tensor
 ```
 
-Chebyshev polynomial of the first kind, if, and only if, $n \in \mathbb{N}:$
+Chebyshev polynomial of the first kind, if, and only if $n \in \mathbb{N} \wedge n \geq 0$:
 
 $$T_n(z)=\frac{\delta _{n,0}}{2}+\frac{1}{2} n \sum _{k=1}^{\left\lfloor\frac{n}{2}\right\rfloor } \frac{(-1)^k (n-k-1)! (2 z)^{n-2 k}}{k! (n-2 k)!}+2^{n-1}z^n.$$
 
@@ -2773,7 +2773,7 @@ chebyshev_polynomial_u(
 ) -> Tensor
 ```
 
-Chebyshev polynomial of the second kind, if, and only if $n \in \mathbb{Z} \wedge n \geq 0$:
+Chebyshev polynomial of the second kind, if, and only if $n \in \mathbb{N} \wedge n \geq 0$:
 
 $$U_n(z)=\sum _{k=0}^{\left\lfloor \frac{n}{2}\right\rfloor } \frac{(-1)^k (n-k)! (2 z)^{n-2 k}}{k! (n-2 k)!}.$$
 
