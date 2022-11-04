@@ -2742,19 +2742,21 @@ appell_f_4(
 ```Python
 chebyshev_polynomial_t(
     n: Tensor, 
-    x: Tensor, 
+    z: Tensor, 
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
 
-Chebyshev polynomial of the first kind, $T_{n}(x).$
+Chebyshev polynomial of the first kind:
+
+$$T_n(z)=\frac{\delta _{n,0}}{2}+\frac{1}{2} n \sum _{k=1}^{\left\lfloor\frac{n}{2}\right\rfloor } \frac{(-1)^k (n-k-1)! (2 z)^{n-2 k}}{k! (n-2 k)!}+2^{n-1}z^n.$$
 
 ##### Parameters
 
 **n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
 
-**x** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) –
 
 ##### Keyword Arguments
 
