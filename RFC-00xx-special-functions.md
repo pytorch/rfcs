@@ -2829,9 +2829,9 @@ appell_f_4(
 </details>
 
 <details>
-<summary>Legendre Polynomial</summary>
+<summary>Orthogonal Polynomials</summary>
 
-### Legendre Polynomial
+### Orthogonal Polynomials
 
 #### Legendre Polynomial
 </details>
