@@ -2558,7 +2558,17 @@ Legendre function of the first kind:
 
 $$P_{n}(z)=\operatorname{_2F_2}\left(-n,n+1;1;\frac{1-z}{2}\right),$$
 
-where $\operatorname{_2F_2}$ is the
+where $\operatorname{_2F_2}$ is the generalized hypergeometric function.
+
+##### Parameters
+
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – order. If $z$ is a number, $n$ must be a tensor.
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – input. If $z$ is a number, $n$ must be a tensor.
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
 #### Legendre Function of the Second Kind
 
@@ -2576,6 +2586,16 @@ Legendre function of the second kind:
 $$Q_{n}(z)=Q_{n}^0(z),$$
 
 where $Q_{n}^m$ is the associated Legendre function of the second kind.
+
+##### Parameters
+
+**n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – order. If $z$ is a number, $n$ must be a tensor.
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – input. If $z$ is a number, $n$ must be a tensor.
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 </details>
 
 <details>
