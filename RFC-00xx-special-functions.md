@@ -2556,7 +2556,7 @@ legendre_p(
 
 Legendre function of the first kind:
 
-$$P_{n}(z)=_{2}F_{1}\left(-n,n+1;1;\frac{1-z}{2}\right).$$
+$$P_{n}(z)= _2F_1 \left(-n,n+1;1;\frac{1-z}{2}\right).$$
 
 #### Legendre Function of the Second Kind
 
