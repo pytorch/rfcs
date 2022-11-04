@@ -2773,7 +2773,9 @@ chebyshev_polynomial_u(
 ) -> Tensor
 ```
 
-Chebyshev polynomial of the second kind, $U_{n}(x).$
+Chebyshev polynomial of the second kind:
+
+$$U_n(z)=\sum _{k=0}^{\left\lfloor \frac{n}{2}\right\rfloor } \frac{(-1)^k (n-k)! (2 z)^{n-2 k}}{k! (n-2 k)!}.$$
 
 ##### Parameters
 
