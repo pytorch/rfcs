@@ -790,10 +790,10 @@ where $\Gamma$ is the gamma function.
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Natural Logarithm of the Beta Function
+#### Logarithm of the Beta Function
 
 ```Python
-ln_beta(
+log_beta(
     a: Tensor, 
     b: Tensor,
     *, 
