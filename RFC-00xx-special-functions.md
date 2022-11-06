@@ -3604,10 +3604,6 @@ $$\vartheta _4(z,q)=1+2 \sum _{k=1}^{\infty } (-1)^k q^{k^2} \cos (2 k z).$$
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
-</details>
-
-<details>
-<summary>Jacobi Elliptic and Related Functions</summary>
 
 #### Derivative of Theta Function $\left(\vartheta_4'\right)$
 
@@ -3633,6 +3629,10 @@ $$\vartheta _4^{\prime }(z,q)=-4 \sum _{k=1}^{\infty } (-1)^k k q^{k^2} \sin (2 
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+</details>
+
+<details>
+<summary>Jacobi Elliptic and Related Functions</summary>
 
 ### Jacobi Elliptic and Related Functions
 
