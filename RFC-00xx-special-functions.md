@@ -3441,6 +3441,10 @@ theta_1(
 ) -> Tensor
 ```
 
+Theta function:
+
+$$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin ((2 k+1) z).$$
+
 ##### Parameters
 
 **z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
