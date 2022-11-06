@@ -726,14 +726,14 @@ trigamma(
 #### Natural Logarithm of the Gamma Function
 
 ```Python
-ln_gamma(
+log_gamma(
     z: Tensor, 
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
 ```
 
-Natural logarithm of the gamma function:
+Logarithm of the gamma function:
 
 $$\log{\Gamma}(z)=\sum _{k=1}^{\infty } \left(\frac{z}{k}-\log \left(1+\frac{z}{k}\right)\right)-\gamma  z-\log (z).$$
 
