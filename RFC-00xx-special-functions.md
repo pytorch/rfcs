@@ -723,7 +723,7 @@ trigamma(
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Natural Logarithm of the Gamma Function
+#### Logarithm of the Gamma Function
 
 ```Python
 log_gamma(
