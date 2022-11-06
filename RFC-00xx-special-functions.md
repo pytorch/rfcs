@@ -3516,6 +3516,10 @@ theta_4(
 ) -> Tensor
 ```
 
+Theta function:
+
+$$\vartheta _4(z,q)=1+2 \sum _{k=1}^{\infty } (-1)^k q^{k^2} \cos (2 k z).$$
+
 ##### Parameters
 
 **z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
