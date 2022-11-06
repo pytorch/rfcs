@@ -3455,6 +3455,8 @@ $$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin 
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
+#### Derivative of Theta Function $\left(\vartheta_1'\right)$
+
 #### Theta Function $\left(\vartheta_2\right)$
 
 ```Python
@@ -3480,6 +3482,8 @@ $$\vartheta _2(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } q^{k (k+1)} \cos ((2 k+1
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
+#### Derivative of Theta Function $\left(\vartheta_2'\right)$
+
 #### Theta Function $\left(\vartheta_3\right)$
 
 ```Python
@@ -3504,6 +3508,8 @@ $$\vartheta _3(z,q)=1+2 \sum _{k=1}^{\infty } q^{k^2} \cos (2 k z).$$
 ##### Keyword Arguments
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
+#### Derivative of Theta Function $\left(\vartheta_3'\right)$
 
 #### Theta Function $\left(\vartheta_4\right)$
 
@@ -3533,6 +3539,8 @@ $$\vartheta _4(z,q)=1+2 \sum _{k=1}^{\infty } (-1)^k q^{k^2} \cos (2 k z).$$
 
 <details>
 <summary>Jacobi Elliptic and Related Functions</summary>
+
+#### Derivative of Theta Function $\left(\vartheta_4'\right)$
 
 ### Jacobi Elliptic and Related Functions
 
