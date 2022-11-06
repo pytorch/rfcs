@@ -3455,7 +3455,7 @@ $$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin 
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Derivative of Theta Function $\left(\vartheta_1'\right)$
+#### Derivative of the Theta Function $\left(\vartheta_1'\right)$
 
 ```Python
 theta_1_prime(
@@ -3466,7 +3466,7 @@ theta_1_prime(
 ) -> Tensor
 ```
 
-Derivative of theta function:
+Derivative of the theta function:
 
 $$\vartheta_1^{\prime}(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} (2 k+1) \cos ((2 k+1) z).$$
 
@@ -3505,7 +3505,7 @@ $$\vartheta _2(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } q^{k (k+1)} \cos ((2 k+1
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Derivative of Theta Function $\left(\vartheta_2'\right)$
+#### Derivative of the Theta Function $\left(\vartheta_2'\right)$
 
 ```Python
 theta_2_prime(
@@ -3516,7 +3516,7 @@ theta_2_prime(
 ) -> Tensor
 ```
 
-Derivative of theta function:
+Derivative of the theta function:
 
 $$\vartheta _2^{\prime }(z,q)=-2 \sqrt[4]{q} \sum _{k=0}^{\infty } q^{k (k+1)} (2 k+1) \sin ((2 k+1) z).$$
 
@@ -3555,7 +3555,7 @@ $$\vartheta _3(z,q)=1+2 \sum _{k=1}^{\infty } q^{k^2} \cos (2 k z).$$
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Derivative of Theta Function $\left(\vartheta_3'\right)$
+#### Derivative of the Theta Function $\left(\vartheta_3'\right)$
 
 ```Python
 theta_3_prime(
@@ -3566,7 +3566,7 @@ theta_3_prime(
 ) -> Tensor
 ```
 
-Derivative of theta function:
+Derivative of the theta function:
 
 $$\vartheta _3^{\prime }(z,q)=-4 \sum _{k=1}^{\infty } q^{k^2} k \sin (2 k z).$$
 
@@ -3605,7 +3605,7 @@ $$\vartheta _4(z,q)=1+2 \sum _{k=1}^{\infty } (-1)^k q^{k^2} \cos (2 k z).$$
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Derivative of Theta Function $\left(\vartheta_4'\right)$
+#### Derivative of the Theta Function $\left(\vartheta_4'\right)$
 
 ```Python
 theta_4_prime(
@@ -3616,7 +3616,7 @@ theta_4_prime(
 ) -> Tensor
 ```
 
-Derivative of theta function:
+Derivative of the theta function:
 
 $$\vartheta _4^{\prime }(z,q)=-4 \sum _{k=1}^{\infty } (-1)^k k q^{k^2} \sin (2 k z).$$
 
