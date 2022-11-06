@@ -733,6 +733,10 @@ ln_gamma(
 ) -> Tensor
 ```
 
+Natural logarithm of the gamma function:
+
+$$\log{\Gamma}(z)=\sum _{k=1}^{\infty } \left(\frac{z}{k}-\log \left(1+\frac{z}{k}\right)\right)-\gamma  z-\log (z).$$
+
 ##### Parameters
 
 **z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – input.
