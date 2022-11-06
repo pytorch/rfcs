@@ -3430,7 +3430,7 @@ carlson_elliptic_integral_r_m(
 
 ### Theta Functions
 
-#### Theta Function $\vartheta_1\left(z, q\right)$
+#### Theta Function $\left(\vartheta_1\right)$
 
 ```Python
 theta_1(
@@ -3455,7 +3455,7 @@ $$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin 
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Theta Function $\vartheta_2\left(z, q\right)$
+#### Theta Function $\left(\vartheta_2\right)$
 
 ```Python
 theta_2(
@@ -3480,7 +3480,7 @@ $$\vartheta _2(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } q^{k (k+1)} \cos ((2 k+1
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Theta Function $\vartheta_3\left(z, q\right)$
+#### Theta Function $\left(\vartheta_3\right)$
 
 ```Python
 theta_3(
@@ -3505,7 +3505,7 @@ $$\vartheta _3(z,q)=1+2 \sum _{k=1}^{\infty } q^{k^2} \cos (2 k z).$$
 
 **out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 
-#### Theta Function $\vartheta_4\left(z, q\right)$
+#### Theta Function $\left(\vartheta_4\right)$
 
 ```Python
 theta_4(
