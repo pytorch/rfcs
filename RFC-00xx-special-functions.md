@@ -3435,7 +3435,7 @@ carlson_elliptic_integral_r_m(
 ```Python
 theta_1(
     z: Tensor,
-    t: Tensor,
+    q: Tensor,
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
@@ -3460,7 +3460,7 @@ $$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin 
 ```Python
 theta_2(
     z: Tensor,
-    t: Tensor,
+    q: Tensor,
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
@@ -3485,7 +3485,7 @@ $$\vartheta _2(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } q^{k (k+1)} \cos ((2 k+1
 ```Python
 theta_3(
     z: Tensor,
-    t: Tensor,
+    q: Tensor,
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
@@ -3510,7 +3510,7 @@ $$\vartheta _3(z,q)=1+2 \sum _{k=1}^{\infty } q^{k^2} \cos (2 k z).$$
 ```Python
 theta_4(
     z: Tensor,
-    t: Tensor,
+    q: Tensor,
     *, 
     out: Optional[Tensor] = None,
 ) -> Tensor
