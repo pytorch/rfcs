@@ -3508,7 +3508,7 @@ $$\vartheta _2(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } q^{k (k+1)} \cos ((2 k+1
 #### Derivative of Theta Function $\left(\vartheta_2'\right)$
 
 ```Python
-theta_1(
+theta_2_prime(
     z: Tensor,
     q: Tensor,
     *, 
@@ -3516,9 +3516,9 @@ theta_1(
 ) -> Tensor
 ```
 
-Theta function:
+Derivative of theta function:
 
-$$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin ((2 k+1) z).$$
+$$\vartheta _2^{\prime }(z,q)=-2 \sqrt[4]{q} \sum _{k=0}^{\infty } q^{k (k+1)} (2 k+1) \sin ((2 k+1) z).$$
 
 ##### Parameters
 
@@ -3558,7 +3558,7 @@ $$\vartheta _3(z,q)=1+2 \sum _{k=1}^{\infty } q^{k^2} \cos (2 k z).$$
 #### Derivative of Theta Function $\left(\vartheta_3'\right)$
 
 ```Python
-theta_1(
+theta_3_prime(
     z: Tensor,
     q: Tensor,
     *, 
@@ -3566,9 +3566,9 @@ theta_1(
 ) -> Tensor
 ```
 
-Theta function:
+Derivative of theta function:
 
-$$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin ((2 k+1) z).$$
+$$\vartheta_1^{\prime}(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} (2 k+1) \cos ((2 k+1) z).$$
 
 ##### Parameters
 
@@ -3612,7 +3612,7 @@ $$\vartheta _4(z,q)=1+2 \sum _{k=1}^{\infty } (-1)^k q^{k^2} \cos (2 k z).$$
 #### Derivative of Theta Function $\left(\vartheta_4'\right)$
 
 ```Python
-theta_1(
+theta_4_prime(
     z: Tensor,
     q: Tensor,
     *, 
@@ -3620,9 +3620,9 @@ theta_1(
 ) -> Tensor
 ```
 
-Theta function:
+Derivative of theta function:
 
-$$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin ((2 k+1) z).$$
+$$\vartheta_1^{\prime}(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} (2 k+1) \cos ((2 k+1) z).$$
 
 ##### Parameters
 
