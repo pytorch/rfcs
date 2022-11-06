@@ -3954,7 +3954,7 @@ liouville_lambda(
 <details>
 <summary>Matthieu Characteristic Values</summary>
 
-### Matthieu Characteristic Values
+### Mathieu Characteristic Values
 
 #### Matthieu Characteristic Value $\left(a\right)$
 
@@ -3982,11 +3982,13 @@ matthieu_characteristic_b(
 <details>
 <summary>Angular Matthieu Functions</summary>
 
-### Angular Matthieu Functions
+### Angular Mathieu Functions
 
-#### Angular Matthieu Function ($\operatorname{ce}$)
+#### Angular Mathieu Function ($\operatorname{ce}$)
 
-#### Angular Matthieu Function ($\operatorname{se}$)
+Even Mathieu function:
+
+#### Angular Mathieu Function ($\operatorname{se}$)
 </details>
 
 <details>
