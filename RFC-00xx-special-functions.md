@@ -669,7 +669,7 @@ polygamma(
 ) -> Tensor
 ```
 
-Polygamma function:
+Polygamma function, if, and only if, $n \in \mathbb{Z} \land n > 0$:
 
 $$\psi^{n}(z)=(-1)^{n+1} n! \sum _{k=0}^{\infty }\frac{1}{(k+z)^{n+1}}.$$
 
