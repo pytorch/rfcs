@@ -3568,7 +3568,7 @@ theta_3_prime(
 
 Derivative of theta function:
 
-$$\vartheta_1^{\prime}(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} (2 k+1) \cos ((2 k+1) z).$$
+$$\vartheta _3^{\prime }(z,q)=-4 \sum _{k=1}^{\infty } q^{k^2} k \sin (2 k z).$$
 
 ##### Parameters
 
