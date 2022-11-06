@@ -3449,7 +3449,7 @@ $$\vartheta _1(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } (-1)^k q^{k (k+1)} \sin 
 
 **z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
-**t** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
 ##### Keyword Arguments
 
@@ -3474,7 +3474,7 @@ $$\vartheta _2(z,q)=2 \sqrt[4]{q} \sum _{k=0}^{\infty } q^{k (k+1)} \cos ((2 k+1
 
 **z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
-**t** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
 ##### Keyword Arguments
 
@@ -3499,7 +3499,7 @@ $$\vartheta _3(z,q)=1+2 \sum _{k=1}^{\infty } q^{k^2} \cos (2 k z).$$
 
 **z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
-**t** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
 ##### Keyword Arguments
 
@@ -3524,7 +3524,7 @@ $$\vartheta _4(z,q)=1+2 \sum _{k=1}^{\infty } (-1)^k q^{k^2} \cos (2 k z).$$
 
 **z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
-**t** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
+**q** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
 
 ##### Keyword Arguments
 
