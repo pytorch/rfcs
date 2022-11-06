@@ -3491,6 +3491,10 @@ theta_3(
 ) -> Tensor
 ```
 
+Theta function:
+
+$$\vartheta _3(z,q)=1+2 \sum _{k=1}^{\infty } q^{k^2} \cos (2 k z).$$
+
 ##### Parameters
 
 **z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – 
