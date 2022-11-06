@@ -669,6 +669,10 @@ polygamma(
 ) -> Tensor
 ```
 
+Polygamma function:
+
+$$\psi^{n}(z)=(-1)^{n+1} n! \sum _{k=0}^{\infty }\frac{1}{(k+z)^{n+1}}.$$
+
 ##### Parameters
 
 **n** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor) *or Number*) – derivative.
@@ -691,7 +695,7 @@ digamma(
 
 Digamma function:
 
-$$\psi(z)=\sum_{k=1}^{\infty}\left(\frac{1}{k}-\frac{1}{k+z-1}\right)-\gamma.$$
+$$\psi(z)=\sum _{k=1}^{\infty } \left(\frac{1}{k}-\frac{1}{k+z-1}\right)-\gamma.$$
 
 ##### Parameters
 
