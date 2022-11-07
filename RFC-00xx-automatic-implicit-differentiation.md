@@ -214,9 +214,9 @@ The LU decomposition of $\partial_{1}G(x,\theta)$, or if, and only if, $\partial
 ### Python API
 
 <details>
-<summary>Decorators</summary>
+<summary>Decorators and Functions</summary>
 
-#### Decorators
+#### Decorators and Functions
 
 ##### `@torch.optim.root`
 
@@ -263,12 +263,6 @@ def fixed_point(f: Callable, g: Callable):
     """
     pass
 ```
-</details>
-
-<details>
-<summary>Functions</summary>
-
-#### Functions
 
 ##### `torch.optim.root_jvp`
 
@@ -646,7 +640,6 @@ class LBFGS(Optimizer):
 
 <details>
 <summary>Derivative-Free Optimizers</summary>
-
 #### Derivative-Free Optimization
 
 Derivative-free methods rely only on the objective function, $f$. Derivative-free methods do not rely on derivative information to guide them toward a local minimum or identify when they have reached a local minimum. They use other criteria to choose the next search direction and to judge when they have converged.
