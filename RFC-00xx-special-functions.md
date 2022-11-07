@@ -1534,9 +1534,9 @@ $\exp{(\operatorname{Bi}'(z))}$ is defined for all real and complex values.
 
 ### Scorer’s Functions
 
-#### Scorer’s Function
+#### Scorer’s Function $\left(\operatorname{Gi}\right)$
 
-#### Scorer’s Function
+#### Scorer’s Function $\left(\operatorname{Hi}\right)$
 </details>
 
 <details>
