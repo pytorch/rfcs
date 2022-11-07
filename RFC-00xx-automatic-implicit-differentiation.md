@@ -595,6 +595,9 @@ class Adam(Optimizer):
 ```
 </details>
 
+<details>
+<summary>Second-Order Method Optimizers</summary>
+
 #### Second-Order Method Optimizers
 
 Second-order methods leverage second-order approximations that use the second derivative in univariate optimization or the Hessian in multivariate optimization to direct the search. This additional information can help improve the local model used for informing the selection of directions and step lengths in descent algorithms.
@@ -639,6 +642,10 @@ class LBFGS(Optimizer):
     def __init__():
         raise NotImplementedError
 ```
+</details>
+
+<details>
+<summary>Derivative-Free Optimizers</summary>
 
 #### Derivative-Free Optimizers
 
@@ -675,8 +682,13 @@ class NelderMead(Optimizer):
     def __init__():
         raise NotImplementedError
 ```
+</details>
+
+<details>
+<summary>Linear Constrained Optimizers</summary>
 
 #### Linear Constrained Optimizers
+</details>
 
 ## Drawbacks
 
