@@ -66,7 +66,7 @@ PyTorch will combine the implicit function theorem and automatic differentation 
 functorch.jacrev(h, argnums=0)(y, 10.0)
 ```
 
-*`torch.optim` would provide a robust set of solvers*
+*`torch.optim` would provide a robust set of solvers*.
 
 ## Motivation
 
@@ -458,6 +458,10 @@ class BacktrackingLineSearch(Optimizer):
     def __init__():
         raise NotImplementedError
 ```
+</details>
+
+<details>
+<summary>Non-Linear Least Squares Optimizers</summary>
 
 #### Non-Linear Least Squares Optimizers
 
@@ -503,6 +507,10 @@ class LevenbergMarquardt(Optimizer):
     def __init__():
         raise NotImplementedError
 ```
+</details>
+
+<details>
+<summary>First-Order Method Optimizers</summary>
 
 #### First-Order Method Optimizers
 
