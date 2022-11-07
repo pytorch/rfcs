@@ -1811,7 +1811,7 @@ Modified Bessel function of the first kind:
 
 $$I_{n}(z)=\sum _{k=0}^{\infty} \frac{\left(\frac{z}{2}\right)^{2k+n}}{\Gamma(k+n+1) k!},$$
 
-where $\Gamma{\left(z\right) is the gamma function.$
+where $\Gamma{\left(z\right)$ is the gamma function.
 
 ##### Parameters
 
