@@ -679,9 +679,10 @@ class NelderMead(Optimizer):
 </details>
 
 <details>
-<summary>Linear Constrained Optimizers</summary>
+<summary>Constrained Optimization</summary>
 
-#### Linear Constrained Optimizers
+#### Constrained Optimization
+
 </details>
 
 ## Drawbacks
