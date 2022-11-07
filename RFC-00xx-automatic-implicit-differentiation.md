@@ -214,6 +214,8 @@ The LU decomposition of $\partial_{1}G(x,\theta)$, or if, and only if, $\partial
 ### Python API
 
 <details>
+<summary>Decorators</summary>
+
 #### Decorators
 
 ##### `@torch.optim.root`
@@ -264,8 +266,9 @@ def fixed_point(f: Callable, g: Callable):
 </details>
 
 <details>
+<summary>Functions</summary>
+
 #### Functions
-</details>
 
 ##### `torch.optim.root_jvp`
 
@@ -318,6 +321,7 @@ def root_vjp(
     """
     pass
 ```
+</details>
 
 #### Bracketing Optimizers
 
