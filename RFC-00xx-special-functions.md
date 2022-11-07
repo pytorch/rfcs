@@ -1882,7 +1882,7 @@ Modified Bessel function of the second kind:
 
 $$K_{n}(z) = \frac{1}{2} \pi i^{n + 1} H_n^{1}(i z),$$
 
-where $i$ is the imaginary unit and $H_{n}^{1}(z)$ is the Hankel function of the first kind.
+where $H_{n}^{1}(z)$ is the Hankel function of the first kind.
 
 ##### Parameters
 
