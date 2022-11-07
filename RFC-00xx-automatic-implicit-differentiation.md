@@ -330,8 +330,7 @@ def root_vjp(
 
 PyTorch provides a variety of bracketing methods for univariate functions, or functions involving a single variable.
 
-Bracketing is the process of identifying an interval in which a local minimum lies and then successively shrinking the interval. For many functions, derivative information can be helpful in directing the search for an optimum, but, for some functions, this information may not be available or might not exist. 
-</details>
+Bracketing is the process of identifying an interval in which a local minimum lies and then successively shrinking the interval. For many functions, derivative information can be helpful in directing the search for an optimum, but, for some functions, this information may not be available or might not exist.
 
 ##### Bisection Method
 
@@ -399,6 +398,10 @@ class Brent(Optimizer):
     ):
         raise NotImplementedError
 ```
+</details>
+
+<details>
+<summary>Local Descent Optimizers</summary>
 
 #### Local Descent Optimizers
 
@@ -582,6 +585,7 @@ class Adam(Optimizer):
     def __init__():
         raise NotImplementedError
 ```
+</details>
 
 #### Second-Order Method Optimizers
 
