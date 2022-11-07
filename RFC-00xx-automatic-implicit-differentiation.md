@@ -639,7 +639,8 @@ class LBFGS(Optimizer):
 </details>
 
 <details>
-<summary>Derivative-Free Optimizers</summary>
+<summary>Derivative-Free Optimization</summary>
+
 #### Derivative-Free Optimization
 
 Derivative-free methods rely only on the objective function, $f$. Derivative-free methods do not rely on derivative information to guide them toward a local minimum or identify when they have reached a local minimum. They use other criteria to choose the next search direction and to judge when they have converged.
