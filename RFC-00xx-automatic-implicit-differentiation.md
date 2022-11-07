@@ -455,9 +455,9 @@ class BacktrackingLineSearch(Optimizer):
 </details>
 
 <details>
-<summary>Non-Linear Least Squares Optimizers</summary>
+<summary>Non-Linear Least Squares</summary>
 
-#### Non-Linear Least Squares Optimizers
+#### Non-Linear Least Squares
 
 Problems of the form:
 
