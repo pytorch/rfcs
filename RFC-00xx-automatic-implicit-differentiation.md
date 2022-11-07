@@ -664,6 +664,8 @@ class NelderMead(Optimizer):
 
 > CasADi is an open-source tool for nonlinear optimization and algorithmic differentiation. It facilitates rapid — yet efficient — implementation of different methods for numerical optimal control, both in an offline context and for nonlinear model predictive control (NMPC).
 
-### [JAXopt](https://jaxopt.github.io)
+### [JAX](https://jax.readthedocs.io)
 
-### [Optax](https://optax.readthedocs.io)
+#### [JAXopt](https://jaxopt.github.io)
+
+#### [Optax](https://optax.readthedocs.io)
