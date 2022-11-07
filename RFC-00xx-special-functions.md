@@ -1533,6 +1533,7 @@ $\exp{(\operatorname{Bi}'(z))}$ is defined for all real and complex values.
 <summary>Scorer’s Functions</summary>
 
 ### Scorer’s Functions
+</details>
 
 ### Bessel Functions
 
