@@ -205,7 +205,7 @@ Newton’s method is obtained by $G(x, \theta) = \delta_{1}f(x, \theta)$, yieldi
 
 $$T(x,\theta)=x-\eta[\nabla^{2}_{1}f(x,\theta)]^{-1}\nabla_{1}f(x,\theta).$$
 
-A practical implementation can pre-compute an LU decomposition ([torch.linalg.lu](https://pytorch.org/docs/stable/generated/torch.linalg.lu.html#torch.linalg.lu)) of $\partial_{1}G(x,\theta)$ or a Cholesky decomposition ([torch.linalg.cholesky](https://pytorch.org/docs/stable/generated/torch.linalg.cholesky.html#torch.linalg.cholesky)) if, and only if, $\partial_{1}G(x,\theta)$ is positive and semi-definite.
+A practical implementation can pre-compute an LU decomposition of $\partial_{1}G(x,\theta)$ or a Cholesky decomposition (if, and only if, $\partial_{1}G(x,\theta)$ is positive and semi-definite).
 
 #### Convex Optimization
 
