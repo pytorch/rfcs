@@ -1536,7 +1536,13 @@ $\exp{(\operatorname{Bi}'(z))}$ is defined for all real and complex values.
 
 #### Scorer’s Function $\left(\operatorname{Gi}\right)$
 
+Scorer’s function:
+
+$$\mathrm{Gi}(x)=\frac{1}{\pi}\int_0^{\infty}\sin\left(\frac{t^3}{3}+xt\right)\text{d}t.$$
+
 #### Scorer’s Function $\left(\operatorname{Hi}\right)$
+
+Scorer’s function:
 
 $$\mathrm{Hi}(x)=\frac{1}{\pi}\int_0^{\infty} \exp \left( -\dfrac{t^3}{3}+xt\right)\text{d}t.$$
 
