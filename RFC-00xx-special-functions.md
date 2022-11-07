@@ -1536,16 +1536,47 @@ $\exp{(\operatorname{Bi}'(z))}$ is defined for all real and complex values.
 
 #### Scorer’s Function $\left(\operatorname{Gi}\right)$
 
+```Python
+scorer_gi(
+    z: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
+
 Scorer’s function:
 
 $$\mathrm{Gi}(z)=\frac{1}{\pi}\int_0^{\infty}\sin\left(\frac{t^3}{3}+zt\right)\text{d}t.$$
 
+##### Parameters
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – input.
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
+
 #### Scorer’s Function $\left(\operatorname{Hi}\right)$
+
+```Python
+scorer_hi(
+    z: Tensor, 
+    *, 
+    out: Optional[Tensor] = None,
+) -> Tensor
+```
 
 Scorer’s function:
 
 $$\mathrm{Hi}(z)=\frac{1}{\pi}\int_0^{\infty}\exp\left(-\frac{t^3}{3}+zt\right)\text{d}t.$$
 
+##### Parameters
+
+**z** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor)) – input.
+
+##### Keyword Arguments
+
+**out** ([Tensor](https://pytorch.org/docs/stable/tensors.html#torch.Tensor), *optional*) – output.
 </details>
 
 <details>
