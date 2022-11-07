@@ -2835,7 +2835,7 @@ appell_f_4(
 
 $q$-factorial:
 
-$$[n]_q! = \prod^{n - 1}_{i = 0} \left(\textstyle\sum^{i}_{j = 0} q^j\right).$$
+$$[n]_q! = \prod^{n - 1} _{i = 0} \left(\textstyle\sum^{i} _{j = 0} q^j\right).$$
 
 #### $q$-Binomial Coefficient
 
