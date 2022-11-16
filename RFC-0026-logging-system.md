@@ -207,7 +207,7 @@ In Python, each element in `*args` must either have a `__str__` function or it
 must be a callable that, when called, produces another object that has
 a `__str__` fuction. Providing the body of a message as a callable can provide
 better performance in cases where the message would not be emitted, as in
-`torch.check(True, lambda: expensive_function())` if `cond == True`, since the
+`torch._check(True, lambda: expensive_function())` if `cond == True`, since the
 `expensive_function()` would not be called in that case.
 
 
@@ -219,58 +219,61 @@ in the following signatures, and throw an error if that condition is false.
 The error APIs are listed below, with the C++ signature on the left and the
 corresponding Python signature on the right.
 
-**`TORCH_CHECK(cond, ...)`** - `torch.check(cond, *args)`
+**`TORCH_CHECK(cond, ...)`** - `torch._check(cond, *args)`
   - C++ error: `c10::Error`
   - Python error: `RuntimeError`
 
-**`TORCH_CHECK_INDEX(cond, ...)`** - `torch.check_index(cond, *args)`
+**`TORCH_CHECK_INDEX(cond, ...)`** - `torch._check_index(cond, *args)`
   - C++ error: `c10::IndexError`
   - Python error: `IndexError`
 
-**`TORCH_CHECK_VALUE(cond, ...)`** - `torch.check_value(cond, *args)`
+**`TORCH_CHECK_VALUE(cond, ...)`** - `torch._check_value(cond, *args)`
   - C++ error: `c10::ValueError`
   - Python error: `IndexError`
 
-**`TORCH_CHECK_TYPE(cond, ...)`** - `torch.check_type(cond, *args)`
+**`TORCH_CHECK_TYPE(cond, ...)`** - `torch._check_type(cond, *args)`
   - C++ error: `c10::TypeError`
   - Python error: `TypeError`
 
-**`TORCH_CHECK_NOT_IMPLEMENTED(cond, ...)`** - `torch.check_not_implemented(cond, *args)`
+**`TORCH_CHECK_NOT_IMPLEMENTED(cond, ...)`** - `torch._check_not_implemented(cond, *args)`
   - C++ error: `c10::NotImplementedError`
   - Python error: `NotImplementedError`
 
-**`TORCH_CHECK_WITH(error_t, cond, ...)`** - `torch.check_with(error_type, cond, *args)`
+**`TORCH_CHECK_WITH(error_t, cond, ...)`** - `torch._check_with(error_type, cond, *args)`
   - C++ error: Specified by `error_t` argument
   - Python error: Specified by `error_type` argument
+
+Additionally, `cond` for the Python overloads is allowed to be a boolean tensor
+with one element.
 
 
 #### Warning APIs
 
-**`TORCH_WARN(...)`** - `torch.warn(*args)`
+**`TORCH_WARN(...)`** - `torch._warn(*args)`
   - C++ warning: `c10::UserWarning`
   - Python warning: `UserWarning`
 
-**`TORCH_WARN_ONCE(...)`** - `torch.warn_once(*args)`
+**`TORCH_WARN_ONCE(...)`** - `torch._warn_once(*args)`
   - C++ warning: `c10::UserWarning`
   - Python warning: `UserWarning`
   - For a given callsite, the warning is emitted only upon the first time it is
     called.
 
-**`TORCH_WARN_DEPRECATION(...)`** - `torch.warn_deprecation(*args)`
+**`TORCH_WARN_DEPRECATION(...)`** - `torch._warn_deprecation(*args)`
   - C++ warning: `c10::DeprecationWarning`
   - Python warning: `UserWarning`
 
-**`TORCH_WARN_DEPRECATION_ONCE(...)`** - `torch.warn_deprecation_once(*args)`
+**`TORCH_WARN_DEPRECATION_ONCE(...)`** - `torch._warn_deprecation_once(*args)`
   - C++ warning: `c10::DeprecationWarning`
   - Python warning: `DeprecationWarning`
   - For a given callsite, the warning is emitted only upon the first time it is
     called.
 
-**`TORCH_WARN_WITH(warning_t, ...)`** - `torch.warn_with(warning_type, ...)`
+**`TORCH_WARN_WITH(warning_t, ...)`** - `torch._warn_with(warning_type, ...)`
   - C++ warning: Specified by `warning_t` argument
   - Python warning: Specified by `warning_type` argument
 
-**`TORCH_WARN_ONCE_WITH(warning_t, ...)`** - `torch.warn_with(warning_type, ...)`
+**`TORCH_WARN_ONCE_WITH(warning_t, ...)`** - `torch._warn_with(warning_type, ...)`
   - C++ warning: Specified by `warning_t` argument
   - Python warning: Specified by `warning_type` argument
   - For a given callsite, the warning is emitted only upon the first time it is
@@ -286,7 +289,7 @@ differently--if two warning messages emitted from the same location differ even
 slightly (for instance, if the value of some variable is included in the
 message and that value differs between two different `warnings.warn` calls),
 then both warnings are emitted. `TORCH_WARN_ONCE` does not check whether
-messages differ. But we could probably implement `torch.warn_once` in a similar
+messages differ. But we could probably implement `torch._warn_once` in a similar
 way to how the `warnings` module filter is implemented.
 
 
@@ -296,7 +299,7 @@ Just like the error and warning APIs, the info APIs each have a variable length
 argument list, `...` in C++ and `*args` in Python. These arguments are
 concatenated into the info message.
 
-**`TORCH_LOG_INFO(...)`** - `torch.log_info(*args)`
+**`TORCH_LOG_INFO(...)`** - `torch._log_info(*args)`
   - C++ info class: `c10::Info`
   - Python warning: `torch.Info`
   - TODO: Is there a better name than `log_info`? I didn't want to call it
@@ -306,7 +309,7 @@ concatenated into the info message.
     [`torch.log`](https://pytorch.org/docs/stable/generated/torch.log.html?highlight=torch%20log#torch.log)
     is already taken.
 
-**`TORCH_LOG_INFO_WITH(info_t, ...)`** - `torch.log_info_with(info_type, *args)`
+**`TORCH_LOG_INFO_WITH(info_t, ...)`** - `torch._log_info_with(info_type, *args)`
   - C++ info class: Specified by `info_t` argument
   - Python info class: Specified by `info_type` argument
 
@@ -336,7 +339,7 @@ However, implementing the duplicate filter like this is not ideal. It would be
 better to have dedicated message system API calls for this. In the case of
 warnings, the following signature could be used:
 
-**`torch.warn_rank(my_rank, *args, warn_rank=0)`**
+**`torch._warn_rank(my_rank, *args, warn_rank=0)`**
   * Args:
     - `my_rank` - Rank of the subprocess calling this function
     - `args` - Warning message
@@ -344,10 +347,10 @@ warnings, the following signature could be used:
   * The warning is only emitted if `my_rank == warn_rank`
 
 TODO: Add APIs for the rest of the message classes, like
-`torch.log_info_rank()`, etc.
+`torch._log_info_rank()`, etc.
 
 TODO: There should also be a global setting to enable emitting the duplicates.
-`torch.warn_rank` could check the setting, and if it's turned on, then it would
+`torch._warn_rank` could check the setting, and if it's turned on, then it would
 emit the warning for all ranks.
 
 TODO: Should we have a `TOCH_WARN_RANK` (and others) in C++ as well? Is there
