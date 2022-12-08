@@ -165,8 +165,8 @@ model = lower_to_custom_backend(model)
 ```python
 from torch.quantization.quantize_fx import prepare_fx
 model = model.eval()
-qconfig_dict = {"": torch.quantization.default_qconfig}
-model = prepare_fx(model, qconfig_dict)
+qconfig_mapping = QConfigMapping().set_global(torch.quantization.default_qconfig)
+model = prepare_fx(model, qconfig_mapping)
 calibration(model, ...)
 model = convert_to_reference_fx(model)
 ```
@@ -177,8 +177,8 @@ The model produced here is a reference model that contains reference patterns, i
 ```python
 from torch.quantization.quantize_fx import prepare_fx
 model = model.eval()
-qconfig_dict = {"": torch.quantization.default_qconfig}
-model = prepare_fx(model, qconfig_dict)
+qconfig_mapping = QConfigMapping().set_global(torch.quantization.default_qconfig)
+model = prepare_fx(model, qconfig_mapping)
 calibration(model, ...)
 model = convert_to_reference_fx(model)
 
@@ -243,8 +243,8 @@ If a backend does not need to modify the quantization flow, that is, it does not
 ```python
 from torch.quantization.quantize_fx import prepare_fx
 model = model.eval()
-qconfig_dict = {"": torch.quantization.default_qconfig}
-model = prepare_fx(model, qconfig_dict)
+qconfig_mapping = QConfigMapping().set_global(torch.quantization.default_qconfig)
+model = prepare_fx(model, qconfig_mapping)
 calibration(model, ...)
 model = convert_to_reference_fx(model)
 
@@ -311,7 +311,7 @@ from torch.quantization.quantize_fx import get_backend_config_dict, QuantizedOpe
 import torch.fx
 
 # Let's say we want to modify the backend_config of fbgemm and add new quantized operators
-custom_backend_config_dict = get_backend_config_dict("fbgemm").copy()
+custom_backend_config_dict = get_backend_config("fbgemm").copy()
 # Notice that the order of the pattern is reversed, this is
 # because we want to support a graph
 bmm_config = {
@@ -326,7 +326,40 @@ custom_backend_config_dict["name"] = "custom_backend"
 # and `dequant - torch.bmm - torch.softmax - quant` patterns
 ```
 
+# QConfig, QConfigMapping and BackendConfig
+## [QConfig](https://pytorch.org/docs/master/generated/torch.quantization.qconfig.QConfig.html#torch.quantization.qconfig.QConfig)
+QConfig is what we use to specify how to observe an operator (e.g. conv) or operator pattern (e.g. conv - relu) in the model, for example:
+```
+qconfig = QConfig(activation=HistogramObserver(dtype=torch.quint8, quant_min=0, quant_max=255), weight=PerChannelMinMaxObserver(dtype=torch.qint8, quant_min=-128, quant_max=127)
+```
+means we want to insert `HistogramObserver` for the input and output of the operator/operator pattern (in FX Graph Mode Quantization), and insert `PerChannelMinMaxObserver` to the weight of the operator/operator pattern. Note that this is relatively restrictive today since we can only specify the same observer for both input and output and only for weight, we plan to make this more general in the future to support specifying different observers for different inputs and outputs. Example:
+```
+QConfig(input_args=(input_act_obs,), input_kwargs={}, attribute = {“weight”: weight_obs, “bias”: bias_obs}, output=output_act_obs)
+```
 
+## [QConfigMapping](https://pytorch.org/docs/master/generated/torch.ao.quantization.qconfig_mapping.QConfigMapping.html#torch.ao.quantization.qconfig_mapping.QConfigMapping)
+`QConfigMapping` is used to configure how to quantize a model, it is a set of rules that applies to the model graph to to decide what should be the `QConfig` for each operator or operator pattern, right now we are mostly supporting operators, but in the future we'll support operator pattern as well.
+Example:
+```
+qconfig_mapping = QConfigMapping()
+    .set_global(global_qconfig)
+    .set_object_type(torch.nn.Linear, qconfig1)
+    .set_object_type(torch.nn.ReLU, qconfig1)
+    .set_module_name_regex("foo.*bar.*conv[0-9]+", qconfig1)
+    .set_module_name_regex("foo.*", qconfig2)
+    .set_module_name("module1", qconfig1)
+    .set_module_name("module2", qconfig2)
+    .set_module_name_object_type_order("foo.bar", torch.nn.functional.linear, 0, qconfig3)
+```
+Setting `qconfig1` for `torch.nn.Linear` means, whenever we see a `call_module` to an module instance of `torch.nn.Linear`, we'll apply `qconfig1`, we'll insert input and output observer for this `call_module` node based on the observer constructors specified in `qconfig1`.
+
+Note that we only apply QConfig if the configuration is supported by `BackendConfig`, for more details please see https://github.com/pytorch/pytorch/blob/master/torch/ao/quantization/fx/README.md#13-quantdequantstub-and-observerfakequantize-insertion
+
+## [BackendConfig](https://pytorch.org/docs/master/generated/torch.ao.quantization.backend_config.BackendConfig.html#torch.ao.quantization.backend_config.BackendConfig)
+`BackendConfig` is used to configure what are the different ways of quantization are supported for an operator or operator pattern, e.g. a backend may support both static and dynamic quantized linear, they can express this information with `BackendConfig`, and if a modeling user requests a type of quantization that is not supported by the backend. In general, there are three possible cases:
+(1). The operator or operator pattern is recognized (the entry exists in BackendConfig) and the requested type of quantization is supported (e.g. static int8 quantization), we'll insert observers based on the `QConfig`
+(2). The operator or operator pattern is recognized, but the requested type of quantization (e.g. requested fp16, but only static int8 is supported)  is not supported in BackendConfig: we'll print a warning
+(3). The operator or operator pattern is not recognized, we'll ignore the request
 
 # Appendix
 * More explanations on patterns: https://docs.google.com/document/d/1kSM0n05vI5Y939n2U3YPD5MWOQNkgXMTpt10ASU-Kns/edit
