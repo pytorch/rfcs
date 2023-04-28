@@ -76,7 +76,17 @@ repository.
 1. **Uniform user experience (UX)** 
      1. Both `torchrun` and `torchx` **launch** PyTorch scripts 
      2. For instance, `torchx run -s local dist.ddp -j 1x2 train.py` is basically equivalent to `torchrun --nnodes 1 --nproc_per_node 2 train.py`
-2. **More native built-in support in PyTorch for launching large-scale, long-running, fault-tolerant distributed jobs**
+     3. TorchX defines specifications to launch PyTorch applications, by having these specs in core, encourages the community to adopt these
+        standards therefore making the UX portable across platforms/cloud providers and reducing the fragmentation in the PyTorch ecosystem.
+2. **Allows PyTorch to more purposefully dictate its runtime environment**
+     1. Today PyTorch is contained in the application (main script) and relies on the user to setup the runtime environment
+        in a compliant way. This model is simple and works well for single-process applications since it is trivial to run
+        single-process programs and many platforms/infra support this type of applications well.
+     2. With distributed applications becoming more prevalent it makes it hard for:
+         1. Users to setup and run distributed applications - today it is harder to launch a distributed trainer than it is to author one.
+         2. PyTorch to be un-opinionated about the run environment - e.g. PTD implicitly assumes specific port ranges to be open which 
+            may require the user (an ML engineer) to modify corporate firewall settings (typically manged by a sysadmin).
+3. **More native built-in support in PyTorch for launching large-scale, long-running, fault-tolerant distributed jobs**
      1. In practice running large-scale jobs reliably requires coordination between the scheduler/infrastructure (controlled by torchx)
          and the process manager (torchelastic)
      2. Example: dealing with host failures in a job:
@@ -86,9 +96,12 @@ repository.
            in such a way that surviving hosts can wait-for a failed host to be replaced then admit the newly replace host
            into the worker group (provided by torchelastic).
 3. **Out-of-the-box support for job launchers in PyTorch** 
-    1. Without additional installs, PyTorch users can run PyTorch scripts both locally and remotely onto widely used schedulers 
-       (Kubernetes, SLURM, CloudProvider-specific batch schedulers).
-4. **Well-defined and self-service plugin-points to integrate PyTorch with the users' infrastructure.**
+    1. Every PyTorch user eventually has to execute their PyTorch applications (which is not always trivial as running the main script) 
+    2. For users: Without additional installs, PyTorch users can run PyTorch scripts both locally and remotely onto widely used schedulers 
+       (Kubernetes, SLURM).
+    3. For torch: PyTorch can more explicitly define the infrastructure requirements and features necessary to run smoothly.
+       (e.g. PTD can ask for specific network topologies, device-mounts, scheduler retry policies)
+4. **Well-defined and self-service plugin-points to integrate PyTorch with commonly used infrastructure (e.g. cloud-providers).**
     1. Examples include (but not limited to):
        1. Job/Experiment tracking (e.g. MLflow, Weights&Biases, FBLearner, etc)
        2. Registration of custom compute resource types to launch jobs onto (e.g. p4d.24xlarge [AWS], a2-megagpu-16g [GCP])
@@ -104,15 +117,31 @@ The diagram below depicts the proposed module move/upstream (optional merge of t
 **The following changes are proposed (refer to diagram above):**
 
 1. Move `torch.distribted.elastic.*` &rarr; `torch.x.elastic.*`
-2. Upstream `torchx.*` &rarr; `torch.x.*`
+2. Upstream `torchx.*` &rarr; `torch.x.*`. Here we have three options:
+     1. (Option 1) Upstream specs only:
+          1. `torchx.specs` (the interfaces and APIs)
+          2. Default implementations of said specs
+          3. Other implementations would remain in TorchX repo
+          4. PROS: Upstreams the minimal set of functionalities to have torch benefit from the topics mentioned in the [Motivation](#motivation) section 
+          5. CONS: 
+              1. Effectively splits the TorchX repo in two hence makes maintenance and CI/CD (testing) more complex
+              2. No built-in support for launching remote jobs
+     2. **[ RECOMMENDED ] (Option 2) Option 1 + Kubernetes and SLURM support**
+          1. PROS: Keeps the minimalistic approach of Option 1 while providing out-of-the-box for CSP agnostic remote scheduler support
+          2. CONS: TorchX still split into two repos
+         
+        > NOTE: The rest of the doc assumes Option 2 as this is the recommended option
+     3. (Option 3) Upstream everything in TorchX:
+          1. PROS: Makes maintenance and CI/CD simple since changes to the specs can be tested for downstream BC easily
+          2. CONS: bloat-torch
 3. Merge the functionalities of `torchx` CLI to
    `torchrun` (a python [`console_script`](https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html)
    that points to `torch.distributed.run`) 
    allowing  `torchrun` to:
      1. Submit PyTorch scripts as a job to remote schedulers (9 x OSS schedulers + 2 x FB-internal schedulers)
      2. Run (simulate) multi-node distributed jobs locally on a single machine with multiple GPUs
-4. (alternatively) keep `torchrun` for BC (eventually to be removed), and consolidate around `torchx` CLI.
-4. (optional) Merge `torch.distributed.elastic.multiprocessing` into `torch.multiprocessing`. Adds the following features to `torch.multiprocessing`:
+4. **(Alternative Option)** keep `torchrun` for BC (eventually to be removed), and consolidate around `torchx` CLI.
+4. **(Optional)** Merge `torch.distributed.elastic.multiprocessing` into `torch.multiprocessing`. Adds the following features to `torch.multiprocessing`:
      1. Launch binaries (e.g. `/home/kiuk/train.py`) in addition to functions (e.g. `pkg.my.train:main`)
      2. Write each sub-proc's stdout and stderr to log files (configurable)
      3. Prefix each line of stdout and stderr with local rank information
@@ -152,8 +181,8 @@ in favor of introducing code complexity and/or tech-debt to keep things BC.
 2. (OSS-only) `torchx` CLI users would have to switch over to `torchrun`.
     1. **Impact**: Every OSS user that currently uses `torchx` CLI would have to one-time opt-in and switch over to torchrun
     2. **To make BC**: 
-         1. (option 1) Add console script `torchx` to PyTorch's `setup.py`, which would act as a symlink discussed in the non-BC section for Meta-internal use-case
-         2. (option 2) Release a final version of `torchx` wheel where the `torchx` CLI walks the user
+         1. **(Option 1)** Add console script `torchx` to PyTorch's `setup.py`, which would act as a symlink discussed in the non-BC section for Meta-internal use-case
+         2. **(Option 2)** Release a final version of `torchx` wheel where the `torchx` CLI walks the user
             through the opt-in step and asks the user to switch over to `torchrun`.  
  
 
@@ -182,9 +211,9 @@ pip install torchx[ray] # torchx + ray>=1.12.1
 
 For `extras-require` we can either:
 
-1. (option 1) Create `[extras]-requirements.txt` (e.g. `kubernetes-requirements.txt`) and
+1. **(Option 1)** Create `[extras]-requirements.txt` (e.g. `kubernetes-requirements.txt`) and
     have the user `pip install -r [extras]-requirements.txt`
-2. (option 2) At runtime display a warning message if the user hits a codepath and does not have the deps installed:
+2. **(Option 2)** At runtime display a warning message if the user hits a codepath and does not have the deps installed:
     ```shell-session
     # sample warning message
     $ pip install torch
@@ -196,7 +225,7 @@ For `extras-require` we can either:
     $ pip install boto3==1.24.59, docker
     =================================================
     ```
-3. (option 3 - not desirable, including for completeness) Adding `extras-require` to torch installs (e.g. `pip install torch[gcp]`)
+3. **(Option 3 - not desirable, including for completeness)** Adding `extras-require` to torch installs (e.g. `pip install torch[gcp]`)
 
 #### CI
 
@@ -225,6 +254,10 @@ See section on BC above.
 
 ## **Alternatives**
 
+> NOTE: Where appropriate we discussed alternatives inlined with itemized **(Option #)**, **(Alternative Option)** or **(Optional)**
+>  for more local context and clarity on the pros and cons.
+
+### Upstreaming TorchX vs Pulling TorchElastic
 We considered pulling `torch.distributed.elastic` (torchelastic) out to the pytorch/torchx repository and
 consolidate TorchElastic and TorchX *outside* the pytorch/pytorch repo. However, due to the prevalent usage
 of `torchrun`, pulling torchelastic out of PyTorch would mean:
@@ -234,7 +267,8 @@ of `torchrun`, pulling torchelastic out of PyTorch would mean:
     (similar to `torchvision`).
 2. -- or -- (to make things BC) have PyTorch take a pip dependency on `torchx`.
 
-Due to the reasons mentioned above, pulling torchelastic out of the PyTorch repo is sub-optimal
+However due to the reaons mentioned in the [Motivation](#motivation) section, pulling torchelastic out of the
+PyTorch repo is sub-optimal.
 
 ### Level of Support
 Pending...
@@ -254,7 +288,9 @@ N/A
 
 
 ### Next Steps
-Pending RFC feedback 
+
+1. Pending RFC feedback
+2. Meet-up between TorchX/Elastic team at Meta and external maintainers proposed (date and place pending)
 
 
 #### Tracking issue
