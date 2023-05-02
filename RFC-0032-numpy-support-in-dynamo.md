@@ -90,7 +90,7 @@ def fn(x, y):
     return np.multiply(x, y).sum()
 ```
 
-Then, TorchDynamo would will cast `x` and `y` to our internal implementation of `ndarray`,
+Then, TorchDynamo will cast `x` and `y` to our internal implementation of `ndarray`,
 and will dispatch `np.multiply` and `sum` to our implementations in terms of `torch`
 functions, effectively turning this function into a pure PyTorch function.
 
@@ -272,6 +272,7 @@ PyTorch-land object (think a `torch.Tensor` or a PyTorch dtype). For example,
 for `np.diag` we would write
 
 ```python
+@normalize
 def diag(v: ArrayLike, k=0):
     return torch.diag(v, k)
 ```
@@ -337,10 +338,10 @@ between NumPy and `torch_np`.
 
 ### Beyond plain NumPy
 
-**GPU**. The current implementation so far only been implemented and tested on
-CPU. We expect GPU coverage to be as good as the coverage we have with CPU-GPU
-matching tests in the PyTorch test suite. If the original tensors are on GPU,
-the execution should be performed fully on GPU.
+**GPU**. The implementation allows for running NumPy code on GPU simply by
+adding a `torch.set_default_device("cuda")` at the top of the relevant
+file/code. We tested this on the code examples that we drew from the internet
+and they run just fine on GPU.
 
 **Gradients**. We have not tested gradient tracking either as we are still to
 find some good examples on which to test it, but it should be a simple
