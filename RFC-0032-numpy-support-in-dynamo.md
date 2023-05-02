@@ -198,6 +198,11 @@ layer does not implement this new API, as the default bit generator in NumPy is
 From this, it follows that this API will not give any reproducibility
 guarantees when it comes to randomness.
 
+**Accuracy**. For deterministic operations, we would expect to give accuracy
+guarantees similar to those in PyTorch 2.0. In particular, we would expect
+these decompositions to be as precise as those from NumPy when compared to an
+`fp64` baseline minus perhaps a small relative error.
+
 
 ## The `torch_np` module
 
