@@ -369,8 +369,8 @@ A few arguments in favor of making it public:
 * People could use it in their NumPy programs just by changing the import to
   `import torch.numpy as np`. This could be a selling point similar to JAX's
   `jax.numpy`, which could incentivize adoption.
-* People would not need to use the whole PyTorch 2.0 stack to start using
-  PyTorch in their codebases
+* People would not need to use the whole `torch.compile` stack to start using
+  PyTorch as a backend for their NumPy code in their codebase.
   * See [this experiment in scikit-learn](https://github.com/scikit-learn/scikit-learn/pull/25956)
     where they got a 7x speed-up on CPU on a layer just by using `torch.linalg`.
 * Since the layer is rather thin and in pure Python, if there are bugs,
