@@ -26,7 +26,7 @@ nor about implementing the described feature until some time in the future.
 
 
 
-# Consolidate TorchElastic and TorchX into `torch.x.run`
+# Consolidate TorchElastic and TorchX into `torch.x`
 
 **Authors:**
 * @kiukchung (Kiuk Chung)
@@ -35,20 +35,24 @@ nor about implementing the described feature until some time in the future.
 
 ## **Summary**
 
-Consolidate TorchElastic (`torch.distributed.elastic` + `torchrun`) and TorchX 
-(`torchx` - on [pytorch/torchx](https://github.com/pytorch/torchx) GitHub)
+Consolidate TorchElastic (`torch.distributed.elastic` + `torchrun`) and [TorchX](https://github.com/pytorch/torchx) 
 into a single module called `torch.x` that launches PyTorch scripts (single-process & distributed)
 both locally and as a job on remote schedulers (e.g. SLURM, Kubernetes, etc).
 
 ## **Background**
 
-The sections below provide background/historical context on TorchElastic and TorchX.
+The sections below provide background/historical context on TorchElastic and TorchX. We do not go into
+the details of how each library works but rather focus on the differences and similarities. Please refer 
+to the corresponding documentation for further details
 
 ### TorchElastic
 
-[torchelastic](https://pytorch.org/docs/stable/distributed.elastic.html), hereafter refered to as [`torchrun`](https://pytorch.org/docs/stable/elastic/run.html),
-is the defacto local **process launcher** to kick-off PyTorch Distributed (PTD) scripts. Prior to `torch-1.9` TorchElastic resided in the PyTorch GitHub organization but under the [pytorch/elastic](https://github.com/pytorch/elastic)
-repository. In `torch-1.9` TorchElastic was upstreamed to torch under the `torch.distributed.elastic` submodule.
+[torchelastic](https://pytorch.org/docs/stable/distributed.elastic.html), hereafter used interchangeably with
+[`torchrun`](https://pytorch.org/docs/stable/elastic/run.html),
+is the defacto local **process launcher** to kick-off PyTorch Distributed (PTD) scripts. 
+Prior to `torch-1.9` TorchElastic resided in the PyTorch GitHub organization but under the 
+[pytorch/elastic](https://github.com/pytorch/elastic) repository. 
+In `torch-1.9` TorchElastic was upstreamed to torch under the `torch.distributed.elastic` submodule.
 
 #### `torchrun` vs `torch.distributed.launch` vs `torch.distributed.run`
 **TL;DR - All three tools use `torch.distributed.run` (torchelastic) under the hood**
@@ -65,52 +69,71 @@ The following table summarizes when each tool was introduced to PyTorch and how 
 ### TorchX
 
 [TorchX](https://pytorch.org/torchx)
-on the other hand is a **job launcher** that can submit PyTorch scripts as a job onto various remote schedulers
-such as SLURM, Kubernetes, AWS/GCP/Azure Batch, etc. Similar to TorchElastic prior to `torch-1.9`,
-TorchX is currently in the PyTorch GitHub organization but under the [pytorch/torchx](https://github.com/pytorch/torchx)
-repository.
+on the other hand is a **job launcher** that can submit PyTorch scripts as a job onto various
+OSS schedulers such as SLURM, Kubernetes, and Ray as well as
+cloud-provider-specific batch compute service offerings such as AWS Batch, GCP Batch, and Azure Batch.
+TorchX covers all the most widely used AI schedulers today. By controlling the specifications and 
+parameters of the job, *TorchX acts as a plugin-point
+to the infrastructure*, much like how TorchDynamo/Inductor is a plugin-point for hardware accelerators.
+
+
+When submitting distributed jobs, TorchX instructs the target scheduler to
+run `torchrun` on each node (see diagram below).
+
+![`torchx` vs `torchrun`](RFC-0030-assets/torchx_torchrun.png)
+
+TorchX is currently in the PyTorch GitHub organization but under the 
+[pytorch/torchx](https://github.com/pytorch/torchx) repository.
 
 
 ## **Motivation**
 
-1. **Uniform user experience (UX)** 
-     1. Both `torchrun` and `torchx` **launch** PyTorch scripts 
-     2. For instance, `torchx run -s local dist.ddp -j 1x2 train.py` is basically equivalent to `torchrun --nnodes 1 --nproc_per_node 2 train.py`
-     3. TorchX defines specifications to launch PyTorch applications, by having these specs in core, encourages the community to adopt these
-        standards therefore making the UX portable across platforms/cloud providers and reducing the fragmentation in the PyTorch ecosystem.
-2. **Allows PyTorch to more purposefully dictate its runtime environment**
-     1. Today PyTorch is contained in the application (main script) and relies on the user to setup the runtime environment
-        in a compliant way. This model is simple and works well for single-process applications since it is trivial to run
-        single-process programs and many platforms/infra support this type of applications well.
-     2. With distributed applications becoming more prevalent it makes it hard for:
-         1. Users to setup and run distributed applications - today it is harder to launch a distributed trainer than it is to author one.
-         2. PyTorch to be un-opinionated about the run environment - e.g. PTD implicitly assumes specific port ranges to be open which 
-            may require the user (an ML engineer) to modify corporate firewall settings (typically manged by a sysadmin).
-3. **More native built-in support in PyTorch for launching large-scale, long-running, fault-tolerant distributed jobs**
-     1. In practice running large-scale jobs reliably requires coordination between the scheduler/infrastructure (controlled by torchx)
-         and the process manager (torchelastic)
-     2. Example: dealing with host failures in a job:
-        1. torchelastic alone cannot deal with host failures. The job needs to be configured (done via torchx) for
-           the scheduler to deal with host failures (e.g. replace the failed host).
-        2. Conversely, the scheduler replacing failed hosts for a job is not enough, the job itself needs to be authored
-           in such a way that surviving hosts can wait-for a failed host to be replaced then admit the newly replace host
-           into the worker group (provided by torchelastic).
-3. **Out-of-the-box support for job launchers in PyTorch** 
-    1. Every PyTorch user eventually has to execute their PyTorch applications (which is not always trivial as running the main script) 
-    2. For users: Without additional installs, PyTorch users can run PyTorch scripts both locally and remotely onto widely used schedulers 
-       (Kubernetes, SLURM).
-    3. For torch: PyTorch can more explicitly define the infrastructure requirements and features necessary to run smoothly.
-       (e.g. PTD can ask for specific network topologies, device-mounts, scheduler retry policies)
-4. **Well-defined and self-service plugin-points to integrate PyTorch with commonly used infrastructure (e.g. cloud-providers).**
-    1. Examples include (but not limited to):
-       1. Job/Experiment tracking (e.g. MLflow, Weights&Biases, FBLearner, etc)
-       2. Registration of custom compute resource types to launch jobs onto (e.g. p4d.24xlarge [AWS], a2-megagpu-16g [GCP])
-       3. Code containerization (e.g. Docker, XAR, etc)
+Uniform and improved user-experience (UX) in running PyTorch applications.
+
+Enhancing `torchrun` with `torchx` capabilities enables users to quickly integrate 
+PyTorch applications to their existing infrastructures. Consolidating to a single tool simplifies
+the UX and setup. Through `torchx`'s infrastructure plugin points, PyTorch can leverage infra features
+that reduce authoring complexity while improving reliability. One such example is in-place retries for 
+distributed training on schedulers that support node-replacements. In-place retries have
+a much lower restart overhead compared to job-level retries, but requires the user to carefully
+coordinate the configuration of the infra (scheduler) as well as the application (`torchrun`).
+Yet another example is running DDP training on GPUs where each rank occupies exactly one CUDA device. 
+The user has to ensure that they request the job to be run on hosts with the GPU count
+matching the `local_world_size`. TorchX makes this simple by taking a single argument: either the host
+type or `nproc_per_node` and automatically configures the other with-respect-to the user specified one.
+
+PyTorch applications are becoming more complex. Distributed training is a norm with LLMs.
+Cloud providers are putting forth custom chips. Some, such as TPU (GCP) and Trainium (AWS), are AI-accelerators
+with implications on compatibility with existing PyTorch models and ops. Others, such as IPUs in AWS' Nitro system
+and EFA, do not directly run compute but need to be configured correctly to work with PyTorch.
+Either way, there exists more runtime couplings between PyTorch and the infrastructure than one might think or like.
+Unfortunately today, `torch` (out-of-the-box) does not offer any type of specifications, standards, or
+plugin-points to the infrastructure. Users are on their own and unsurprisingly,
+it is easier to author a DDP or FSDP trainer than it is to get it to run on a cluster.
+This UX gap has created an opportunity for CSPs and 3rd party platforms to create
+a myriad of "MLOps" offerings, enticing users with easy on-boarding and quick results.
+Unfortunately, most of these tools are vertically integrated with the provider's ecosystem,
+with a thick air-gap between native PyTorch and the user.
+
+An interesting observation is that despite the amount of fragmentation in the tooling for PyTorch,
+when it comes to process launchers, most of these tools either directly invoke or are compatible with
+`torchrun`. This is the case with [Accelerate](https://huggingface.co/blog/pytorch-ddp-accelerate-transformers),
+[DeepSpeed](https://github.com/microsoft/DeepSpeed/blob/master/deepspeed/launcher/launch.py#L29), 
+[Megatron-LM](https://github.com/NVIDIA/Megatron-LM/blob/main/examples/run_text_generation_server_345M.sh#L17),
+and [SageMaker](https://sagemaker.readthedocs.io/en/stable/frameworks/pytorch/using_pytorch.html#launching-a-distributed-training-job).
+So there is something to be said about the acceptance and adoption of standards when it belongs in 
+the core pytorch library versus it being offered as a separate and optional install. 
+Having TorchX specs/APIs in core encourages the community to adopt and extend PyTorch-defined infrastructure
+standards. For the user, this means better less fragmentation, better portability and uniform UX. 
+For PyTorch, this means being able to leverage and dictate its runtime requirements and environment.
  
 
 ## **Proposed Implementation**
 
-The diagram below depicts the proposed module move/upstream (optional merge of the `multiprocessing` module not shown).
+**TL;DR - Upstream TorchX (specs and sensible default impls only) to PyTorch under a new sub-module called `torch.x` and pull TorchElastic out of
+`torch.distributed` and merge it with `torch.x`**
+
+The diagram below depicts the proposed module move + upstream (optional merge of the `multiprocessing` module not shown).
 
 ![`torch.x` Before and After](RFC-0030-assets/modules_before_after.png)
 
@@ -126,7 +149,7 @@ The diagram below depicts the proposed module move/upstream (optional merge of t
           5. CONS: 
               1. Effectively splits the TorchX repo in two hence makes maintenance and CI/CD (testing) more complex
               2. No built-in support for launching remote jobs
-     2. **[ RECOMMENDED ] (Option 2) Option 1 + Kubernetes and SLURM support**
+     2. **[ PREFERRED ] (Option 2) Option 1 + Kubernetes and SLURM support**
           1. PROS: Keeps the minimalistic approach of Option 1 while providing out-of-the-box for CSP agnostic remote scheduler support
           2. CONS: TorchX still split into two repos
          
@@ -267,8 +290,8 @@ of `torchrun`, pulling torchelastic out of PyTorch would mean:
     (similar to `torchvision`).
 2. -- or -- (to make things BC) have PyTorch take a pip dependency on `torchx`.
 
-However due to the reaons mentioned in the [Motivation](#motivation) section, pulling torchelastic out of the
-PyTorch repo is sub-optimal.
+Additionally, due to the reasons mentioned in the [Motivation](#motivation) section, there is value in upstreaming
+TorchX's specs APIs to core.
 
 ### Level of Support
 Pending...
