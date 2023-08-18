@@ -1,0 +1,14 @@
+#
+# Usage:
+#   conda env create --file=rfc3-env.yaml -n rfc3
+#
+name: rfc3
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - watchdog
+  - pandoc
+  - pytest
+  - pytest-cov
+  - flake8
