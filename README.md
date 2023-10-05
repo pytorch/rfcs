@@ -1,5 +1,36 @@
 This page contains instructions on how to propose and implement feature changes to PyTorch.
 
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Proposing a Feature to PyTorch](#proposing-a-feature-to-pytorch)
+  - [Step 1: Create an RFC](#step-1-create-an-rfc)
+  - [Step 2: Get Feedback on the RFC](#step-2-get-feedback-on-the-rfc)
+  - [Step 3: Implement your Feature](#step-3-implement-your-feature)
+- [Implementing an RFC](#implementing-an-rfc)
+- [RFC Rejection](#rfc-rejection)
+- [Inspiration](#inspiration)
+- [License](#license)
+
+## Introduction
+Welcome to the PyTorch Feature Proposal and Implementation Guide!
+
+This guide provides comprehensive instructions on how to propose and implement feature changes within the PyTorch ecosystem. Whether you're a seasoned developer or a newcomer, understanding the process of introducing new features and improvements to PyTorch is essential for contributing to this dynamic and rapidly evolving framework.
+
+In this document, you will find step-by-step guidance on how to submit a Request For Comments (RFC), which serves as a design proposal for your proposed changes. RFCs offer a structured way to share detailed descriptions of the features you wish to introduce, explain their necessity, and outline your proposed implementation approach.
+
+We emphasize the importance of initiating discussions and refining your ideas during the ideation phase rather than waiting until the pull request (PR) phase. Engaging with PyTorch's core maintainers early on allows for valuable feedback, alignment with existing efforts, and the possibility of making your feature more widely applicable.
+
+While smaller changes, including bug fixes and documentation enhancements, can follow the standard GitHub pull request workflow on the main PyTorch repository, RFCs are specifically designed for more extensive design proposals that require in-depth discussion and deliberation.
+
+If you're uncertain whether your proposed change should follow the RFC process or be submitted as a feature-request issue, we encourage you to open an issue in the main PyTorch/PyTorch repository for clarification.
+
+Throughout this guide, we'll walk you through the three primary steps of proposing and implementing a PyTorch feature: creating an RFC, gathering feedback, and implementing your feature. We'll also explain how to navigate the implementation phase, track progress, and seek assistance when needed.
+
+Remember that your contributions, whether they lead to an RFC approval or not, play a vital role in the evolution of PyTorch. We appreciate your dedication to improving this open-source project and look forward to your valuable contributions.
+
+Let's dive into the process of shaping the future of PyTorch together!
+
 # Proposing a Feature to Pytorch
 
 To propose a new feature, you’ll submit a Request For Comments (RFC).  This RFC is basically a design proposal where you can share a detailed description of what change you want to make, why it’s needed, and how you propose to implement it.
