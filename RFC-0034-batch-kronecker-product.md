@@ -133,7 +133,7 @@ Accomodating the generalisation detailed above may be quite slow, and this will 
 
 
 ## **Prior Art**
-A version been implemented in [pylabk](https://github.com/yulkang/pylabyk/blob/master/numpytorch.py) for only 3D tensors, batching the product in the first dimension only. The approach used in the same as how `kron` is currently implemented, albeit using PyTorch functions instead of being written in C++ for LibTorch.
+A version been implemented in [pylabyk](https://github.com/yulkang/pylabyk/blob/master/numpytorch.py) for only 3D tensors, batching the product in the first dimension only. The approach used in the same as how `kron` is currently implemented, albeit using PyTorch functions instead of being written in C++ for LibTorch.
 
 This feature had already been proposed in an [issue on PyTorch](https://github.com/pytorch/pytorch/issues/77537), but this was not fleshed out at all. I felt that raising this as an RFC was necessary in order to clear up the concerns I currently have.
 
