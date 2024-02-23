@@ -63,15 +63,17 @@ Instead of storing the entire posterior distribution as in the Librosa implement
 Because we use only a single block per input sequence, we can process a batch of input sequences very quickly in parallel, depending on the GPU in use. This also cuts down on the number of kernel-invocation-style syncs that must be performed.
 
 ## **Metrics**
-All recorded with batch size 512 on VCTK
+All recorded with batch size 512 on a subset of 8192 files in VCTK
 
 | Method  | Real Time Factor (higher is better) |
 | ------------- | ------------- |
-| Librosa (1x cpu)|  |
-| Librosa (16x cpu)| |
-| Torbi (1x cpu)|  |
-| Torbi (16x cpu)| |
-| Torbi (1x RTX 4090)| |
+| Librosa (1x cpu)| 1.93* |
+| Librosa (16x cpu)| 13.82 |
+| Torbi (1x cpu)| 1.71 |
+| Torbi (16x cpu)| **22.40** |
+| Torbi (1x a40 gpu)| **2907471.42** |
+
+*This was performed with only 1 cpu allocated, but the implementation may have used multiple threads, whereas Torbi uses exactly as many threads as listed in the table.
 
 ## **Drawbacks**
 * The only real drawback is that it could be considered bloat by some.
