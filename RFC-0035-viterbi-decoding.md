@@ -66,18 +66,18 @@ Because we use only a single block per input sequence, we can process a batch of
 ## **Metrics**
 We use Viterbi decoding to decode distributions over pitch inferred by a pitch estimating neural network. We compare our proposed implementation to the reference implementation in Librosa that uses just-in-time compilation via numba.
 
-All recorded with batch size 512 on a subset of 8192 files in VCTK
+Unless otherwise noted, all recorded with batch size 512 on a subset of 8192 files randomly selected from VCTK
 
 | Method  | Real Time Factor (higher is better) |
 | ------------- | ------------- |
-| Librosa (1x cpu)| 1.93* |
-| Librosa (16x cpu)| 13.82 |
+| Librosa (1x cpu)| 2.08 |
+| Librosa (16x cpu)| 13.82* |
 | Proposed (1x cpu)| 1.71 |
 | Proposed (16x cpu)| **22.40** |
-| Proposed (1x a40 gpu, batch size 512)| **39444.52** |
-| Proposed (1x a40 gpu)| **2907471.42** |
+| Proposed (1x a40 gpu, batch size 1)| **39444.52** |
+| Proposed (1x a40 gpu)| **6921604.22** |
 
-*This was performed with only 1 cpu allocated, but the implementation may have used multiple threads, whereas Torbi uses exactly as many threads as listed in the table.
+*We use a Multiprocessing pool to parallelize the Librosa implementation.
 
 ## **Drawbacks**
 * The only real drawback is that it could be considered bloat by some.
