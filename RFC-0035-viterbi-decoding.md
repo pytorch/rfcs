@@ -37,7 +37,7 @@ We want to add Viterbi decoding to PyTorch. Viterbi decoding is a well-known alg
 
 ## **Motivation**
 
-Viterbi decoding is a generally useful algorithm that is missing from the PyTorch library, with applications in automatic speech recognition, bioinformatics, digital communications, and more. However, Viterbi decoding is O(C^2T) for C classes and T timesteps, making it challenging to scale to large datasets and real-time applications. A commonly-used implementation of Viterbi decoding exists in Librosa (`librosa.sequence.viterbi`). We use Librosa's implementation as a reference for correctness and as a baseline for benchmarking. Our benchmark uses `C = 1,440` states and approximately `T ~= 10 million` time steps across approximately 40k files.
+Viterbi decoding is a generally useful algorithm that is missing from the PyTorch library, with applications in automatic speech recognition, bioinformatics, digital communications, and more. However, Viterbi decoding is O(C^2T) for C classes and T timesteps, making it challenging to scale to large datasets and real-time applications. A commonly-used implementation of Viterbi decoding exists in Librosa (`librosa.sequence.viterbi`). We use Librosa's implementation as a reference for correctness and as a baseline for benchmarking. Our benchmark uses `C = 1,440` states and approximately `T ~= 200 million` time steps across approximately 40k files.
 
 We use Viterbi decoding to decode distributions over pitch inferred by a pitch estimating neural network. We compare our proposed implementation to the reference implementation in Librosa ([`librosa.sequence.viterbi`](https://librosa.org/doc/main/generated/librosa.sequence.viterbi.html)) that uses just-in-time compilation via numba.
 
