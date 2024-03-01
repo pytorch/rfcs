@@ -37,26 +37,30 @@ We want to add Viterbi decoding to PyTorch. Viterbi decoding is a well-known alg
 
 ## **Motivation**
 
-Viterbi decoding is a generally useful algorithm that is missing from the PyTorch library, with applications in automatic speech recognition, bioinformatics, digital communications, and more. However, Viterbi decoding is O(C^2T) for C classes and T timesteps, making it challenging to scale to large datasets and real-time applications. A commonly-used implementation of Viterbi decoding exists in Librosa (`librosa.sequence.viterbi`). We use Librosa's implementation as a reference for correctness and a baseline for
+Viterbi decoding is a generally useful algorithm that is missing from the PyTorch library, with applications in automatic speech recognition, bioinformatics, digital communications, and more. However, Viterbi decoding is O(C^2T) for C classes and T timesteps, making it challenging to scale to large datasets and real-time applications. A commonly-used implementation of Viterbi decoding exists in Librosa (`librosa.sequence.viterbi`). We use Librosa's implementation as a reference for correctness and as a baseline for benchmarking. Our benchmark uses `C = 1,440` states and approximately `T ~= 10 million` time steps across approximately 40k files.
 
+We use Viterbi decoding to decode distributions over pitch inferred by a pitch estimating neural network. We compare our proposed implementation to the reference implementation in Librosa ([`librosa.sequence.viterbi`](https://librosa.org/doc/main/generated/librosa.sequence.viterbi.html)) that uses just-in-time compilation via numba.
 
-We use Viterbi decoding to decode distributions over pitch inferred by a pitch estimating neural network. We compare our proposed implementation to the reference implementation in Librosa that uses just-in-time compilation via numba.
-
-| Method  | Real Time Factor (higher is better) |
+| Method  | Timesteps decoded per second |
 | ------------- | ------------- |
-| Librosa (1x cpu)|  |
-| Librosa (16x cpu)| |
-| Proposed (1x cpu)|  |
-| Proposed (16x cpu)| |
-| Proposed (1x RTX 4090; batch size 1)| |
-| Proposed (1x RTX 4090; batch size 512)| |
+| Librosa (1x cpu)| 208 |
+| Librosa (16x cpu)| 1,382* |
+| Proposed (1x cpu)| 171 |
+| Proposed (16x cpu)| **2,240** |
+| Proposed (1x a40 gpu, batch size 1)| **3,944,452** |
+| Proposed (1x a40 gpu, batch size 512)| **692,160,422** |
 
+*By default, librosa.sequence.viterbi uses one CPU thread. We use a Multiprocessing pool to parallelize.
 
-Concretely, Viterbi decoding consists of two stages: (1) construction of a _trellis_ matrix containing path probabilities, and (2) backtracing along the maximal path. We have developed and open-sourced fast CPU and CUDA implementations of both stages. We think our implementations would be a viable starting point for adding Viterbi decoding to PyTorch.
+Our proposed implementation is fast enough that we are considering novel use cases of Viterbi decoding in future work, such as decoding optimal high-resolution sequences during the training of a neural network.
 
 
 ## **Proposed Implementation**
-We have implemented the Viterbi decoding algorithm in five parts:
+
+Viterbi decoding consists of two stages: (1) construction of a _trellis_ matrix containing path probabilities, and (2) backtracing along the maximal path. We have developed and open-sourced fast CPU and CUDA implementations of both stages. We think our implementations would be a viable starting point for adding Viterbi decoding to PyTorch.
+
+Our current implementation is structured as follows.
+
 * A python wrapper module ([torbi](https://github.com/maxrmorrison/torbi))
     * A C++, Pybind11 style Torch extension ([viterbi.cpp](https://github.com/maxrmorrison/torbi/blob/main/torbi/viterbi.cpp))
         * A `viterbi_make_trellis_cpu` CPU function which uses OpenMP (with SIMD) to parallelize some loops. ([viterbi.cpp](https://github.com/maxrmorrison/torbi/blob/main/torbi/viterbi.cpp))
@@ -64,44 +68,234 @@ We have implemented the Viterbi decoding algorithm in five parts:
         * A `viterbi_backtrace_trellis_cpu` CPU function which does the final decoding ([viterbi.cpp](https://github.com/maxrmorrison/torbi/blob/main/torbi/viterbi.cpp))
         * A `viterbi_backtrace_tellis_kernel` CUDA kernel which does the final decoding on the GPU ([viterbi_kernel.cu](https://github.com/maxrmorrison/torbi/blob/main/torbi/viterbi_kernel.cu))
 
-We have also implemented a series of tests and [benchmarks](https://github.com/maxrmorrison/torbi/blob/main/torbi/evaluate/core.py) to evaluate our method against the implementation in Librosa. See [metrics](#metrics) for results.
 
+We propose a Python API and underlying C++/CUDA extensions for Viterbi decoding in PyTorch. This proposal is a draft; we welcome input and opinions naming and implementation. Specifically, we propose adding a `torch.viterbi.decode` function (and corresponding stateful `torch.viterbi.Decoder`) that makes use of underlying functions `torch.viterbi.make_trellis` and `torch.viterbi.backtrace_trellis`.
+
+
+#### `torch.viterbi.decode`
+
+```
+def decode(
+    observation: torch.Tensor,
+    batch_frames: Optional[torch.Tensor] = None,
+    transition: Optional[torch.Tensor] = None,
+    initial: Optional[torch.Tensor] = None,
+    log_probs: bool = False
+) -> torch.Tensor:
+    """Decode a time-varying categorical distribution
+
+    Arguments
+        observation
+            Time-varying categorical distribution
+            shape=(batch, frames, states)
+        batch_frames
+            Number of frames in each batch item; defaults to all
+            shape=(batch,)
+        transition
+            Categorical transition matrix; defaults to uniform
+            shape=(states, states)
+        initial
+            Categorical initial distribution; defaults to uniform
+            shape=(states,)
+        log_probs
+            Whether inputs are in (natural) log space
+
+    Returns
+        indices
+            The decoded bin indices
+            shape=(batch, frames)
+    """
+```
+
+
+#### `torch.viterbi.make_trellis`
+
+```
+def make_trellis(
+    self,
+    observation: torch.Tensor,
+    batch_frames: Optional[torch.Tensor] = None,
+    transition: Optional[torch.Tensor] = None,
+    initial: Optional[torch.Tensor] = None,
+    log_probs: bool = False
+) -> torch.Tensor:
+    """Perform first step of Viterbi decoding to construct the path trellis
+
+    Arguments
+        observation
+            Time-varying categorical distribution
+            shape=(batch, frames, states)
+        batch_frames
+            Number of frames in each batch item; defaults to all
+            shape=(batch,)
+        transition
+            Categorical transition matrix; defaults to uniform
+            shape=(states, states)
+        initial
+            Categorical initial distribution; defaults to uniform
+            shape=(states,)
+        log_probs
+            Whether inputs are in (natural) log space
+
+    Returns
+        trellis
+            The matrix of greedy path pointers used to decode the optimal path
+            shape=(batch, frames, states)
+    """
+```
+
+
+#### `torch.viterbi.backtrace_trellis`
+
+```
+def backtrace_trellis(
+    trellis: torch.Tensor,
+    batch_frames: Optional[torch.Tensor] = None,
+    transition: Optional[torch.Tensor] = None,
+    initial: Optional[torch.Tensor] = None
+) -> torch.Tensor:
+    """Perform second step of Viterbi decoding to backtrace optimal path
+
+    Arguments
+        trellis
+            The matrix of greedy path pointers used to decode the optimal path
+            shape=(batch, frames, states)
+        batch_frames
+            Number of frames in each batch item; defaults to all
+            shape=(batch,)
+        transition
+            Categorical transition matrix; defaults to uniform
+            shape=(states, states)
+        initial
+            Categorical initial distribution; defaults to uniform
+            shape=(states,)
+
+    Returns
+        indices
+            The decoded bin indices
+            shape=(batch, frames)
+    """
+```
+
+
+#### `torch.viterbi.Decoder`
+
+```
+class Decoder:
+    """Stateful Viterbi decoder that stores transition and initial matrices"""
+
+    def __init__(
+        self,
+        transition: Optional[torch.Tensor] = None,
+        initial: Optional[torch.Tensor] = None
+    ) -> None:
+        """
+        Arguments
+            transition
+                Categorical transition matrix; defaults to uniform
+                shape=(states, states)
+            initial
+                Categorical initial distribution; defaults to uniform
+                shape=(states,)
+        """
+
+    def decode(
+        self,
+        observation: torch.Tensor,
+        batch_frames: Optional[torch.Tensor] = None,
+        log_probs: bool = False
+    ) -> torch.Tensor:
+        """Decode a time-varying categorical distribution
+
+        Arguments
+            observation
+                Time-varying categorical distribution
+                shape=(batch, frames, states)
+            batch_frames
+                Number of frames in each batch item; defaults to all
+                shape=(batch,)
+            log_probs
+                Whether inputs are in (natural) log space
+
+        Returns
+            indices
+                The decoded bin indices
+                shape=(batch, frames)
+        """
+
+    def make_trellis(
+        self,
+        observation: torch.Tensor,
+        batch_frames: Optional[torch.Tensor] = None,
+        log_probs: bool = False
+    ) -> torch.Tensor:
+        """Perform first step of Viterbi decoding to construct the path trellis
+
+        Arguments
+            observation
+                Time-varying categorical distribution
+                shape=(batch, frames, states)
+            batch_frames
+                Number of frames in each batch item; defaults to all
+                shape=(batch,)
+            log_probs
+                Whether inputs are in (natural) log space
+
+        Returns
+            trellis
+                The matrix of greedy path pointers used to decode the optimal path
+                shape=(batch, frames, states)
+        """
+
+    def backtrace_trellis(
+        self,
+        trellis: torch.Tensor,
+        batch_frames: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """Perform second step of Viterbi decoding to backtrace optimal path
+
+        Arguments
+            trellis
+                The matrix of greedy path pointers used to decode the optimal path
+                shape=(batch, frames, states)
+            batch_frames
+                Number of frames in each batch item; defaults to all
+                shape=(batch,)
+
+        Returns
+            indices
+                The decoded bin indices
+                shape=(batch, frames)
+        """
+```
 
 ### CUDA Algorithm
 
 Our CUDA algorithm makes efficient use of warps to cache posterior probabilities in shared memory. The core design is nested loop, first over timesteps, and then over possible states. One warp is assigned to each state to compute posterior distributions and then perform a parallel argmax (with reduction) to find the best next state from the current state that the warp is assigned to.
 
-The warps iterate over the input states for cases where there are more than 32 (#warps in a block) input states.
+The warps iterate over the input states for cases where there are more than 32 input states (i.e., the number of warps in a block).
 
-Instead of storing the entire posterior distribution as in the Librosa implementation, we only store the current and next timesteps, reducing memory usage. To avoid expensive memory copies, we use pointers to switch which array stores current values and which stores next values. In addition, to support a variable number of input states, these two arrays are just pointers to the two halves of a shared memory array which is sized externally.
+Instead of storing the entire posterior distribution (as in the Librosa implementation), we only store the current and next timesteps, reducing memory usage. To avoid expensive memory copies, we use pointers to switch which array stores current values and which stores next values. In addition, to support a variable number of input states, these two arrays are just pointers to the two halves of a shared memory array which is sized externally.
 
 Because we use only a single block per input sequence, we can process a batch of input sequences very quickly in parallel, depending on the GPU in use. This also cuts down on the number of kernel-invocation-style syncs that must be performed.
 
 
-## **Alternatives**
-* Our design is currently open source so anyone wanting to make use of it need only install it. Unfortunately, due to the [well known difficulties](https://github.com/pytorch/builder/issues/468#issuecomment-661943587) with packaging torch extensions, it must be built from source which requires users to have installed the cuda toolkit and g++ which satisfy version constraints.
-* We tested a variety of other implementations which ultimately were all slower:
+## **Prior Art**
+* We tested a variety of other implementations, which were all slower:
     * Pure Python torch implementation
     * Cython numpy implementation
-    * Cython implementaiton (without numpy operations)
+    * Cython implementation (without numpy operations)
     * C++ implementation without OpenMP
-    * Librosa Numba implementation
+    * [Librosa Numba implementation](https://librosa.org/doc/main/generated/librosa.sequence.viterbi.html)
+* Our implementation is [currently open source](https://github.com/maxrmorrison/torbi/). However, due to the [complexities of packaging cross-platform torch extensions](https://github.com/pytorch/builder/issues/468#issuecomment-661943587), it currently must be built from source. Adding our implementation to `torch` allows us to use `torch`'s existing cross-platform build system instead of hand-rolling our own.
 
 
-## **Prior Art**
-[Current librosa implementation](https://librosa.org/doc/main/generated/librosa.sequence.viterbi.html)
-
-
-## **How we teach this**
-* No reorganization of documentation would be necessary to the best of my knowledge.
-* Ideally, this would take no more work to document than any other `torch.nn.functional` function.
-
-
-## **Unresolved questions**
-* Right now our implementation is written as a pytorch extension. How can it be converted to something like a `TORCH_MODULE_FRAGMENT`?
-* How can our implementation be changed to support float16 and float64 types in addition?
+## **Discussion questions**
+* Are there desired changes in the naming conventions?
+* Right now our implementation is written as a PyTorch extension. How can it be converted to something like a `TORCH_MODULE_FRAGMENT`?
+* Are there recommended methods for ensuring compliance over a set of allowed dtypes? Our implementation currently works for torch.float32, but is not guaranteed to work for all types.
 * Currently our kernel only supports recent compute capabilities (7 and later?) and makes assumptions about that capability. Ideally this would be generalized to easily support new compute capabilities as they are announced. The assumptions made are the following:
     * The number of threads in a block
     * The number of threads in a warp
     * The number of warps in a block
-* Does torch allow the use of OpenMP?
+* Does torch allow the use of OpenMP, as we use in our CPU implementation? If not, what is used instead?
