@@ -31,11 +31,26 @@ nor about implementing the described feature until some time in the future.
 
 
 ## **Summary**
-Add Viterbi decoding to PyTorch
+
+We want to add Viterbi decoding to PyTorch. Viterbi decoding is a well-known algorithm that finds the path of maximum likelihood over a time-varying distribution. It is used in automatic speech recognition, bioinformatics, digital communications, and other tasks that produce models that infer or generate sequences of probability distributions. No implementation of Viterbi decoding exists in PyTorch, and no convenient alternative implementation exists for ML practitioners that is fast enough to scale to large datasets. We have created batched CPU and GPU implementations of Viterbi decoding significantly faster than available implementations. We have found our implementations useful for our own research tasks, and believe the community may find them useful as well.
 
 
 ## **Motivation**
-Viterbi decoding finds the path of maximum likelihood over a time-varying distribution with applications in automatic speech recognition (ASR), pitch estimation, bioinformatics, and more. No implementation of Viterbi decoding exists in PyTorch, and no convenient alternative implementation exists for ML practitioners. A commonly-used implementation in Librosa is used as a reference implementation for correctness, but this reference does not scale well to large datasets due to a relatively inefficient implementation.
+
+Viterbi decoding is a generally useful algorithm that is missing from the PyTorch library, with applications in automatic speech recognition, bioinformatics, digital communications, and more. However, Viterbi decoding is O(C^2T) for C classes and T timesteps, making it challenging to scale to large datasets and real-time applications. A commonly-used implementation of Viterbi decoding exists in Librosa (`librosa.sequence.viterbi`). We use Librosa's implementation as a reference for correctness and a baseline for
+
+
+We use Viterbi decoding to decode distributions over pitch inferred by a pitch estimating neural network. We compare our proposed implementation to the reference implementation in Librosa that uses just-in-time compilation via numba.
+
+| Method  | Real Time Factor (higher is better) |
+| ------------- | ------------- |
+| Librosa (1x cpu)|  |
+| Librosa (16x cpu)| |
+| Proposed (1x cpu)|  |
+| Proposed (16x cpu)| |
+| Proposed (1x RTX 4090; batch size 1)| |
+| Proposed (1x RTX 4090; batch size 512)| |
+
 
 Concretely, Viterbi decoding consists of two stages: (1) construction of a _trellis_ matrix containing path probabilities, and (2) backtracing along the maximal path. We have developed and open-sourced fast CPU and CUDA implementations of both stages. We think our implementations would be a viable starting point for adding Viterbi decoding to PyTorch.
 
@@ -61,20 +76,6 @@ The warps iterate over the input states for cases where there are more than 32 (
 Instead of storing the entire posterior distribution as in the Librosa implementation, we only store the current and next timesteps, reducing memory usage. To avoid expensive memory copies, we use pointers to switch which array stores current values and which stores next values. In addition, to support a variable number of input states, these two arrays are just pointers to the two halves of a shared memory array which is sized externally.
 
 Because we use only a single block per input sequence, we can process a batch of input sequences very quickly in parallel, depending on the GPU in use. This also cuts down on the number of kernel-invocation-style syncs that must be performed.
-
-
-## **Metrics**
-
-We use Viterbi decoding to decode distributions over pitch inferred by a pitch estimating neural network. We compare our proposed implementation to the reference implementation in Librosa that uses just-in-time compilation via numba.
-
-| Method  | Real Time Factor (higher is better) |
-| ------------- | ------------- |
-| Librosa (1x cpu)|  |
-| Librosa (16x cpu)| |
-| Proposed (1x cpu)|  |
-| Proposed (16x cpu)| |
-| Proposed (1x RTX 4090; batch size 1)| |
-| Proposed (1x RTX 4090; batch size 512)| |
 
 
 ## **Alternatives**
