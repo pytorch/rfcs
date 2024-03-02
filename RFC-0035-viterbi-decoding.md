@@ -37,9 +37,7 @@ We want to add Viterbi decoding to PyTorch. Viterbi decoding is a well-known alg
 
 ## **Motivation**
 
-Viterbi decoding is a generally useful algorithm that is missing from the PyTorch library, with applications in automatic speech recognition, bioinformatics, digital communications, and more. However, Viterbi decoding is O(C^2T) for C classes and T timesteps, making it challenging to scale to large datasets and real-time applications. A commonly-used implementation of Viterbi decoding exists in Librosa (`librosa.sequence.viterbi`). We use Librosa's implementation as a reference for correctness and as a baseline for benchmarking. Our benchmark uses `C = 1,440` states and approximately `T ~= 20 million` time steps across approximately 40k files.
-
-We use Viterbi decoding to decode distributions over pitch inferred by a pitch estimating neural network. We compare our proposed implementation to the reference implementation in Librosa ([`librosa.sequence.viterbi`](https://librosa.org/doc/main/generated/librosa.sequence.viterbi.html)) that uses just-in-time compilation via numba.
+Viterbi decoding is a generally useful algorithm that is missing from the PyTorch library, with applications in automatic speech recognition, bioinformatics, digital communications, and more. However, Viterbi decoding is O(C^2T) for C classes and T timesteps, making it challenging to scale to large datasets and real-time applications. A commonly-used implementation of Viterbi decoding exists in Librosa (`librosa.sequence.viterbi`). We use Librosa's implementation as a reference for correctness and as a baseline for benchmarking. Our benchmark uses `C = 1,440` states and approximately `T ~= 20 million` time steps across approximately 40k files. We compare our proposed implementation to the reference implementation in Librosa ([`librosa.sequence.viterbi`](https://librosa.org/doc/main/generated/librosa.sequence.viterbi.html)) that uses just-in-time compilation via numba.
 
 | Method  | Timesteps decoded per second |
 | ------------- | ------------- |
@@ -77,33 +75,48 @@ We propose a Python API and underlying C++/CUDA extensions for Viterbi decoding 
 ```
 def decode(
     observation: torch.Tensor,
-    batch_frames: Optional[torch.Tensor] = None,
-    transition: Optional[torch.Tensor] = None,
-    initial: Optional[torch.Tensor] = None,
-    log_probs: bool = False
-) -> torch.Tensor:
+    batch_frames: torch.Tensor,
+    transition: torch.Tensor,
+    initial: torch.Tensor
+):
     """Decode a time-varying categorical distribution
 
-    Arguments
-        observation
+    Args:
+        observation: :math:`(N, T, S)` or :math:`(T, S)`
+            where `S = the number of states`,
+            `T = the length of the sequence`,
+            and `N = batch size`.
             Time-varying categorical distribution
-            shape=(batch, frames, states)
-        batch_frames
-            Number of frames in each batch item; defaults to all
-            shape=(batch,)
-        transition
-            Categorical transition matrix; defaults to uniform
-            shape=(states, states)
-        initial
-            Categorical initial distribution; defaults to uniform
-            shape=(states,)
-        log_probs
-            Whether inputs are in (natural) log space
+        batch_frames :math:`(N)`
+            Sequence length of each batch item
+        transition :math:`(S, S)`
+            Categorical transition matrix
+        initial :math:`(S)`
+            Categorical initial distribution
 
-    Returns
-        indices
+    Return:
+        indices: :math:`(N, T)`
             The decoded bin indices
-            shape=(batch, frames)
+
+    Example::
+
+            >>> observation = torch.tensor([[
+            >>>     [0.25, 0.5, 0.25],
+            >>>     [0.25, 0.25, 0.5],
+            >>>     [0.33, 0.33, 0.33]
+            >>> ]])
+            >>> batch_frames = torch.tensor([3])
+            >>> transition = torch.tensor([
+            >>>     [0.5, 0.25, 0.25],
+            >>>     [0.33, 0.34, 0.33],
+            >>>     [0.25, 0.25, 0.5]
+            >>> ])
+            >>> initial = torch.tensor([0.4, 0.35, 0.25])
+            >>> bins = torch.viterbi.decode(
+            >>>     observation,
+            >>>     batch_frames,
+            >>>     transition,
+            >>>     initial)
     """
 ```
 
@@ -112,35 +125,29 @@ def decode(
 
 ```
 def make_trellis(
-    self,
     observation: torch.Tensor,
-    batch_frames: Optional[torch.Tensor] = None,
-    transition: Optional[torch.Tensor] = None,
-    initial: Optional[torch.Tensor] = None,
-    log_probs: bool = False
+    batch_frames: torch.Tensor,
+    transition: torch.Tensor,
+    initial: torch.Tensor
 ) -> torch.Tensor:
     """Perform first step of Viterbi decoding to construct the path trellis
 
-    Arguments
-        observation
+   Args:
+        observation: :math:`(N, T, S)` or :math:`(T, S)`
+            where `S = the number of states`,
+            `T = the length of the sequence`,
+            and `N = batch size`.
             Time-varying categorical distribution
-            shape=(batch, frames, states)
-        batch_frames
-            Number of frames in each batch item; defaults to all
-            shape=(batch,)
-        transition
-            Categorical transition matrix; defaults to uniform
-            shape=(states, states)
-        initial
-            Categorical initial distribution; defaults to uniform
-            shape=(states,)
-        log_probs
-            Whether inputs are in (natural) log space
+        batch_frames :math:`(N)`
+            Sequence length of each batch item
+        transition :math:`(S, S)`
+            Categorical transition matrix
+        initial :math:`(S)`
+            Categorical initial distribution
 
-    Returns
-        trellis
-            The matrix of greedy path pointers used to decode the optimal path
-            shape=(batch, frames, states)
+    Return:
+        trellis: :math:`(N, T, S)`
+            Matrix of minimum path indices for backtracing
     """
 ```
 
@@ -150,30 +157,25 @@ def make_trellis(
 ```
 def backtrace_trellis(
     trellis: torch.Tensor,
-    batch_frames: Optional[torch.Tensor] = None,
-    transition: Optional[torch.Tensor] = None,
-    initial: Optional[torch.Tensor] = None
+    batch_frames: torch.Tensor,
+    transition: torch.Tensor,
+    initial: torch.Tensor
 ) -> torch.Tensor:
     """Perform second step of Viterbi decoding to backtrace optimal path
 
-    Arguments
-        trellis
-            The matrix of greedy path pointers used to decode the optimal path
-            shape=(batch, frames, states)
-        batch_frames
-            Number of frames in each batch item; defaults to all
-            shape=(batch,)
-        transition
-            Categorical transition matrix; defaults to uniform
-            shape=(states, states)
-        initial
-            Categorical initial distribution; defaults to uniform
-            shape=(states,)
+    Args:
+        trellis: :math:`(N, T, S)`
+            Matrix of minimum path indices for backtracing
+        batch_frames :math:`(N)`
+            Sequence length of each batch item
+        transition :math:`(S, S)`
+            Categorical transition matrix
+        initial :math:`(S)`
+            Categorical initial distribution
 
-    Returns
-        indices
+    Return:
+        indices: :math:`(N, T)`
             The decoded bin indices
-            shape=(batch, frames)
     """
 ```
 
@@ -186,86 +188,75 @@ class Decoder:
 
     def __init__(
         self,
-        transition: Optional[torch.Tensor] = None,
-        initial: Optional[torch.Tensor] = None
+        transition: torch.Tensor,
+        initial: torch.Tensor
     ) -> None:
         """
-        Arguments
-            transition
-                Categorical transition matrix; defaults to uniform
-                shape=(states, states)
-            initial
-                Categorical initial distribution; defaults to uniform
-                shape=(states,)
+        Args:
+            transition :math:`(S, S)`
+                Categorical transition matrix
+            initial :math:`(S)`
+                Categorical initial distribution
         """
 
     def decode(
         self,
         observation: torch.Tensor,
-        batch_frames: Optional[torch.Tensor] = None,
-        log_probs: bool = False
+        batch_frames: torch.Tensor
     ) -> torch.Tensor:
         """Decode a time-varying categorical distribution
 
-        Arguments
-            observation
+        Args:
+            observation: :math:`(N, T, S)` or :math:`(T, S)`
+                where `S = the number of states`,
+                `T = the length of the sequence`,
+                and `N = batch size`.
                 Time-varying categorical distribution
-                shape=(batch, frames, states)
-            batch_frames
-                Number of frames in each batch item; defaults to all
-                shape=(batch,)
-            log_probs
-                Whether inputs are in (natural) log space
+            batch_frames :math:`(N)`
+                Sequence length of each batch item
 
-        Returns
-            indices
+        Return:
+            indices: :math:`(N, T)`
                 The decoded bin indices
-                shape=(batch, frames)
         """
 
     def make_trellis(
         self,
         observation: torch.Tensor,
-        batch_frames: Optional[torch.Tensor] = None,
-        log_probs: bool = False
+        batch_frames: torch.Tensor
     ) -> torch.Tensor:
         """Perform first step of Viterbi decoding to construct the path trellis
 
-        Arguments
-            observation
+        Args:
+            observation: :math:`(N, T, S)` or :math:`(T, S)`
+                where `S = the number of states`,
+                `T = the length of the sequence`,
+                and `N = batch size`.
                 Time-varying categorical distribution
-                shape=(batch, frames, states)
-            batch_frames
-                Number of frames in each batch item; defaults to all
-                shape=(batch,)
-            log_probs
-                Whether inputs are in (natural) log space
+            batch_frames :math:`(N)`
+                Sequence length of each batch item
 
-        Returns
-            trellis
-                The matrix of greedy path pointers used to decode the optimal path
-                shape=(batch, frames, states)
+        Return:
+            trellis: :math:`(N, T, S)`
+                Matrix of minimum path indices for backtracing
         """
 
     def backtrace_trellis(
         self,
         trellis: torch.Tensor,
-        batch_frames: Optional[torch.Tensor] = None
+        batch_frames: torch.Tensor
     ) -> torch.Tensor:
         """Perform second step of Viterbi decoding to backtrace optimal path
 
-        Arguments
-            trellis
-                The matrix of greedy path pointers used to decode the optimal path
-                shape=(batch, frames, states)
-            batch_frames
-                Number of frames in each batch item; defaults to all
-                shape=(batch,)
+        Args:
+            trellis: :math:`(N, T, S)`
+                Matrix of minimum path indices for backtracing
+            batch_frames :math:`(N)`
+                Sequence length of each batch item
 
-        Returns
-            indices
-                The decoded bin indices
-                shape=(batch, frames)
+        Return:
+            trellis: :math:`(N, T, S)`
+                Matrix of minimum path indices for backtracing
         """
 ```
 
@@ -291,6 +282,7 @@ Because we use only a single block per input sequence, we can process a batch of
 
 
 ## **Discussion questions**
+
 * Are there desired changes in the naming conventions?
 * Right now our implementation is written as a PyTorch extension. How can it be converted to something like a `TORCH_MODULE_FRAGMENT`?
 * Are there recommended methods for ensuring compliance over a set of allowed dtypes? Our implementation currently works for torch.float32, but is not guaranteed to work for all types.
