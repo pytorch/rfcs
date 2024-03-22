@@ -1,11 +1,8 @@
 # Hardware accelerators at pytorch.org
 
 **Authors:**
-* @bsochack
-* @sujoysaraswati
-* @fzhao3
-* @jgong5
-
+* Intel: @bsochack @sujoysaraswati @fzhao3 @jgong5
+* Huawei: @Yikun @hipudding
 
 ## **Summary**
 The main page of pytorch.org only shows PyTorch Get-Started  on CUDA, ROCm and CPU, but the hardware accelerator support is more diverse and the ecosystem is rapidly evolving with new accelerators like Intel Gaudi, Google TPU, etc.
