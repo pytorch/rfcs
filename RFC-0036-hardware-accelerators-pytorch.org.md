@@ -5,7 +5,7 @@
 * Huawei: @Yikun @hipudding
 
 ## **Summary**
-The main page of pytorch.org only shows PyTorch Get-Started  on CUDA, ROCm and CPU, but the hardware accelerator support is more diverse and the ecosystem is rapidly evolving with new accelerators like Intel Gaudi, Google TPU, etc.
+The main page of pytorch.org only shows PyTorch Get-Started  on CUDA, ROCm and CPU, but the hardware accelerator support is more diverse and the ecosystem is rapidly evolving with new accelerators like Intel Gaudi, Huawei Ascend, Google TPU, etc.
 The proposal in this RFC is to enable the visibility of broad set of accelerators that supports PyTorch for the community, and create a space for hardware vendors to provide instructions and details about their PyTorch support.  
 
 
@@ -28,9 +28,15 @@ The proposal is to enhance pytorch.org by adding 3  new sections:
 ### PyTorch integration types
 There are at least 2 ways how compute platforms are integrated with PyTorch:
 1. In-tree – CPU, CUDA, ROCm are developed, built and tested in PyTorch environment. PyTorch is ensuring quality criteria. This approach is limited to only a few compute platforms and it does not scale with number of compute platforms.
-2. Out-of-tree – Integration of other compute platforms like Intel Gaudi is done via additional python package (extension) that needs to be installed on top of PyTorch CPU package. Development, built and testing is done outside of PyTorch. In this case:
+2. Out-of-tree – Integration of other compute platforms like Intel Gaudi or Huawei Ascend is done via additional python package (extension) that needs to be installed on top of PyTorch CPU package. Development, built and testing is done outside of PyTorch. In this case:
    * PyTorch is ensuring quality of PyTorch CPU package.
    * Hardware provider is ensuring quality of its extension against PyTorch CPU package.
+
+### Out-of-tree integration vs. device key
+Out-of-tree integration refers to compute platforms integrated with its own device key or PrivateUse1.
+Example of out-of-tree integration with its own device key is Intel Gaudi with "HPU" key.
+Example of out-of-tree integration using PrivateUse1 is Huawei Ascend.
+
 
 ### Stable vs. nightly builds
 1. Stable builds – the hardware provider shall provide the installation commands when a compute platform is tested against given PyTorch version and it meets the quality criteria set by PyTorch Foundation.    
@@ -42,8 +48,9 @@ Report what kind of testing was done on a compute platform with PyTorch build
 * A common test report format - to be defined.
   * A test report to contain: results of tests (PyTorch UT, TorchBench, model runs, additional test suites), tested OSes.
 * Test requirements:
-    * Define must pass tests from PyTorch perspective i.e. subset of PyTorch framework UT tests.
-    * Leave other tests as optional so hardware providers can decide what kind of tests are the most relevant for its compute platform.
+  * Define must pass tests from PyTorch perspective i.e. subset of PyTorch framework UT tests.
+    * The must pass tests shall focus on basic PyTorch infrastructure as compute platforms have various capabilities.
+  * Leave other tests as optional so hardware providers can decide what kind of tests are the most relevant for its compute platform.
 
 
 ### Extend the “Install PyTorch” section on pytorch.org with new compute platforms
