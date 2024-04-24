@@ -62,6 +62,11 @@ The proposal is to add buttons for new compute platforms:
 
 ![Proposed Install PyTorch section](./RFC-0030-assets/pytorch_install_proposed.png)
 
+### Device plugins maintained out of the PyTorch tree
+Most devices are maintained out of the PyTorch tree, and some of them require an additional device extension package to be installed to initialize the device, register operators, and provide  optimizations. In such case, the additional command to install a device extension package should be provided in the installation instruction.
+
+![Proposed Install PyTorch section](./RFC-0030-assets/pytorch_install_proposed2.png)
+
 #### Editing PyTorch installation instructions
 The hardware providers should have a way to edit the installation commands via GitHub PRs.
 
@@ -80,14 +85,3 @@ When clicked at the hardware accelerator, it should take a user to a Pytorch sub
 * How to install PyTorch.
 * How to get started to work with a compute platform in Python i.e. importing pytorch, importing additional compute platform specific packages.
 * Where to get help in case of any issues.
-
-## Open points
-### Device plugins maintained out of the PyTorch tree
-Most devices are maintained out of the PyTorch tree, and some of them require an additional PyTorch device plugin to be installed to initialize the device, register operators, and provider additional optimizations.
-Can the PyTorch installation instruction provide the additional package to be installed? The package will be hosted elsewhere.  
-
-![Proposed Install PyTorch section](./RFC-0030-assets/pytorch_install_proposed2.png)
-
-### Access to older stable PyTorch builds
-Currently only the latest stable PyTorch builds are present in the PyTorch install table. Can it be extended with the older builds (N-1) ?    
-Rationale: The compute platforms integrated out-of-tree may need more time to provide its support for a given PyTorch version as regressions do not block PyTorch CI and release.
