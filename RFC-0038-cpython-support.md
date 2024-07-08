@@ -28,6 +28,7 @@ The key requirements driving this proposal are:
 PyTorch supports all CPython versions that are fully released and have not reached end of life: https://devguide.python.org/versions/
 
 Note: This is an update from the current policy at https://github.com/pytorch/pytorch/blob/main/RELEASE.md#python which is following NumPy’s approach. In practice, we are not following the rules stated in that .md and following the rule stated just above here. We are updating the rule (instead of enforcing the NEP above) as the cost of supporting more versions is minimal.
+Also split build to have a single (large) c++ package shared by all CPython version is way underway (https://github.com/pytorch/pytorch/pull/129011) and will reduce the binary size use on PyPi even though we support a large number of versions.
 
 ### What is tested in CI/CD
 
