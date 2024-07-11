@@ -6,7 +6,7 @@
 
 ## **Motivation**
 
-CPython release schedule is regularly cadenced every year. Given that the amount of work to enable and sunset versions yearly is fixed, we should be proactive in how we handle these tasks.
+CPython follows annual release cycle. Given that the amount of work to enable and sunset versions yearly is fixed, we should be proactive in how we handle these tasks.
 This RFC suggests an updated policy we want for CPython version support, CI/CD requirements and the proposed yearly timeline for enablement/sunsetting.
 
 The key requirements driving this proposal are:
@@ -99,4 +99,8 @@ At any given time, we should run:
   - ETA: 2 weeks
   - Goal: migrate all the CI jobs running on the oldest version to the soon-to-be oldest version
   - Who: Infra
-
+- Remove un-used code and use new features
+  - When: After the version is fully dropped
+  - ETA: N/A
+  - Goal: clean up tech debt related to older cpython versions and simplify code using new features.
+  - Who: All
