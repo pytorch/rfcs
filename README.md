@@ -22,7 +22,7 @@ RFCs are located in their own repository.
 
 To create one:
 
-1. For the https://github.com/pytorch/rfcs repository
+1. Fork the https://github.com/pytorch/rfcs repository
 2. Copy the template file `RFC-0000-template.md` to `RFC-00xx-your-feature.md` and fill it out with your proposal. The template is a guideline, feel free to add sections as appropriate
 3. You may also have the template simply link to another editor, like a Google Docs file, but please ensure that the document is publicly visible.  This can make the template easier to add edit, but commenting doesn’t scale very well, so please use this option with caution.
 
