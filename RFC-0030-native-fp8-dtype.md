@@ -11,7 +11,7 @@ Since fp8 data type seems to be a natural evolution of currently used fp16/bf16,
 
 * Nvidia, Arm and Intel - https://arxiv.org/pdf/2209.05433.pdf
 * GraphCore, AMD and Qualcomm - https://arxiv.org/pdf/2206.02915.pdf
-* Tesla - https://tesla-cdn.thron.com/static/MXMU3S_tesla-dojo-technology_1WDVZN.pdf
+* Tesla - https://web.archive.org/web/20230503235751/https://tesla-cdn.thron.com/static/MXMU3S_tesla-dojo-technology_1WDVZN.pdf
 
 This RFC proposes adding two 8-bit floating point data types variants to PyTorch, based on the Nvidia/Arm/Intel paper. It’s important to consider these two variants, because they’re already known to be used by Nvidia H100 and Intel Gaudi2 accelerators.
 

@@ -235,7 +235,7 @@ def lower_to_qnnpack_fx(model: QuantizedGraphModule) -> torch.nn.Module:
 ```
 
 As is shown from the code, there are two requirements that must be met when we add a new lowering pass for a specific backed:
-We need to register the backend quantized operator in `torch.ops` namespace, this can be achieved with PyTorch custom operator registration: https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/quantized/cpu/qconv.cpp#L881.
+We need to register the backend quantized operator in `torch.ops` namespace, this can be achieved with PyTorch custom operator registration: https://github.com/pytorch/pytorch/blob/dfbd030854359207cb3040b864614affeace11ce/aten/src/ATen/native/quantized/cpu/qconv.cpp#L881.
 
 ## Use Case 2: Quantizing the Same Model for Inference on Custom Backend
 If a backend does not need to modify the quantization flow, that is, it does not have extra quantized operators, fused quantized operators or customizations of quantization flow, we only need to write a lowering pass to transform a reference quantized model to a model runnable on a custom backend.

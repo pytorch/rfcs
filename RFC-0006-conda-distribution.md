@@ -124,7 +124,7 @@ There's more integration testing happening already:
   repo contains tooling to test PyTorch release candidates.
 - An overview of integration test results from the `builder` repo (last updated Oct'19,
   so perhaps no longer maintained) can be found
-  [here](http://ossci-integration-test-results.s3-website-us-east-1.amazonaws.com/test-results.html).
+  [here](https://web.archive.org/web/20201222195552/http://ossci-integration-test-results.s3-website-us-east-1.amazonaws.com/test-results.html).
 
 
 ## Usage and Impact

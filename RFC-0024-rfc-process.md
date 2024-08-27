@@ -49,7 +49,7 @@ We can easily implement this lifecycle on the existing rfcs repo (https://github
 - Submit a pull request titled `RFC-00xx-my-feature`. 
     - Assign the `draft` label while composing the RFC. You may find it easier to use a WYSIWYG editor (like Google Docs) when working with a few close collaborators; feel free to use whatever platform you like. Ideally this document is publicly visible and is linked to from the PR.
     - When opening the RFC for general discussion, copy your document into the `RFC-00xx-my-feature.md` file on the PR and assign the `commenting` label.
-- Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md#resolution).
+- Build consensus for your proposal, integrate feedback and revise it as needed, and summarize the outcome of the discussion via a [resolution template](https://github.com/pytorch/rfcs/blob/master/RFC-0000-template.md#resolution).
     - If the RFC is idle here (no activity for 2 weeks), assign the label `stalled` to the PR.
 - Once the discussion has settled, assign a new label based on the level of support:
     - `accepted` if a decision has been made in the RFC
@@ -69,7 +69,7 @@ When an RFC is in `commenting`, we can highlight it in a few ways by sharing a w
 * Twitter
 
 ### RFC Template
-The provided [RFC template](https://github.com/pytorch/rfcs/blob/rfc-process/RFC-0000-template.md) contains sections to help draft a detailed RFC, and workflow instructions so that contributors don't need to refer to any other place to understand the process.
+The provided [RFC template](https://github.com/pytorch/rfcs/blob/master/RFC-0000-template.md) contains sections to help draft a detailed RFC, and workflow instructions so that contributors don't need to refer to any other place to understand the process.
 
 ### Advantages of Github as a platform for RFCs:
 * Review comments are threaded, so conversations around a particular sentence are colocated
@@ -121,8 +121,8 @@ When authors open a new PR on the RFCs repo, they are asked to create a document
 ## **Prior Art**
 The proposals in this document are inspired by  
 * [Rust](https://github.com/rust-lang/rfcs) and [React](https://github.com/reactjs/rfcs/) RFC process that use Github, 
-* the Artsy RFC process for the [resolution template](https://github.com/artsy/README/blob/main/playbooks/rfcs.md#resolution), and 
-* the [Sourcegraph RFC](https://handbook.sourcegraph.com/company-info-and-process/communication/rfcs) process that uses Google Docs.
+* the Artsy RFC process for the [resolution template](https://github.com/artsy/README/blob/main/playbooks/rfcs.md#resolve-rfc), and
+* the [Sourcegraph RFC](https://sourcegraph.notion.site/Requests-for-comments-RFCs-3e9cb5c238f04042893d449572ca02bd) process that uses Google Docs.
 
 
 ## Resolution
