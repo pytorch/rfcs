@@ -1,0 +1,54 @@
+# (Dynamic)NestedDeviceMesh
+
+**Authors:**
+* @Jackmin801
+* @samsja 
+* @JohannesHa
+
+## **Summary**
+The current implementation of ProcessGroups assumes a fixed rank and world size.
+This results in the need to recreate ProcessGroups on all processes when there is a failure in one process.
+Currenty torch elastic implements this through restarting all the processes in the event of a failure and loading from the last checkpoint.
+
+However, the ProcessGroup abstraction actually wraps lazily created nccl communicators.
+We could allow ProcessGroups to have dynamic world size and rank, and recreate the nccl communicators when necessary.
+This would allow nodes to retry collectives that have world size independent inputs (i.e. all-reduce) when a node in the process group fails, reducing the amount of checkpointing and restarts necessary.
+
+## **Motivation**
+- Checkpointing and restarts are a pain
+- On and off ramping
+
+## **Proposed Implementation**
+
+## **Drawbacks**
+TBD
+
+## **Alternatives**
+- Status Quo
+- Doing it at the python level
+
+## **Prior Art**
+- Our PoC for ElasticDeviceMesh
+
+## **How we teach this**
+- The change shouldn't change the way users use torch distrbuted or the torchrun launcher other than the ability for their training workload to survive gpu failures.
+- Documentation should be added to inform users of the ability to on and off ramp workers in their distributed training.
+
+## **Unresolved questions**
+- **Compatibility with Functional implementation**: Does this change break some assumptions made by the Functional Comms implementation?
+- **Other backends**: This RFC was written with nccl in mind. Could we and should we also implement this for other backends? (i.e. GLOO)
+
+## **Resolution**
+TBD
+
+### Level of Support
+TBD
+
+#### Additional Context
+TBD
+
+### Next Steps
+TBD
+
+#### Tracking issue
+TBD
