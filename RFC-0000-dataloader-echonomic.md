@@ -116,8 +116,7 @@ and review /dev/shm "used" column.
 ## **Drawbacks**
 In the suggested implementation, the prefetch_factor becomes more prominent.
 It determines the total number of items sent simultenously to all workers, and (by default) also determines num_workers_batches.
-Hence, this parameter should be set with more attention by the user. Especially when collate_fn is TPT consuming.
-A larger default value for prefetch_factor, may be considered (for example 3 instead of 2).
+Hence, this parameter should be set with more attention. Additionally, a larger default value may be considered (possibly 3 instead of 2).
 
 Additionally, number of workers required for the same TPT increases by num_batch_workers.
 
