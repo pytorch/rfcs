@@ -76,12 +76,11 @@ Each worker prepares the batch, and send it back to the main process through wor
 After a batch is retrived by the main process, another batch is sent to the appropriate worker.
 
 A new design for MultiProcessingDataLoaderIter class is suggested. In the suggested design, there are 2 levels of workers: 
-* item_workers - designated to generate one item at a time (by running dataset \_\_getitem__ function), and send it to shared memory 
+* item_workers - Designated to generate one item at a time (by running dataset \_\_getitem__ function), and send it to shared memory 
   * This worker is similar to the workers of the current design, but it recieves and sends one item at a time (and not one batch at a time) 
-* batch_workers - designated to get items from shared memory, collect batch items, run collate function, and send the prepared batch back to shared memory
+* batch_workers - Designated to get items from shared memory, collect [batch_size] items, run collate function, and send the prepared batch back to shared memory
 
-By the new design, data flow will run as follows: \
-main_process -> item_workers -> batch_workers -> main_proces
+By the new design, data will flow by the following order: main_process -> item_workers -> batch_workers -> main_proces
 
 ### **main process high-level flow**
 * Send one item at a time to item_workers (using index_queues)
