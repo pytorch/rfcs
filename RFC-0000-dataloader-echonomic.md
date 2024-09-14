@@ -127,7 +127,7 @@ and review /dev/shm "used" column.
 
 ## **How we teach this**
 * dataloader documentation should be updated to include:
-  * Add a new parameter: num_batch_workers
+  * Add a new parameter: num_batch_workers (which equals prefetch_factor by default)
   * Revise parameter description: prefetch_factor
   
 ## Resolution
