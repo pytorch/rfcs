@@ -104,7 +104,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 ### **Suggested items_worker main-loop flow**
 * get item from index_queue
 * run dataset.\_\_getitem__(item_index)
-* send item to batch_worker by item_queue[bw_idx]
+* send item to the appropriate batch_worker by item_queue
 
 ### **Suggested batches_worker main-loop flow**
 * get items from item_queue
