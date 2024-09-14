@@ -45,7 +45,7 @@ The main process operates in parallel, to extract one batch after another, and i
 Storing about [num_workers] batches in shared memory, at the same time, imposes a limit over [num_workers]:\
 [num_workers < SERVER_RAM_AVAILABLE_BYTES / BATCH_SIZE_BYTES]\
 This limitation can produce a bottleneck over training TPT, not allowing to increase num_workers, due to server's RAM limitations.
-Alternatively, severs with more RAM can be used, increaseing severs cost.
+Alternatively, severs with more RAM can be used, to increase num_workers, increaseing severs cost.
 
 A new dataloader multiprocessing pipeline is suggested.
 In this pipline the amount of batches sent into shared memory is not dependant in [num_workers].
