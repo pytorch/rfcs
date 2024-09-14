@@ -110,7 +110,7 @@ By the new design, data will flow by the following order: main_process -> item_w
   * There is no reason to use a larger value than prefetch_factor. However, smaller value may be considered by the user, if collate_fn is very fast
 
 ## **Metrics **
-The new flow should require significantly less shared memory, while preserving TPT. \
+The new flow should require significantly less shared memory, while preserving TPT (for the same num_workers, and using a large enough prefetch_factor). \
 To monitor shared memory usage, type in linux server terminal: \
 $ monitor -n0.1 df -h \
 and review /dev/shm "used" column.
@@ -118,7 +118,8 @@ and review /dev/shm "used" column.
 ## **Drawbacks**
 In the suggested implementation, the prefetch_factor becomes more prominent.
 It determines the total number of items sent simultenously to all workers, and (by default) also determines num_workers_batches.
-Hence, this parameter should be set with more attention by the user. Especially when collate_fn is TPT consuming
+Hence, this parameter should be set with more attention by the user. Especially when collate_fn is TPT consuming.
+A larger default value for prefetch_factor, may be considered (for example 3 instead of 2).
 
 ## **How we teach this**
 * dataloader documentation should be updated to include:
