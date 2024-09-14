@@ -98,7 +98,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
       * Select bw_idx of the batches_worker with the minimal work-load
     * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]. Stop sending items when reaching this limit.
 * Retrive and store prepared batches from batch_workers (by worker_result_queue)
-  * Make sure to reduce work-load for the relevant batch_worker and for each relevant batch_worker when retriving the batch
+  * Make sure to reduce work-load counter for the relevant batch_worker and for each relevant batch_worker when retriving the batch
 * Once the next required batch is retrived, return batch to caller function 
 
 ### **Suggested items_worker main-loop flow**
