@@ -60,8 +60,8 @@ The new flow is designated to reduce RAM related bottelnecks and/or requirements
 |----------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | iw                   | items_worker (there are num_workers workers)                                                                                                                       |
 | bw                   | batch worker                                                                                                                                                       |
-| index_queue[iw]      | a queue for each items_worker - used to send items index (and metadata) to items_workers. Main process is putting data, and items_worker[iw] is gettting data      |
-| item_queue[ib]       | item_queue[ib] - one queue for each batch_worker - used to retrive items from items_workers. All items workers are putting data, batch_worker[ib] is getting data  |
+| index_queue[iw]      | a queue for each items_worker - used to send items index (and metadata) to item_workers. Main process is putting data, and items_worker[iw] is gettting data      |
+| item_queue[ib]       | item_queue[ib] - one queue for each batch_worker - used to retrive items from item_workers. All items workers are putting data, batch_worker[ib] is getting data  |
 | worker_result_queue  | one queue - used to send prepared batches back to main process. All batches workers are putting data, main process is getting data                                 |
 | item_idx             | item serial number (from epoch start)                                                                                                                              |
 | batch_idx            | batch serial number (from epoch start)                                                                                                                             |
@@ -75,26 +75,25 @@ The main process sends [prefetch_factor] batches to each worker, by index_queues
 Each worker prepares the batch, and send it back to the main process through worker_result_queue.
 After a batch is retrived by the main process, another batch is sent to the appropriate worker.
 
-A new design for MultiProcessingDataLoaderIter class is suggested \
-In the suggested design, there are 2 levels of workers: 
-* items_workers - designated to generate one item at a time (by running dataset __getitem__ function), and send to shared memory 
+A new design for MultiProcessingDataLoaderIter class is suggested. In the suggested design, there are 2 levels of workers: 
+* item_workers - designated to generate one item at a time (by running dataset __getitem__ function), and send to shared memory 
   * This worker is similar to current design workers, but recieving and sending one item at a time (and not one batch at a time) 
 * batchs_workers - designated to get items from shared memory, collect batch items, run collate function, and send the prepared batch back to shared memory
 
 By the new design, data flow will run as follows: \
-main_process -> items_workers -> batch_workers -> main_proces
+main_process -> item_workers -> batch_workers -> main_proces
 
 ### **main process high-level flow**
-* Send one item at a time to items_workers (using index_queues)
+* Send one item at a time to item_workers (using index_queues)
   * Each item should include (item_idx, batch_idx, item_index, iw_idx, bw_idx):
   * Track number of items at work ("work-load") at each worker.  
     * A different iw_idx should be selected for each item
       * Select iw_idx of the items_worker with the minimal work-load
     * An identical bw_idx should be selected for all items in the batch
       * Select bw_idx of the batches_worker with the minimal work-load
-    * Make sure that the sum of items_workers work-load is always <= [prefetch_factor] * [batch_size]
+    * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]
       * Stop sending items when reaching this limit
-* Retrive and store prepared batches from batches_workers (by worker_result_queue)
+* Retrive and store prepared batches from batch_workers (by worker_result_queue)
   * Make sure to reduce work-load for the relevant batch_worker and for each relevant batch_worker when retriving the batch
 * Once the next required batch is retrived (by , return batch to caller function 
 
@@ -104,11 +103,11 @@ main_process -> items_workers -> batch_workers -> main_proces
 * send item to the designated batch_worker (by item's bw_idx), through a designated queue (queue_item)
 
 ### **batches_worker main-loop flow**
-* get items from all items_workers through items_queue
+* get items from all item_workers through items_queue
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
 ### **Notes**
-* A new parameter for num_batches_workers should be introduced
+* A new parameter for num_batch_workers should be introduced
   * This parameter can be set by default to prefetch_factor. There is no reason to use larger value. However, smaller value may be considered, if collate_fn is very fast
 
 ## **Metrics **
