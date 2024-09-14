@@ -43,7 +43,7 @@ At most, [num_workers * prefetch_factor] can be stored in shared memory at the s
 The main process operates in parallel, to extracts one batch after another, and inject it into the model for training/validation/test. 
 
 Storing about [num_workers] batches in shared memory, at the same time, imposes a limit over [num_workers]:\
-[num_workers] < [SERVER_RAM_AVAILABLE_BYTES] / [BATCH_SIZE_BYTES]\
+[num_workers < SERVER_RAM_AVAILABLE_BYTES / BATCH_SIZE_BYTES]\
 This limitation can produce a bottleneck over training time, not allowing to increase num_workers, due to server's RAM limitations.
 Alternatively, severs with more RAM can be used, increaseing severs cost.
 
