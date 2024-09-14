@@ -110,8 +110,10 @@ By the new design, data will flow by the following order: main_process -> item_w
   * There is no reason to use a larger value than prefetch_factor. However, smaller value may be considered by the user, if collate_fn is very fast
 
 ## **Metrics **
-What are the main metrics to measure the value of this feature? 
-
+For similar configuration, the new flow should require significantly less shared memory, while preserving TPT.
+To monitor shared memory usage, type in linux server terminal: \
+$ monitor -n0.1 df -h \
+and review /dev/shm "used" column
 
 ## **Drawbacks**
 Are there any reasons why we should not do this? Here we aim to evaluate risk and check ourselves.
