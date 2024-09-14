@@ -111,9 +111,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
 ### **Notes**
-* A new dataloader parameter: num_batch_workers should be introduced
-  * By default, this parameter should be set to prefetch_factor. 
-  * There is no reason to use a larger value than prefetch_factor. However, smaller value may be considered by the user, if collate_fn is very fast
+* A new dataloader parameter: num_batch_workers should be introduced. By default, this parameter should be set to prefetch_factor. There is no reason to use a larger value than prefetch_factor. However, smaller value may be considered by the user, if collate_fn is very fast
 
 ## **Metrics **
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
