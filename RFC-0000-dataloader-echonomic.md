@@ -35,7 +35,7 @@ nor about implementing the described feature until some time in the future.
 A new pytorch dataloader multiprocessing pipline is suggested. This pipline is designated to significantly reduce random-access-memory (RAM) usage, without any significant reduction in throughput (TPT).
 
 ## **Motivation**
-Model input batch may require significant amounts of RAM. For example, in video processing or in 3D graphics applications.
+Model input batch may require significant amounts of RAM. For example, in video processing or in 3D graphics applications. 
 
 By current dataloader multiprocessing pipline design, workers simultaneously prepere batches and send them into shared memory, by a queue.
 In practice, about [num_workers] batches are simultenously stored in shared memory, nearly after epoch start. 
@@ -48,7 +48,7 @@ This limitation can produce a bottleneck over training TPT, not allowing to incr
 Alternatively, in order to increase num_workers, a severs with more RAM can be used, increaseing sever cost.
 
 A new dataloader multiprocessing pipeline is suggested.
-In this pipline, only up to [prefetch_factor] batches are simultenously processed by all the workers together.
+In this pipline, only up to [prefetch_factor] batches are simultenously processed by all the workers together, and sent into shared memory.
 This decoupling from [num_workers], allowes to increase [num_workers], without any significant increase in shared memory consumption. 
 As in current implemnation, workers are not expected to enter idle state, hence no TPT reduction is expected.
 
