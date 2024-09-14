@@ -97,16 +97,17 @@ By the new design, data will flow by the following order: main_process -> item_w
 
 ### **items_worker main-loop flow**
 * get item from index_queue
-* run dataset __getitem__(item_index)
-* send item to the designated batch_worker (by item's bw_idx), through a designated queue (queue_item)
+* run dataset.\_\_getitem__(item_index)
+* send item to batch_worker by item_queue[bw_idx]
 
 ### **batches_worker main-loop flow**
-* get items from all item_workers through items_queue
+* get items from item_queue
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
 ### **Notes**
-* A new parameter for num_batch_workers should be introduced
-  * This parameter can be set by default to prefetch_factor. There is no reason to use larger value. However, smaller value may be considered, if collate_fn is very fast
+* A new dataloader parameter: num_batch_workers should be introduced
+  * By default, this parameter should be set to prefetch_factor. 
+  * There is no reason to use a larger value than prefetch_factor. However, smaller value may be considered by the user, if collate_fn is very fast
 
 ## **Metrics **
 What are the main metrics to measure the value of this feature? 
