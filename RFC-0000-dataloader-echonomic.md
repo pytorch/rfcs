@@ -83,12 +83,12 @@ A new design for MultiProcessingDataLoaderIter class is suggested. In the sugges
 By the new design, data will flow by the following order: main_process -> item_workers -> batch_workers -> main_proces
 
 ### **main process high-level flow**
-* Send one item at a time to item_workers (using index_queues)
-  * Each item should include (item_idx, batch_idx, item_index, iw_idx, bw_idx):
-  * Track number of items at work ("work-load") at each worker.  
-    * A different iw_idx should be selected for each item
+* Send one item at a time to item_workers (by index_queues)
+  * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx):
+  * Track number of items at work ("work-load") for each worker.  
+    * A different iw_idx should be assigned to each item
       * Select iw_idx of the items_worker with the minimal work-load
-    * An identical bw_idx should be selected for all items in the batch
+    * An identical bw_idx should be assigned to all items in the same batch
       * Select bw_idx of the batches_worker with the minimal work-load
     * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]
       * Stop sending items when reaching this limit
