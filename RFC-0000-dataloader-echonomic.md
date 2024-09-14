@@ -42,7 +42,7 @@ In practice, about [num_workers] batches are simultenously stored in shared memo
 At most, [num_workers * prefetch_factor] may be simultenously stored in shared memory.
 The main process operates in parallel to the workers, to extract one batch after another, from shared memory, and inject it into the model for training/validation/test. 
 
-Storing about [num_workers] batches in shared memory, at the same time, imposes a limit over [num_workers]:\
+Simultenously storing about [num_workers] batches in shared memory, imposes a limit over [num_workers]:\
 [num_workers < servers_total_available_ram_in_bytes / batch_size_in_bytes]\
 This limitation can produce a bottleneck over training TPT, by not allowing to increase num_workers, due to server's RAM limitations.
 Alternatively, in order to increase num_workers, a severs with more RAM can be used, increaseing sever cost.
