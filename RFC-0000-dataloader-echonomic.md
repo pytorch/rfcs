@@ -75,7 +75,7 @@ Each worker prepares one batch at a time, and send it back to the main process b
 After a batch is retrived by the main process, another batch is sent to the appropriate worker.
 
 A new multiprocessing pipline is suggested. In the suggested pipeine, there are 2 levels of workers: 
-* item_workers - Designated to generate one item at a time (by running dataset \_\_getitem__ function), and send it to shared memory 
+* item_workers - Designated to generate one item at a time (by running dataset \_\_getitem__ function), and send it to shared memory by item_queue 
   * This worker is similar to the workers of the current design, but it recieves and sends one item at a time (and not one batch at a time) 
 * batch_workers - Designated to get items from shared memory, collect [batch_size] items, run collate function, and send the prepared batch back to shared memory
 
