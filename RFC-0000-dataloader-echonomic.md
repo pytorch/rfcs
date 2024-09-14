@@ -113,7 +113,6 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 ### **New parameters**
 * A new dataloader parameter: num_batch_workers should be introduced. By default, this parameter should be set to prefetch_factor. 
   * There is no reason to use a larger value than prefetch_factor
-  * An increase of prefetch_factor default value from 2 to 3 may be considered.
 
 ## **Metrics **
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
@@ -123,7 +122,7 @@ and review /dev/shm "used" column.
 
 ## **Drawbacks**
 * Additional layer of batch_workers is required, somewhat increasing flow compexity.
-* Number of workers required for the same TPT increases by num_batch_workers.
+* Number of workers required for the same TPT increases by num_batches_workers (by default: num_batch_workers = prefetch_factor = 2).
   
 
 ## **How we teach this**
