@@ -70,8 +70,8 @@ The suggested flow is designated to reduce RAM related bottelnecks and/or requir
 
 
 By current design, one level of workers is used. 
-The main process sends [prefetch_factor] batches to each worker, by index_queues.
-Each worker prepares the batch, and send it back to the main process through worker_result_queue.
+The main process sends [prefetch_factor] batches to each worker, by the worker's index_queue.
+Each worker prepares one batch at a time, and send it back to the main process by worker_result_queue.
 After a batch is retrived by the main process, another batch is sent to the appropriate worker.
 
 A new design for MultiProcessingDataLoaderIter class is suggested. In the suggested design, there are 2 levels of workers: 
