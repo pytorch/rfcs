@@ -114,11 +114,10 @@ $ monitor -n0.1 df -h \
 and review /dev/shm "used" column.
 
 ## **Drawbacks**
-In the suggested implementation, the prefetch_factor becomes more prominent.
+* In the suggested implementation, the prefetch_factor becomes more prominent.
 It determines the total number of items sent simultenously to all workers, and (by default) also determines num_workers_batches.
 Hence, this parameter should be set with more attention. Additionally, a larger default value may be considered (possibly 3 instead of 2).
-
-Additionally, number of workers required for the same TPT increases by num_batch_workers.
+* Number of workers required for the same TPT increases by num_batch_workers.
 
 ## **How we teach this**
 * dataloader documentation should be updated to include:
