@@ -130,7 +130,7 @@ and review /dev/shm "used" column.
   * Add a new parameter: num_batch_workers
     * Default value should be num_batch_workers = prefetch_factor
     * If num_batch_workers > prefetch_factor, a warining should be issued: "There is no benefit in setting num_batch_workers > prefetch_factor, please consider setting it to None. This would set num_batch_workers = prefetch_factor, by default"
-  * Revise parameter description: prefetch_factor
+  * Adjust parameter description: prefetch_factor
   
 ## Resolution
 We decided to do it. X% of the engineering team actively approved of this change.
