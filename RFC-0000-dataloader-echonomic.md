@@ -113,7 +113,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
   * There is no reason to use a larger value than prefetch_factor. However, smaller value may be considered by the user, if collate_fn is very fast
 
 ## **Metrics **
-The new flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
+The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
 To monitor shared memory usage, type in linux server terminal: \
 $ monitor -n0.1 df -h \
 and review /dev/shm "used" column.
