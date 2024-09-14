@@ -37,21 +37,21 @@ A new pytorch dataloader multiprocessing pipline is suggested. This pipline is d
 ## **Motivation**
 Model input batch may require significant amounts of RAM. For example, in video processing or in 3D graphics applications.
 
-By current dataloader multiprocessing pipline design, workers simultaneously prepere batches and send them into shared memory, using a queue.
+By current dataloader multiprocessing pipline design, workers simultaneously prepere batches and send them into shared memory, by a queue.
 In practice, about [num_workers] batches are simultenously stored in shared memory, nearly after epoch start. 
 At most, [num_workers * prefetch_factor] may be stored in shared memory at the same time.
-The main process operates in parallel, to extract one batch after another, and inject it into the model for training/validation/test. 
+The main process operates in parallel to the workers, to extract one batch after another, from shared memory, and inject it into the model for training/validation/test. 
 
 Storing about [num_workers] batches in shared memory, at the same time, imposes a limit over [num_workers]:\
-[num_workers < SERVER_RAM_AVAILABLE_BYTES / BATCH_SIZE_BYTES]\
-This limitation can produce a bottleneck over training TPT, not allowing to increase num_workers, due to server's RAM limitations.
-Alternatively, severs with more RAM can be used, to increase num_workers, increaseing severs cost.
+[num_workers < servers_total_available_ram_in_bytes / batch_size_in_bytes]\
+This limitation can produce a bottleneck over training TPT, by not allowing to increase num_workers, due to server's RAM limitations.
+Alternatively, in order to increase num_workers, a severs with more RAM can be used, increaseing sever cost.
 
 A new dataloader multiprocessing pipeline is suggested.
-In this pipline the amount of batches sent into shared memory is not dependant in [num_workers].
-This decoupling, allowes to increase [num_workers] without any significant increase in RAM consumption. 
-As in current implemnation, workers are not expected to enter idle state during the epoch, hence no TPT reduction is expected for the same num_workers.
-The new flow is designated to reduce RAM related bottelnecks and/or requirements, and improve training costeffectiveness.
+In this pipline, only up to [prefetch_factor] batches are simultenously processed by all the workers together.
+This decoupling from [num_workers], allowes to increase [num_workers], without any significant increase in shared memory consumption. 
+As in current implemnation, workers are constantly recieving items, and are not expected to enter idle state. Hence no TPT reduction is expected.
+By introducing this improvement, the new flow is designated to reduce RAM related bottelnecks and/or requirements, and improve training costeffectiveness.
 
 ## **Proposed Implementation**
 ### **Definitions**
@@ -110,44 +110,21 @@ By the new design, data will flow by the following order: main_process -> item_w
   * There is no reason to use a larger value than prefetch_factor. However, smaller value may be considered by the user, if collate_fn is very fast
 
 ## **Metrics **
-For similar configuration, the new flow should require significantly less shared memory, while preserving TPT.
+The new flow should require significantly less shared memory, while preserving TPT. \
 To monitor shared memory usage, type in linux server terminal: \
 $ monitor -n0.1 df -h \
-and review /dev/shm "used" column
+and review /dev/shm "used" column.
 
 ## **Drawbacks**
-Are there any reasons why we should not do this? Here we aim to evaluate risk and check ourselves.
-
-Please consider:
-* is it a breaking change?
-* Impact on UX
-* implementation cost, both in terms of code size and complexity
-* integration of this feature with other existing and planned features
-
-
-## **Alternatives**
-What other designs have been considered? What is the impact of not doing this?
-
-
-## **Prior Art**
-Discuss prior art (both good and bad) in relation to this proposal:
-* Does this feature exist in other libraries? What experience has their community had?
-* What lessons can be learned from other implementations of this feature?
-* Published papers or great posts that discuss this
-
+In the suggested implementation, the prefetch_factor becomes more prominent.
+It determines the total number of items sent simultenously to all workers, and (by default) also determines num_workers_batches.
+Hence, this parameter should be set with more attention by the user. Especially when collate_fn is TPT consuming
 
 ## **How we teach this**
-* What names and terminology work best for these concepts and why? How is this idea best presented?
-* Would the acceptance of this proposal mean the PyTorch documentation must be re-organized or altered?
-* How should this feature be taught to existing PyTorch users?
-
-
-## **Unresolved questions**
-* What parts of the design do you expect to resolve through the RFC process before this gets merged?
-* What parts of the design do you expect to resolve through the implementation of this feature before stabilization?
-* What related issues do you consider out of scope for this RFC that could be addressed in the future independently of the solution that comes out of this RFC?
-
-
+* dataloader documentation should be updated to include:
+  * Add a new parameter: num_batch_workers
+  * Revise prefetch_factor parameter description
+  
 ## Resolution
 We decided to do it. X% of the engineering team actively approved of this change.
 
