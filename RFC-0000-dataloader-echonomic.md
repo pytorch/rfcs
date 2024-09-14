@@ -50,7 +50,7 @@ Alternatively, severs with more RAM can be used, to increase num_workers, increa
 A new dataloader multiprocessing pipeline is suggested.
 In this pipline the amount of batches sent into shared memory is not dependant in [num_workers].
 This decoupling, allowes to increase [num_workers] without any significant increase in RAM consumption. 
-As in current implemnation, workers keep generating new data during the epoch (without entering idle state), to avoid TPT reduction.
+As in current implemnation, workers are not expected to enter idle state during the epoch, hence no TPT reduction is expected for the same num_workers.
 The new flow is designated to reduce RAM related bottelnecks / requirements, and improve training costeffectiveness.
 
 
