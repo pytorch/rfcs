@@ -126,10 +126,10 @@ and review /dev/shm "used" column.
   
 
 ## **How we teach this**
-* dataloader documentation should be updated to include:
+* Dataloader documentation updates:
   * Add a new parameter: num_batch_workers
-    * Default value should be prefetch_factor
-    * If num_batch_workers > prefetch_factor, a warining should be issued: "There is no benefit in setting num_batch_workers > prefetch_factor, please consider setting it to None. This would set num_batch_workers = prefetch_factor by default"
+    * Default value should be num_batch_workers = prefetch_factor
+    * If num_batch_workers > prefetch_factor, a warining should be issued: "There is no benefit in setting num_batch_workers > prefetch_factor, please consider setting it to None. This would set num_batch_workers = prefetch_factor, by default"
   * Revise parameter description: prefetch_factor
   
 ## Resolution
