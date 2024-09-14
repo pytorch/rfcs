@@ -65,8 +65,8 @@ The suggested flow is designated to reduce RAM related bottelnecks and/or requir
 | item_idx              | Item serial index from epoch start (0 for first item, 1 for next item, etc)                                                     |
 | batch_idx             | Batch serial index from epoch start (0 for first batch, 1 for next batch, etc)                                                  |
 | item_index            | Item's dataset index, as in dataset.__getitem__(index)                                                                          |
-| iw_idx                | Item_worker index (which item_worker is designated to process the item)                                                         |  
-| bw_idx                | Batch_worker index (which batch_worker is designated to process the item)                                                       |
+| iw_idx                | Item_worker index                                                                                                               
+| bw_idx                | Batch_worker index                                                                                                              
 
 
 By current design, the class _MultiProcessingDataLoaderIter has one level of [num_workers] workers. 
