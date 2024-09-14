@@ -51,9 +51,7 @@ A new dataloader multiprocessing pipeline is suggested.
 In this pipline the amount of batches sent into shared memory is not dependant in [num_workers].
 This decoupling, allowes to increase [num_workers] without any significant increase in RAM consumption. 
 As in current implemnation, workers are not expected to enter idle state during the epoch, hence no TPT reduction is expected for the same num_workers.
-The new flow is designated to reduce RAM related bottelnecks / requirements, and improve training costeffectiveness.
-
-
+The new flow is designated to reduce RAM related bottelnecks and/or requirements, and improve training costeffectiveness.
 
 ## **Proposed Implementation**
 ### **Definitions**
