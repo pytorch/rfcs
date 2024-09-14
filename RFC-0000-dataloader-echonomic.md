@@ -99,7 +99,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
     * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]. Stop sending items when reaching this limit.
 * Retrive and store prepared batches from batch_workers (by worker_result_queue)
   * Make sure to reduce work-load for the relevant batch_worker and for each relevant batch_worker when retriving the batch
-* Once the next required batch is retrived (by , return batch to caller function 
+* Once the next required batch is retrived, return batch to caller function 
 
 ### **Suggested items_worker main-loop flow**
 * get item from index_queue
@@ -110,8 +110,10 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * get items from item_queue
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
-### **Notes**
-* A new dataloader parameter: num_batch_workers should be introduced. By default, this parameter should be set to prefetch_factor. There is no reason to use a larger value than prefetch_factor. However, smaller value may be considered by the user, if collate_fn is very fast
+### **New parameters**
+* A new dataloader parameter: num_batch_workers should be introduced. By default, this parameter should be set to prefetch_factor. 
+  * There is no reason to use a larger value than prefetch_factor
+  * An increase of prefetch_factor default value from 2 to 3 may be considered.
 
 ## **Metrics **
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
@@ -120,10 +122,9 @@ $ monitor -n0.1 df -h \
 and review /dev/shm "used" column.
 
 ## **Drawbacks**
-* In the suggested implementation, the prefetch_factor becomes more prominent.
-It determines the total number of items sent simultenously to all workers, and (by default) also determines num_workers_batches.
-Hence, this parameter should be set with more attention. Additionally, a larger default value may be considered (possibly 3 instead of 2).
+* Additional layer of batch_workers is required, somewhat increasing flow compexity.
 * Number of workers required for the same TPT increases by num_batch_workers.
+  
 
 ## **How we teach this**
 * dataloader documentation should be updated to include:
