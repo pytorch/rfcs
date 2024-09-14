@@ -124,7 +124,7 @@ Additionally, number of workers required for the same TPT increases by num_batch
 ## **How we teach this**
 * dataloader documentation should be updated to include:
   * Add a new parameter: num_batch_workers
-  * Revise prefetch_factor parameter description
+  * Revise parameter description: prefetch_factor
   
 ## Resolution
 We decided to do it. X% of the engineering team actively approved of this change.
