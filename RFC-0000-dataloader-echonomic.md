@@ -69,7 +69,7 @@ The suggested flow is designated to reduce RAM related bottelnecks and/or requir
 | bw_idx                | Batch_worker index                                                                                                              
 
 
-By current design, one level of workers is used. 
+By the current multiprocessing pipeline, a single level of workers is used. 
 The main process sends [prefetch_factor] batches to each worker, by the worker's index_queue.
 Each worker prepares one batch at a time, and send it back to the main process by worker_result_queue.
 After a batch is retrived by the main process, another batch is sent to the appropriate worker.
