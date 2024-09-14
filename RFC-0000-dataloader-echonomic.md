@@ -39,12 +39,12 @@ Model input batch may require significant amounts of RAM. For example, in video 
 
 By current dataloader multiprocessing pipline design, workers simultaneously prepere batches and send them into shared memory, using a queue.
 In practice, about [num_workers] batches are simultenously stored in shared memory, nearly after epoch start. 
-At most, [num_workers * prefetch_factor] can be stored in shared memory at the same time.
-The main process operates in parallel, to extracts one batch after another, and inject it into the model for training/validation/test. 
+At most, [num_workers * prefetch_factor] may be stored in shared memory at the same time.
+The main process operates in parallel, to extract one batch after another, and inject it into the model for training/validation/test. 
 
 Storing about [num_workers] batches in shared memory, at the same time, imposes a limit over [num_workers]:\
 [num_workers < SERVER_RAM_AVAILABLE_BYTES / BATCH_SIZE_BYTES]\
-This limitation can produce a bottleneck over training time, not allowing to increase num_workers, due to server's RAM limitations.
+This limitation can produce a bottleneck over training TPT, not allowing to increase num_workers, due to server's RAM limitations.
 Alternatively, severs with more RAM can be used, increaseing severs cost.
 
 A new dataloader multiprocessing pipeline is suggested.
