@@ -79,7 +79,7 @@ A new multiprocessing pipline is suggested. In the suggested pipeine, there are 
   * This worker is similar to the workers of the current design, but it recieves and sends one item at a time (and not one batch at a time) 
 * batch_workers - Designated to get items from shared memory, collect [batch_size] items, run collate function, and send the prepared batch back to shared memory
 
-By the new design, data will flow by the following order: main_process -> item_workers -> batch_workers -> main_proces
+The new design data flow, is accoroding to the following order: main_process -> item_workers -> batch_workers -> main_proces
 
 ### **main process high-level flow**
 * Send one item at a time to item_workers (by index_queues)
