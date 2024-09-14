@@ -85,7 +85,7 @@ Current design dataflow: main_process -> workers -> main_process
 
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
-### **main process high-level flow**
+### **Suggested main process high-level flow**
 * Send one item at a time to item_workers (by index_queues)
   * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx):
   * Track number of items at work ("work-load") for each worker.  
@@ -98,12 +98,12 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
   * Make sure to reduce work-load for the relevant batch_worker and for each relevant batch_worker when retriving the batch
 * Once the next required batch is retrived (by , return batch to caller function 
 
-### **items_worker main-loop flow**
+### **Suggested items_worker main-loop flow**
 * get item from index_queue
 * run dataset.\_\_getitem__(item_index)
 * send item to batch_worker by item_queue[bw_idx]
 
-### **batches_worker main-loop flow**
+### **Suggested batches_worker main-loop flow**
 * get items from item_queue
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
