@@ -83,7 +83,7 @@ A new multiprocessing pipline is suggested. In the suggested pipeine, there are 
 ### **dataflow**
 Current design dataflow: main_process -> workers -> main_process
 
-New design dataflow: main_process -> item_workers -> batch_workers -> main_process
+Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
 ### **main process high-level flow**
 * Send one item at a time to item_workers (by index_queues)
