@@ -39,7 +39,7 @@ Model input batch may require significant amounts of RAM. For example, in video 
 
 By current dataloader multiprocessing pipline design, workers simultaneously prepere batches and send them into shared memory, by a queue.
 In practice, about [num_workers] batches are simultenously stored in shared memory, nearly after epoch start. 
-At most, [num_workers * prefetch_factor] may be stored in shared memory at the same time.
+At most, [num_workers * prefetch_factor] may be simultenously stored in shared memory.
 The main process operates in parallel to the workers, to extract one batch after another, from shared memory, and inject it into the model for training/validation/test. 
 
 Storing about [num_workers] batches in shared memory, at the same time, imposes a limit over [num_workers]:\
