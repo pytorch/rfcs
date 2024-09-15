@@ -88,25 +88,25 @@ Current design dataflow: main_process -> workers -> main_process
 
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
-### **Main process flow**
-* Send one item at a time to item_workers (by index_queues)
-  * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx):
-  * Track number of items at work ("work-load") for each worker.  
-    * A different iw_idx should be assigned to each item
-      * Select iw_idx of the items_worker with the minimal work-load
-    * An identical bw_idx should be assigned to all items in the same batch
-      * Select bw_idx of the batches_worker with the minimal work-load
-    * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]. Stop sending items when reaching this limit.
+### **Main process loop description**
 * Retrive and store prepared batches from batch_workers (by worker_result_queue)
-  * Make sure to reduce work-load counter for the relevant batch_worker and for each relevant batch_worker when retriving the batch
+  * Track number of items at work ("work-load") by each worker. Make sure to reduce work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when retriving the batch
 * Once the next required batch is retrived, return batch to caller function 
+* Send batches of items to item_workers, one batch at a time
+  * A possibly different iw_idx should be assigned to each item
+    * Select iw_idx of the items_worker with the minimal work-load
+  * An identical bw_idx should be assigned to all items in the same batch
+    * Select bw_idx of the batches_worker with the minimal work-load
+  * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]. Stop sending batches when reaching this limit. 
+  * Make sure to increase work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
+  * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx):
 
-### **items_worker flow**
+### **items_worker loop description**
 * get item from index_queue
 * run dataset.\_\_getitem__(item_index)
 * send item to the appropriate batch_worker by item_queue
 
-### **batches_worker flow**
+### **batches_worker loop description**
 * get one item at a time from item_queue and append them into batches, by item batch_idx
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
