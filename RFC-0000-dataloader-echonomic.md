@@ -111,8 +111,10 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
 ### **New parameters**
-* A new dataloader parameter: num_batch_workers should be introduced. By default, this parameter should be set to prefetch_factor. 
+* A new dataloader parameter: num_batch_workers should be introduced 
+  * Default value should be num_batch_workers = prefetch_factor = 2
   * There is no reason to use a larger value than prefetch_factor
+  * If num_batch_workers > prefetch_factor, a warining should be issued: "There is no benefit in setting num_batch_workers > prefetch_factor, please consider setting it to None. This would set num_batch_workers = prefetch_factor, by default"
 
 ## **Metrics **
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
@@ -128,8 +130,6 @@ and review /dev/shm "used" column.
 ## **How we teach this**
 * Dataloader documentation updates:
   * Add a new parameter: num_batch_workers
-    * Default value should be num_batch_workers = prefetch_factor
-    * If num_batch_workers > prefetch_factor, a warining should be issued: "There is no benefit in setting num_batch_workers > prefetch_factor, please consider setting it to None. This would set num_batch_workers = prefetch_factor, by default"
   * Adjust parameter description: prefetch_factor
   
 ## Resolution
