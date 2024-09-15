@@ -72,6 +72,7 @@ Additionally, the new flow is introducing only minor modifications in dataloader
 | bw_idx              | Batch_worker index                                                                                                          
 | batch_size          | batch size (may be smaller for last batch in epoch)                                                                         |
 
+### **High level**
 
 By the current multiprocessing pipeline, a single level of workers is used. 
 The main process sends [prefetch_factor] batches to each worker.
@@ -83,13 +84,11 @@ A new multiprocessing pipline is suggested. In the suggested pipeine, there are 
   * This worker is similar to the workers of the current design, but it recieves and sends one item at a time (and not one batch at a time) 
 * batch_workers - designated to get items from shared memory, collect [batch_size] items, run collate function, and send the prepared batch back to shared memory, for consumption by the main process
 
-
-### **Data flow**
 Current design dataflow: main_process -> workers -> main_process
 
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
-### **Suggested main process high-level flow**
+### **Main process flow**
 * Send one item at a time to item_workers (by index_queues)
   * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx):
   * Track number of items at work ("work-load") for each worker.  
@@ -102,12 +101,12 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
   * Make sure to reduce work-load counter for the relevant batch_worker and for each relevant batch_worker when retriving the batch
 * Once the next required batch is retrived, return batch to caller function 
 
-### **Suggested items_worker main-loop flow**
+### **items_worker flow**
 * get item from index_queue
 * run dataset.\_\_getitem__(item_index)
 * send item to the appropriate batch_worker by item_queue
 
-### **Suggested batches_worker main-loop flow**
+### **batches_worker flow**
 * get one item at a time from item_queue and append them into batches, by item batch_idx
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
