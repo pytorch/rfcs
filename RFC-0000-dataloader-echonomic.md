@@ -60,17 +60,17 @@ Additionally, the new flow is introducing only minor modifications in dataloader
 ## **Proposed Implementation**
 ### **Definitions**
 
-| symbol              | description                                                                                                                     |
-|---------------------|:--------------------------------------------------------------------------------------------------------------------------------|
-| index_queue         | A queue used to send item's index and metadata from main process to item_worker. There is a seperate queue to each item_worker. |
-| item_queue          | A queue used to send item from item_workers to batch_worker. There is a seperate queue to each batch_worker.                    |
-| worker_result_queue | A queue used to send prepared batches from batch_workers to main process.                                                       |
-| item_idx            | Item serial index from epoch start (0 for first item, 1 for next item, etc)                                                     |
-| batch_idx           | Batch serial index from epoch start (0 for first batch, 1 for next batch, etc)                                                  |
-| item_index          | Item's dataset index, as in dataset.__getitem__(index)                                                                          |
-| iw_idx              | Item_worker index                                                                                                               
-| bw_idx              | Batch_worker index                                                                                                              
-| batch_size          | batch size (may be smaller for last batch in epoch)                                                                        |
+| symbol              | description                                                                                                              |
+|---------------------|:-------------------------------------------------------------------------------------------------------------------------|
+| index_queue         | Queue to send item's index and metadata from main process to item_worker. There is a seperate queue to each item_worker. |
+| item_queue          | Queue to send item from item_workers to batch_worker. There is a seperate queue to each batch_worker.                    |
+| worker_result_queue | Queue to send prepared batches from batch_workers to main process.                                                       |
+| item_idx            | Item serial index from epoch start (0 for first item, 1 for next item, etc)                                              |
+| batch_idx           | Batch serial index from epoch start (0 for first batch, 1 for next batch, etc)                                           |
+| item_index          | Item's dataset index, as in dataset.__getitem__(index)                                                                   |
+| iw_idx              | Item_worker index                                                                                                        
+| bw_idx              | Batch_worker index                                                                                                       
+| batch_size          | batch size (may be smaller for last batch in epoch)                                                                      |
 
 
 By the current multiprocessing pipeline, a single level of workers is used. 
