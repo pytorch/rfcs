@@ -74,7 +74,7 @@ Additionally, the new flow is introducing only minor modifications in dataloader
 
 
 By the current multiprocessing pipeline, a single level of workers is used. 
-The main process sends [prefetch_factor] batches to each worker, by the worker's index_queue.
+The main process sends [prefetch_factor] batches to each worker.
 Each worker prepares one batch at a time, and send it back to the main process by worker_result_queue.
 After a batch is retrived by the main process, another batch is sent to the appropriate worker.
 
