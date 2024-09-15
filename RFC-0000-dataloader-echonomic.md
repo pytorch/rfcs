@@ -51,7 +51,7 @@ A new dataloader multiprocessing pipeline is suggested.
 In this pipline, only up to [prefetch_factor] batches are simultenously processed by all the workers together, and sent into shared memory.
 This decoupling from [num_workers], allowes to increase [num_workers], without any significant increase in shared memory consumption. 
 
-As in current implemnation, items generating workers are not expected to enter idle state, hence no TPT reduction is expected.
+As in current implemnation, the workers continuesly generate items during epoch, and are not expected to enter idle state. Hence no TPT reduction is expected.
 Additionally, the new flow is introducing only minor modifications in dataloader interface, making the transition almost transparent to the user.
 
 
