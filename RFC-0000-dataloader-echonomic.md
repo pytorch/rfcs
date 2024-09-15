@@ -84,7 +84,7 @@ A new multiprocessing pipline is suggested. In the suggested pipeine, there are 
 * batch_workers - designated to get items from shared memory, collect [batch_size] items, run collate function, and send the prepared batch back to shared memory, for consumption by the main process
 
 
-### **dataflow**
+### **Data flow**
 Current design dataflow: main_process -> workers -> main_process
 
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
