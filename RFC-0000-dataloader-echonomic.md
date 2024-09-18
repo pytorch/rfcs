@@ -93,8 +93,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 
 ### **Main process loop description**
 * Retrive and store prepared batches from batch_workers (by worker_result_queue)
-  * Track number of items at work ("work-load") by each worker. Make sure to reduce work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when retriving the batch
-* Once the next required batch is retrived, return batch to caller function 
+  * Track number of items at work ("work-load") by each worker. Make sure to reduce work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when retriving the batch 
 * Send batches of items to item_workers, one batch at a time
   * A possibly different iw_idx should be assigned to each item
     * Select iw_idx of the items_worker with the minimal work-load
@@ -103,6 +102,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
   * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]. Stop sending batches when reaching this limit. 
   * Make sure to increase work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
   * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx):
+* Once the next required batch is retrived, return batch to caller function
 
 ### **items_worker loop description**
 * get item from index_queue
