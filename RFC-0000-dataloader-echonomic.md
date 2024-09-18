@@ -101,7 +101,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
     * Select bw_idx of the batches_worker with the minimal work-load
   * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]. Stop sending batches when reaching this limit. 
   * Make sure to increase work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
-  * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx):
+  * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx, batch_size):
 * Once the next required batch is retrived, return batch to caller function
 
 ### **items_worker loop description**
@@ -110,7 +110,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * send item to the appropriate batch_worker by item_queue
 
 ### **batches_worker loop description**
-* get one item at a time from item_queue and append them into batches, by item batch_idx
+* get one item at a time from item_queue and append them into batches, by item batch_idx (and batch_size)
 * Once all items of a given batch are recived, run collate_fn and send the prepared batch to worker_result_queue
 
 ### **New parameters**
