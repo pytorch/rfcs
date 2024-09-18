@@ -71,8 +71,8 @@ The new flow is introducing only minor modifications in dataloader interface, ma
 | item_idx            | Item serial index in epoch (0 for first item, 1 for next item, etc)                                                         |
 | batch_idx           | Batch serial index in epoch (0 for first batch, 1 for next batch, etc)                                                |
 | item_index          | Item's dataset index, as in dataset.__getitem__(index)                                                                      |
-| iw_idx              | Item_worker index                                                                                                           
-| bw_idx              | Batch_worker index                                                                                                          
+| iw_idx              | Item_worker index {0, 1, ..., num_workers - 1}                                                                                                           
+| bw_idx              | Batch_worker index {0, 1, ..., num_batch_workers - 1}                                                                                                          
 | batch_size          | batch size (may be smaller for last batch in epoch)                                                                         |
 
 ### **High level**
