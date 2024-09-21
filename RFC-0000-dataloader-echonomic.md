@@ -94,13 +94,13 @@ Current design dataflow: main_process -> workers -> main_process
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
 #### **Main Process Flow**
-* Retrieve and store prepared batches from batch_workers (by _worker_result_queue_)
+* Retrieve and store prepared batches from _worker_result_queue_
   * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch 
 * Send batches of items for preparation to item_workers, one batch at a time
   * Each item should include the following metadata: (_item_idx_in_batch_, _batch_idx_, _item_index_, _iw_idx_, _bw_idx_, _batch_size_):
-  * A possibly different iw_idx should be assigned to each item
+  * A possibly different item_worker should be assigned to each item
     * Select iw_idx by the item_worker with the minimal workload
-  * An identical bw_idx should be assigned to all items in the same batch
+  * The same batch_worker should be assigned to all items in the same batch
     * Select bw_idx by the batch_worker with the minimal workload
   * Make sure that the sum of item_workers workload is always <= (_prefetch_factor_ * _batch_size_). Stop sending batches when reaching this limit 
   * Make sure to increase workload counter for the relevant batch_worker, and for each of the relevant item_workers, when sending the batch of items
