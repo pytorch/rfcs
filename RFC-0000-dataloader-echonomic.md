@@ -37,7 +37,7 @@ item generating workers (by calling `dataset.__getitem__`), and batch generating
 This pipeline is designated to significantly reduce random-access-memory (RAM) usage, without any significant reduction in throughput (TPT).
 
 ## **Motivation**
-In serveral applications, the input batch of a PyTorch model may require large amounts of RAM. Such applications may include video processing or in 3D graphics. 
+In serveral applications, the input batch of a PyTorch model may require large amounts of RAM. Such applications may include video processing and 3D graphics. 
 
 By current dataloader multiprocessing pipeline design, workers simultaneously prepare batches and send them into shared memory, by a queue.
 In practice, about _num_workers_ batches are simultaneously stored in shared memory, nearly after epoch start. 
