@@ -135,7 +135,7 @@ and review /dev/shm "used" column.
 
 ## **Drawbacks**
 * Additional layer of batch_workers is required, somewhat increasing flow complexity.
-* The user should consider increaseing _prefetch_factor_, if `collate_fn` is very slow and becomes a bottleneck. 
+* The user should consider increasing _prefetch_factor_, if `collate_fn` is very slow and becomes a bottleneck. 
   
 
 ## **How we teach this**
