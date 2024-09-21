@@ -140,7 +140,7 @@ $ monitor -n0.1 df -h \
 and review /dev/shm "used" column.
 
 ## **Drawbacks**
-* Additional layer of batch_workers is required, somewhat increasing flow compexity.
+* Additional layer of batch_workers is required, somewhat increasing flow complexity.
 * Number of workers required for the same TPT increases by num_batches_workers (by default: num_batch_workers = prefetch_factor = 2).
   
 
