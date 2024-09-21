@@ -50,7 +50,7 @@ This limitation can produce a bottleneck over training TPT, not allowing to incr
 Alternatively, to increase num_workers, a severs with more RAM is required, increasing sever cost.
 
 A new dataloader multiprocessing pipeline is suggested. In this pipeline, there are two types of workers:
-item generating workers (by `dataset.__getitem__` function), and batch generating workers (by collate_fn). 
+item generating workers (by `dataset.__getitem__` function), and batch generating workers (by `collate_fn`). 
 This design allows to simultaneously process only up to _prefetch_factor_ batches by all the workers together.
 This decoupling from _num_workers_, allows to increase _num_workers_, without any significant increase in shared memory consumption.
 As in current implementation, the workers continuously generate items during epoch, and are not expected to enter idle state. Hence no TPT reduction is expected. 
