@@ -103,7 +103,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
   * An identical bw_idx should be assigned to all items in the same batch
     * Select bw_idx by the batch_worker with the minimal workload
   * Make sure that the sum of item_workers workload is always <= (_prefetch_factor_ * _batch_size_). Stop sending batches when reaching this limit 
-  * Make sure to increase workload counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
+  * Make sure to increase workload counter for the relevant batch_worker, and for each of the relevant item_workers, when sending the batch of items
   
 * Once the next required batch is retrieved, return batch to caller function
 
