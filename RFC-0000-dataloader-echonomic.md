@@ -107,14 +107,14 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 
 ### **Main process loop description**
 * Retrieve and store prepared batches from batch_workers (by worker_result_queue)
-  * Track number of items at work ("work-load") by each worker. Make sure to reduce work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch 
+  * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch 
 * Send batches of items to item_workers, one batch at a time
   * A possibly different iw_idx should be assigned to each item
-    * Select iw_idx of the items_worker with the minimal work-load
+    * Select iw_idx of the items_worker with the minimal workload
   * An identical bw_idx should be assigned to all items in the same batch
-    * Select bw_idx of the batches_worker with the minimal work-load
-  * Make sure that the sum of item_workers work-load is always <= _prefetch_factor_ * _batch_size_. Stop sending batches when reaching this limit. 
-  * Make sure to increase work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
+    * Select bw_idx of the batches_worker with the minimal workload
+  * Make sure that the sum of item_workers workload is always <= _prefetch_factor_ * _batch_size_. Stop sending batches when reaching this limit. 
+  * Make sure to increase workload counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
   * Each item should include the following data: (item_idx_in_batch, batch_idx, item_index, iw_idx, bw_idx, batch_size):
 * Once the next required batch is retrieved, return batch to caller function
 
