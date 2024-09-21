@@ -86,7 +86,7 @@ After a batch is retrieved by the main process, another batch is sent to the app
 
 In the suggested pipeline, there are 2 levels of workers: 
 * item_workers - designated to generate one item at a time (by running `dataset.__getitem__` function), and send it to shared memory 
-  * This worker is similar to the workers of the current design, but it receives and sends one item at a time (and not one batch at a time) 
+  * This worker is similar to the workers in the current design, but it receives and sends one item at a time (and not one batch at a time) 
 * batch_workers - designated to get items from shared memory, collect _batch_size_ items, run collate function, and send the prepared batch back to shared memory, for consumption by the main process
 
 Current design dataflow: main_process -> workers -> main_process
