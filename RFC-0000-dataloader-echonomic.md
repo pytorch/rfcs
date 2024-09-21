@@ -119,12 +119,12 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 
 The following dataloader input parameters were modified / added:
 
-| name                       | description                                                                                                                                               |
-|----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| num_workers (modified)     | number of item workers. Setting it to 0 disables multiprocessing (as today). There is no benefit in increasing it beyond _prefetch_factor_ * _batch_size_ |
-|                            |                                                                                                                                                           |
-| prefetch_factor (modified) | number of batches simultanously sent for processing <u>by all workers</u> (2 by default)                                                                  |
-| num_workers_batches (new)  | number of batch workers (default is prefetch_factor). There is no benefit in increasing it beyond _prefetch_factor_                                       |   
+| name                         | description                                                                                                                                               |
+|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| _num_workers_ (modified)     | number of item workers. Setting it to 0 disables multiprocessing (as today). There is no benefit in increasing it beyond _prefetch_factor_ * _batch_size_ |
+|                              |                                                                                                                                                           |
+| _prefetch_factor_ (modified) | number of batches simultanously sent for processing <u>by all workers</u> (2 by default)                                                                  |
+| _num_workers_batches_ (new)  | number of batch workers (default is prefetch_factor). There is no benefit in increasing it beyond _prefetch_factor_                                       |   
 
 ## **Metrics **
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
