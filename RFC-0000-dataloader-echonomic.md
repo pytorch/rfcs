@@ -108,12 +108,12 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * Once the next required batch is retrieved, return batch to caller function
 
 #### **Item_worker Flow**
-* get item from index_queue
-* run `dataset.__getitem__(item_index)`
-* send item to the appropriate item_queue (by item's bw_idx)
+* Get item from index_queue
+* Run `dataset.__getitem__(item_index)`
+* Send item to the appropriate item_queue (by item's bw_idx)
 
 #### **Batch_worker Flow**
-* get one item at a time from item_queue and append them into batches, by item batch_idx (and batch_size)
+* Get one item at a time from item_queue and append them into batches, by item batch_idx (and batch_size)
 * Once all items of a given batch are received, run collate_fn and send the prepared batch to worker_result_queue
 
 #### **New Parameters**
