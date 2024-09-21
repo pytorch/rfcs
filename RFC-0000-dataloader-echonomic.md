@@ -33,7 +33,7 @@ nor about implementing the described feature until some time in the future.
                                            
 ## **Summary**
 A new PyTorch dataloader multiprocessing pipline design is suggested. This pipline splits the task of batch generation, into 2 types of workers:\
-item generating workers (by dataset.`__getitem__` function), and batch generating workers (by collate_fn).  
+item generating workers (by calling `dataset.__getitem__` function), and batch generating workers (by calling `collate_fn`).  
 This pipline is designated to significantly reduce random-access-memory (RAM) usage, without any significant reduction in throughput (TPT).
 
 ## **Motivation**
@@ -50,7 +50,7 @@ This limitation can produce a bottleneck over training TPT, not allowing to incr
 Alternatively, in order to increase num_workers, a severs with more RAM is required, increaseing sever cost.
 
 A new dataloader multiprocessing pipeline is suggested. In this pipline, there are two types of workers:
-item generating workers (by dataset.`__getitem__` function), and batch generating workers (by collate_fn). 
+item generating workers (by `dataset.__getitem__` function), and batch generating workers (by collate_fn). 
 This design allows to simultenously process only up to _prefetch_factor_ batches by all the workers together.
 This decoupling from _num_workers_, allowes to increase _num_workers_, without any significant increase in shared memory consumption.
 As in current implemnation, the workers continuesly generate items during epoch, and are not expected to enter idle state. Hence no TPT reduction is expected. 
@@ -82,9 +82,9 @@ The following dataloader input parameters were modified / added:
 | item_queue          | A queue to send items from item_workers to batch_worker. There is a seperate queue to each batch_worker.                    |
 | worker_result_queue | A queue to send prepared batches from batch_workers to main process.                                                        |
 | item_idx            | Item serial index in epoch (0 for first item, 1 for next item, etc)                                                         |
-| item_idx_in_batch   | Item serial index in batch                                                                                 |
+| item_idx_in_batch   | Item serial index in batch                                                                                                  |
 | batch_idx           | Batch serial index in epoch (0 for first batch, 1 for next batch, etc)                                                      |
-| item_index          | Item's dataset index, as in dataset.`__getitem__`(index)                                                                      |
+| item_index          | Item's dataset index, as in `dataset.__getitem__(index)`                                                                |
 | iw_idx              | Item_worker index {0, 1, ..., num_workers - 1}                                                                              
 | bw_idx              | Batch_worker index {0, 1, ..., num_batch_workers - 1}                                                                       
 | batch_size          | batch size (may be smaller for last batch in epoch)                                                                         |
@@ -97,7 +97,7 @@ Each worker prepares one batch at a time, and sends it back to the main process 
 After a batch is retrived by the main process, another batch is sent to the appropriate worker.
 
 A new multiprocessing pipline is suggested. In the suggested pipeine, there are 2 levels of workers: 
-* item_workers - designated to generate one item at a time (by running dataset.`__getitem__` function), and send it to shared memory 
+* item_workers - designated to generate one item at a time (by running `dataset.__getitem__` function), and send it to shared memory 
   * This worker is similar to the workers of the current design, but it recieves and sends one item at a time (and not one batch at a time) 
 * batch_workers - designated to get items from shared memory, collect _batch_size_ items, run collate function, and send the prepared batch back to shared memory, for consumption by the main process
 
@@ -120,7 +120,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 
 ### **items_worker loop description**
 * get item from index_queue
-* run dataset`.__getitem__`(item_index)
+* run `dataset.__getitem__(item_index)`
 * send item to the appropriate batch_worker by item_queue
 
 ### **batches_worker loop description**
