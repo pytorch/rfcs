@@ -32,7 +32,9 @@ nor about implementing the described feature until some time in the future.
 * @yoadbs
 
 ## **Summary**
-A new pytorch dataloader multiprocessing pipline is suggested. This pipline is designated to significantly reduce random-access-memory (RAM) usage, without any significant reduction in throughput (TPT).
+A new PyTorch dataloader multiprocessing pipline is suggested. This pipline splits the batch generation, into 2 types of workers:\
+item generating workers (by dataset.__getitem__ function), and batch generating workers (by collate_fn).  
+This pipline is designated to significantly reduce random-access-memory (RAM) usage, without any significant reduction in throughput (TPT).
 
 ## **Motivation**
 Model input batch may require significant amounts of RAM. For example, in video processing or in 3D graphics applications. 
@@ -84,7 +86,7 @@ Each worker prepares one batch at a time, and sends it back to the main process 
 After a batch is retrived by the main process, another batch is sent to the appropriate worker.
 
 A new multiprocessing pipline is suggested. In the suggested pipeine, there are 2 levels of workers: 
-* item_workers - designated to generate one item at a time (by running dataset \_\_getitem__ function), and send it to shared memory 
+* item_workers - designated to generate one item at a time (by running dataset.\_\_getitem__ function), and send it to shared memory 
   * This worker is similar to the workers of the current design, but it recieves and sends one item at a time (and not one batch at a time) 
 * batch_workers - designated to get items from shared memory, collect [batch_size] items, run collate function, and send the prepared batch back to shared memory, for consumption by the main process
 
