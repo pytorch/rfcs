@@ -33,7 +33,7 @@ nor about implementing the described feature until some time in the future.
                                            
 ## **Summary**
 A new PyTorch dataloader multiprocessing pipeline design is suggested. This pipeline splits the task of batch generation, into 2 types of workers:\
-item generating workers (by calling `dataset.__getitem__` function), and batch generating workers (by calling `collate_fn`).  
+item generating workers (by calling `dataset.__getitem__`), and batch generating workers (by calling `collate_fn`).  
 This pipeline is designated to significantly reduce random-access-memory (RAM) usage, without any significant reduction in throughput (TPT).
 
 ## **Motivation**
