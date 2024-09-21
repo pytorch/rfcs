@@ -49,7 +49,7 @@ _num_workers_ < (_total_available_ram_in_bytes_ / _batch_size_in_bytes_) \
 This limitation can produce a bottleneck over training TPT, not allowing to increase num_workers, due to server's RAM limitations.
 Alternatively, to increase num_workers, a sever with more available RAM is required, increasing sever cost.
 
-A new dataloader multiprocessing pipeline is suggested. In this pipeline, there are two types of workers:
+A new dataloader multiprocessing pipeline design is suggested. In this pipeline, there are two types of workers:
 item generating workers (by calling `dataset.__getitem__`), and batch generating workers (by calling `collate_fn`). 
 This design allows to simultaneously process only up to _prefetch_factor_ batches by all the workers together.
 The decoupling of number of processed batches from _num_workers_, allows to increase _num_workers_, without any significant increase in shared memory consumption.
