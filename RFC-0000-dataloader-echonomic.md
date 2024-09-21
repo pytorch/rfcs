@@ -41,7 +41,7 @@ In several applications, the input batch of a PyTorch model may require large am
 
 By current dataloader multiprocessing pipeline design, workers simultaneously prepare batches and send them into shared memory, by a queue.
 In practice, about _num_workers_ prepared batches are simultaneously stored in shared memory, nearly after epoch start. 
-At most, (_num_workers_ * _prefetch_factor_) may be simultaneously stored in shared memory.
+At most, (_num_workers_ * _prefetch_factor_) prepared batches may be simultaneously stored in shared memory.
 The main process operates in parallel to the workers, to extract one batch after another, from shared memory, and inject it into the model for training/validation/test. 
 
 Simultaneously storing about _num_workers_ batches in shared memory, imposes a limit over _num_workers_:\
