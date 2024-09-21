@@ -98,9 +98,9 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
   * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch 
 * Send batches of items to item_workers, one batch at a time
   * A possibly different iw_idx should be assigned to each item
-    * Select iw_idx of the items_worker with the minimal workload
+    * Select iw_idx by the items_worker with the minimal workload
   * An identical bw_idx should be assigned to all items in the same batch
-    * Select bw_idx of the batches_worker with the minimal workload
+    * Select bw_idx by the batches_worker with the minimal workload
   * Make sure that the sum of item_workers workload is always <= _prefetch_factor_ * _batch_size_. Stop sending batches when reaching this limit. 
   * Make sure to increase workload counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
   * Each item should include the following data: (item_idx_in_batch, batch_idx, item_index, iw_idx, bw_idx, batch_size):
