@@ -69,10 +69,11 @@ The new flow is introducing only minor modifications in dataloader interface, ma
 | item_queue          | A queue to send items from item_workers to batch_worker. There is a seperate queue to each batch_worker.                    |
 | worker_result_queue | A queue to send prepared batches from batch_workers to main process.                                                        |
 | item_idx            | Item serial index in epoch (0 for first item, 1 for next item, etc)                                                         |
-| batch_idx           | Batch serial index in epoch (0 for first batch, 1 for next batch, etc)                                                |
+| item_idx_in_batch   | Item serial index in batch                                                                                 |
+| batch_idx           | Batch serial index in epoch (0 for first batch, 1 for next batch, etc)                                                      |
 | item_index          | Item's dataset index, as in dataset.__getitem__(index)                                                                      |
-| iw_idx              | Item_worker index {0, 1, ..., num_workers - 1}                                                                                                           
-| bw_idx              | Batch_worker index {0, 1, ..., num_batch_workers - 1}                                                                                                          
+| iw_idx              | Item_worker index {0, 1, ..., num_workers - 1}                                                                              
+| bw_idx              | Batch_worker index {0, 1, ..., num_batch_workers - 1}                                                                       
 | batch_size          | batch size (may be smaller for last batch in epoch)                                                                         |
 
 ### **High level**
@@ -101,7 +102,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
     * Select bw_idx of the batches_worker with the minimal work-load
   * Make sure that the sum of item_workers work-load is always <= [prefetch_factor] * [batch_size]. Stop sending batches when reaching this limit. 
   * Make sure to increase work-load counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
-  * Each item should include the following data: (item_idx, batch_idx, item_index, iw_idx, bw_idx, batch_size):
+  * Each item should include the following data: (item_idx_in_batch, batch_idx, item_index, iw_idx, bw_idx, batch_size):
 * Once the next required batch is retrived, return batch to caller function
 
 ### **items_worker loop description**
