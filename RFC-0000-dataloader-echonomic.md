@@ -131,7 +131,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * A new dataloader parameter: num_batch_workers should be introduced 
   * Default value should be num_batch_workers = prefetch_factor = 2
   * There is no reason to use a larger value than prefetch_factor
-  * If num_batch_workers > prefetch_factor, a warining should be issued: "There is no benefit in setting num_batch_workers > prefetch_factor, please consider setting it to None. This would set num_batch_workers = prefetch_factor, by default"
+  * If num_batch_workers > prefetch_factor, a warning should be issued: "There is no benefit in setting num_batch_workers > prefetch_factor, please consider setting it to None. This would set num_batch_workers = prefetch_factor, by default"
 
 ## **Metrics **
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
