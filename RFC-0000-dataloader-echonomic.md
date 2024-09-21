@@ -1,4 +1,4 @@
-# PyTorch-DataLoader-Economic
+# DataLoader-Economic 
 
 **Authors:**
 * @yoadbs
