@@ -81,7 +81,7 @@ The new flow is introducing only minor modifications in dataloader interface, ma
 
 By the current multiprocessing pipeline, a single level of workers is used. 
 The main process sends _prefetch_factor_ batches to each worker.
-Each worker prepares one batch at a time, and sends it back to the main process by worker_result_queue.
+Each worker prepares one batch at a time, and sends it back to the main process by _worker_result_queue_.
 After a batch is retrieved by the main process, another batch is sent to the appropriate worker.
 
 In the suggested pipeline, there are 2 levels of workers: 
@@ -94,10 +94,10 @@ Current design dataflow: main_process -> workers -> main_process
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
 #### **Main Process Flow**
-* Retrieve and store prepared batches from batch_workers (by worker_result_queue)
+* Retrieve and store prepared batches from batch_workers (by _worker_result_queue_)
   * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch 
 * Send batches of items for preparation to item_workers, one batch at a time
-  * Each item should include the following metadata: (item_idx_in_batch, batch_idx, item_index, iw_idx, bw_idx, batch_size):
+  * Each item should include the following metadata: (_item_idx_in_batch_, _batch_idx_, _item_index_, _iw_idx_, _bw_idx_, _batch_size_):
   * A possibly different iw_idx should be assigned to each item
     * Select iw_idx by the item_worker with the minimal workload
   * An identical bw_idx should be assigned to all items in the same batch
@@ -108,13 +108,13 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * Once the next required batch is retrieved, return batch to caller function
 
 #### **Item_worker Flow**
-* Get item from index_queue
+* Get item from _index_queue_
 * Run `dataset.__getitem__(item_index)`
-* Send item to the appropriate item_queue (by item's bw_idx)
+* Send item to the appropriate _item_queue_ (by item's bw_idx)
 
 #### **Batch_worker Flow**
-* Get one item at a time from item_queue and collect them into batches, by item batch_idx (and batch_size)
-* Once all items of a given batch are received, run collate_fn and send the prepared batch to worker_result_queue
+* Get one item at a time from _item_queue_ and collect them into batches, by item batch_idx (and batch_size)
+* Once all items of a given batch are received, run collate_fn and send the prepared batch to _worker_result_queue_
 
 #### **New Parameters**
 The following dataloader input parameters were modified / added:
