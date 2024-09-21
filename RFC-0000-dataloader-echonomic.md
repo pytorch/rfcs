@@ -45,7 +45,7 @@ At most, _num_workers_ * _prefetch_factor_ may be simultaneously stored in share
 The main process operates in parallel to the workers, to extract one batch after another, from shared memory, and inject it into the model for training/validation/test. 
 
 Simultaneously storing about _num_workers_ batches in shared memory, imposes a limit over _num_workers_:\
-_num_workers_ < _total_available_ram_in_bytes_ / _batch_size_in_bytes_.\
+_num_workers_ < (_total_available_ram_in_bytes_ / _batch_size_in_bytes_) \
 This limitation can produce a bottleneck over training TPT, not allowing to increase num_workers, due to server's RAM limitations.
 Alternatively, to increase num_workers, a sever with more available RAM is required, increasing sever cost.
 
@@ -101,7 +101,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
     * Select iw_idx by the items_worker with the minimal workload
   * An identical bw_idx should be assigned to all items in the same batch
     * Select bw_idx by the batches_worker with the minimal workload
-  * Make sure that the sum of item_workers workload is always <= _prefetch_factor_ * _batch_size_. Stop sending batches when reaching this limit. 
+  * Make sure that the sum of item_workers workload is always <= (_prefetch_factor_ * _batch_size_). Stop sending batches when reaching this limit. 
   * Make sure to increase workload counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
   * Each item should include the following data: (item_idx_in_batch, batch_idx, item_index, iw_idx, bw_idx, batch_size):
 * Once the next required batch is retrieved, return batch to caller function
