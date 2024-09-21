@@ -96,36 +96,36 @@ Each worker prepares one batch at a time, and sends it back to the main process 
 After a batch is retrieved by the main process, another batch is sent to the appropriate worker.
 
 In the suggested pipeline, there are 2 levels of workers: 
-* item_workers - designated to generate one item at a time (by running `dataset.__getitem__` function), and send it to shared memory. 
+* item_workers - designated to generate one item at a time (by running `dataset.__getitem__` function), and send it to shared memory 
   * This worker is similar to the workers in the current design, but it receives and sends one item at a time (and not one batch at a time) 
-* batch_workers - designated to get items from shared memory, prepare batches by running collate_fn, and send the prepared batches back to shared memory, for consumption by the main process.
+* batch_workers - designated to get items from shared memory, prepare batches by running collate_fn, and send the prepared batches back to shared memory, for consumption by the main process
 
 Current design dataflow: main_process -> workers -> main_process
 
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
 #### **Main Process Flow**
-* Retrieve and store prepared batches from batch_workers (by worker_result_queue).
-  * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch. 
-* Send batches of items metadata to item_workers, one batch at a time.
+* Retrieve and store prepared batches from batch_workers (by worker_result_queue)
+  * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch 
+* Send batches of items metadata to item_workers, one batch at a time
   * Each item should include the following metadata: (item_idx_in_batch, batch_idx, item_index, iw_idx, bw_idx, batch_size):
-  * A possibly different iw_idx should be assigned to each item.
-    * Select iw_idx by the items_worker with the minimal workload.
-  * An identical bw_idx should be assigned to all items in the same batch.
-    * Select bw_idx by the batches_worker with the minimal workload.
-  * Make sure that the sum of item_workers workload is always <= (_prefetch_factor_ * _batch_size_). Stop sending batches when reaching this limit. 
-  * Make sure to increase workload counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items.
+  * A possibly different iw_idx should be assigned to each item
+    * Select iw_idx by the items_worker with the minimal workload
+  * An identical bw_idx should be assigned to all items in the same batch
+    * Select bw_idx by the batches_worker with the minimal workload
+  * Make sure that the sum of item_workers workload is always <= (_prefetch_factor_ * _batch_size_). Stop sending batches when reaching this limit 
+  * Make sure to increase workload counter for the relevant batch_worker, and for each of the relevant item-workers, when sending the batch of items
   
-* Once the next required batch is retrieved, return batch to caller function.
+* Once the next required batch is retrieved, return batch to caller function
 
 #### **Item Worker Flow**
-* get item from index_queue.
-* run `dataset.__getitem__(item_index)`.
-* send item to the appropriate batch_worker by item_queue.
+* get item from index_queue
+* run `dataset.__getitem__(item_index)`
+* send item to the appropriate batch_worker by item_queue
 
 #### **Batch Worker Flow**
-* get one item at a time from item_queue and append them into batches, by item batch_idx (and batch_size).
-* Once all items of a given batch are received, run collate_fn and send the prepared batch to worker_result_queue.
+* get one item at a time from item_queue and append them into batches, by item batch_idx (and batch_size)
+* Once all items of a given batch are received, run collate_fn and send the prepared batch to worker_result_queue
 
 ## **Metrics **
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
@@ -134,14 +134,14 @@ $ monitor -n0.1 df -h \
 and review /dev/shm "used" column.
 
 ## **Drawbacks**
-* Additional layer of batch_workers is required, somewhat increasing flow complexity.
-* The user should consider increasing _prefetch_factor_, if `collate_fn` is very slow and becomes a bottleneck. 
+* Additional layer of batch_workers is required, somewhat increasing flow complexity
+* The user should consider increasing _prefetch_factor_, if `collate_fn` is very slow and becomes a bottleneck 
   
 
 ## **How we teach this**
 * Dataloader documentation updates:
-  * Add a new parameter: num_batch_workers.
-  * Adjust parameter description: prefetch_factor.
+  * Add a new parameter: num_batch_workers
+  * Adjust parameter description: prefetch_factor
   
 ## Resolution
 We decided to do it. X% of the engineering team actively approved of this change.
