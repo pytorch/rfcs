@@ -64,18 +64,18 @@ The new flow is introducing only minor modifications in dataloader interface, ma
 
 ### **Definitions**
 
-| symbol                | description                                                                                                                 |
-|-----------------------|:----------------------------------------------------------------------------------------------------------------------------|
-| _index_queue_         | A queue to send items indices and metadata from main process to item_worker. There is a separate queue to each item_worker. |
-| _item_queue_          | A queue to send items from item_workers to batch_worker. There is a separate queue to each batch_worker.                    |
-| _worker_result_queue_ | A queue to send prepared batches from batch_workers to main process.                                                        |
-| _item_idx_            | Item serial index in epoch (0 for first item, 1 for next item, etc.)                                                        |
-| _item_idx_in_batch_   | Item serial index in batch.                                                                                                 |
-| _batch_idx_           | Batch serial index in epoch (0 for first batch, 1 for next batch, etc.)                                                     |
-| _item_index_          | Item's dataset index, as in `dataset.__getitem__(index)`                                                                    |
-| _iw_idx_              | Item_worker index {0, 1, ..., _num_workers_ - 1}                                                                            |
-| _bw_idx_              | Batch_worker index {0, 1, ..., _num_batch_workers_ - 1}                                                                     |
-| _batch_size_          | batch size (may be smaller for last batch in epoch)                                                                         |
+| symbol                | description                                                                                                                   |
+|-----------------------|:------------------------------------------------------------------------------------------------------------------------------|
+| _index_queue_         | A queue to send items indices and metadata from main process to item_worker. There is a separate queue to each item_worker    |
+| _item_queue_          | A queue to send items from item_workers to batch_worker. There is a separate queue to each batch_worker                       |
+| _worker_result_queue_ | A queue to send prepared batches from batch_workers to main process                                                           |
+| _item_idx_            | Item serial index in epoch (0 for first item, 1 for next item, etc.)                                                          |
+| _item_idx_in_batch_   | Item serial index in batch                                                                                                    |
+| _batch_idx_           | Batch serial index in epoch (0 for first batch, 1 for next batch, etc.)                                                       |
+| _item_index_          | Item's dataset index, as in `dataset.__getitem__(index)`                                                                      |
+| _iw_idx_              | Item_worker index {0, 1, ..., _num_workers_ - 1}                                                                              |
+| _bw_idx_              | Batch_worker index {0, 1, ..., _num_batch_workers_ - 1}                                                                       |
+| _batch_size_          | batch size (may be smaller for last batch in epoch)                                                                           |
 
 ### **High Level Description**
 
@@ -120,12 +120,12 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 
 The following dataloader input parameters were modified / added:
 
-| name                         | description                                                                                                                                                |
-|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| _num_workers_ (modified)     | number of item workers. Setting it to 0 disables multiprocessing (as today). There is no benefit in increasing it beyond _prefetch_factor_ * _batch_size_. |
-|                              |                                                                                                                                                            |
-| _prefetch_factor_ (modified) | number of batches simultanously sent for processing <u>by all workers</u> (2 by default).                                                                  |
-| _num_workers_batches_ (new)  | number of batch workers (default is _prefetch_factor_). There is no benefit in increasing it beyond _prefetch_factor_.                                     |   
+| name                         | description                                                                                                                                                 |
+|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| _num_workers_ (modified)     | number of item workers. Setting it to 0 disables multiprocessing (as today). There is no benefit in increasing it beyond _prefetch_factor_ * _batch_size_   |
+|                              |                                                                                                                                                             |
+| _prefetch_factor_ (modified) | number of batches simultanously sent for processing <u>by all workers</u> (2 by default)                                                                    |
+| _num_workers_batches_ (new)  | number of batch workers (default is _prefetch_factor_). There is no benefit in increasing it beyond _prefetch_factor_                                       |   
 
 ## **Metrics **
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
