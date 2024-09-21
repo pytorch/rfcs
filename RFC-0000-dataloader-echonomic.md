@@ -104,7 +104,7 @@ Current design dataflow: main_process -> workers -> main_process
 
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
-### **Main Process Flow Description**
+#### **Main Process Flow**
 * Retrieve and store prepared batches from batch_workers (by worker_result_queue).
   * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch. 
 * Send batches of items metadata to item_workers, one batch at a time.
@@ -118,12 +118,12 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
   
 * Once the next required batch is retrieved, return batch to caller function.
 
-### **Item Worker Flow Description**
+#### **Item Worker Flow**
 * get item from index_queue.
 * run `dataset.__getitem__(item_index)`.
 * send item to the appropriate batch_worker by item_queue.
 
-### **Batch Worker Flow Description**
+#### **Batch Worker Flow**
 * get one item at a time from item_queue and append them into batches, by item batch_idx (and batch_size).
 * Once all items of a given batch are received, run collate_fn and send the prepared batch to worker_result_queue.
 
