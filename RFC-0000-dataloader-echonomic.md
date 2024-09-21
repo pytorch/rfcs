@@ -47,7 +47,7 @@ The main process operates in parallel to the workers, to extract one batch after
 Simultaneously storing about _num_workers_ batches in shared memory, imposes a limit over _num_workers_:\
 _num_workers_ < _total_available_ram_in_bytes_ / _batch_size_in_bytes_.\
 This limitation can produce a bottleneck over training TPT, not allowing to increase num_workers, due to server's RAM limitations.
-Alternatively, in order to increase num_workers, a severs with more RAM is required, increasing sever cost.
+Alternatively, to increase num_workers, a severs with more RAM is required, increasing sever cost.
 
 A new dataloader multiprocessing pipeline is suggested. In this pipeline, there are two types of workers:
 item generating workers (by `dataset.__getitem__` function), and batch generating workers (by collate_fn). 
