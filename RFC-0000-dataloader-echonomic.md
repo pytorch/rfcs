@@ -138,35 +138,5 @@ and review /dev/shm "used" column.
   
 
 ## **How we teach this**
-* Dataloader documentation updates:
-  * Add a new parameter: num_batch_workers
-  * Adjust parameter description: prefetch_factor
-  
-## Resolution
-We decided to do it. X% of the engineering team actively approved of this change.
-
-### Level of Support
-Choose one of the following:
-* 1: Overwhelming positive feedback.
-* 2: Positive feedback.
-* 3: Majority Acceptance, with conflicting Feedback.
-* 4: Acceptance, with Little Feedback.
-* 5: Unclear Resolution.
-* 6: RFC Rejected.
-* 7: RFC Rejected, with Conflicting Feedback.
-
-
-#### Additional Context
-Some people were in favor of it, but some people didn’t want it for project X.
-
-
-### Next Steps
-Will implement it. 
-
-
-#### Tracking issue
-<github issue URL>
-
-
-#### Exceptions
-Not implementing on project X now. Will revisit the decision in 1 year.
+Update Dataloader documentation to include the description of the suggested pipeline. 
+Add/update description of the new/modified parameters.
