@@ -77,7 +77,7 @@ The new flow is introducing only minor modifications in dataloader interface, ma
 | bw_idx              | Batch_worker index {0, 1, ..., num_batch_workers - 1}                                                                        |
 | batch_size          | batch size (may be smaller for last batch in epoch)                                                                          |
 
-### **High level**
+### **High Level Description**
 
 By the current multiprocessing pipeline, a single level of workers is used. 
 The main process sends _prefetch_factor_ batches to each worker.
@@ -93,7 +93,7 @@ Current design dataflow: main_process -> workers -> main_process
 
 Suggested design dataflow: main_process -> item_workers -> batch_workers -> main_process
 
-### **Main process loop description**
+### **Main Process**
 * Retrieve and store prepared batches from batch_workers (by worker_result_queue)
   * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch 
 * Send batches of items to item_workers, one batch at a time
@@ -106,12 +106,12 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
   * Each item should include the following data: (item_idx_in_batch, batch_idx, item_index, iw_idx, bw_idx, batch_size):
 * Once the next required batch is retrieved, return batch to caller function
 
-### **items_worker loop description**
+### **Item Worker**
 * get item from index_queue
 * run `dataset.__getitem__(item_index)`
 * send item to the appropriate batch_worker by item_queue
 
-### **batches_worker loop description**
+### **Batch Worker**
 * get one item at a time from item_queue and append them into batches, by item batch_idx (and batch_size)
 * Once all items of a given batch are received, run collate_fn and send the prepared batch to worker_result_queue
 
