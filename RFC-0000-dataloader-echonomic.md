@@ -110,5 +110,11 @@ and review /dev/shm "used" column.
   
 
 ## **How we teach this**
-Update Dataloader documentation to include the description of the suggested pipeline. 
-Add/update description of the new/modified parameters.
+* Update Dataloader documentation to include the description of the suggested pipeline. 
+* Add/update description of the new/modified parameters.
+
+
+
+
+
+
