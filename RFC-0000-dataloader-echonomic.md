@@ -95,7 +95,7 @@ The following dataloader input parameters were modified / added:
 | _num_workers_ (modified)     | Number of item_workers. Setting it to 0 disables multiprocessing (as today). There is no benefit in increasing it beyond (_prefetch_factor_ * _batch_size_) |
 |                              |                                                                                                                                                             |
 | _prefetch_factor_ (modified) | Number of batches simultaneously sent for processing <u>by all workers</u> (2 by default)                                                                   |
-| _num_workers_batches_ (new)  | Number of batch_workers (defaults to _prefetch_factor_). There is no benefit in increasing it beyond _prefetch_factor_                                      |   
+| _num_batch_workers_ (new)  | Number of batch_workers (defaults to _prefetch_factor_). There is no benefit in increasing it beyond _prefetch_factor_                                      |   
 
 ## **Metrics**
 The suggested flow should require significantly less shared memory, while preserving TPT, using similar configurations. \
@@ -105,7 +105,7 @@ and review /dev/shm "used" column.
 
 ## **Drawbacks**
 * Additional layer of batch_workers is required, somewhat increasing flow complexity
-* CPU usage is somewhat higher in the suggested flow, due to the additional _num_workers_batches_ processes 
+* CPU usage is somewhat higher in the suggested flow, due to the additional _num_batch_workers_ processes 
 * The user should be aware that if `collate_fn` is very slow and becomes a bottleneck, an increase in _prefetch_factor_ should be considered 
   
 
