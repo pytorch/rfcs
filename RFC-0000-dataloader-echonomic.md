@@ -84,7 +84,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * Send item to the appropriate _item_queue_ (by item's bw_idx)
 
 #### **Batch_worker Flow**
-* Get one item at a time from _item_queue_ and collect them into batches, by item's batch_idx, item_idx_in_batch, and batch_size
+* Get one item at a time from _item_queue_ and collect them into batches, by item's metadata (batch_idx, item_idx_in_batch, batch_size)
 * Once all items of a given batch are received, run collate_fn and send the prepared batch to _worker_result_queue_
 
 #### **New Parameters**
