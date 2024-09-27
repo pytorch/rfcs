@@ -109,7 +109,7 @@ and review /dev/shm "used" column.
 * The user should be aware that if `collate_fn` is very slow and becomes a bottleneck, an increase in _prefetch_factor_ should be considered 
   
 
-## **How we teach this**
+## **How We Teach This**
 * Update Dataloader documentation to include the description of the suggested pipeline. 
 * Add/update description of the new/modified parameters.
 
