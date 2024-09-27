@@ -1,4 +1,4 @@
-# DataLoader-Economic Feature Suggestion
+# DataLoader-Economic Pipline Suggestion
 
 **Authors:**
 * @yoadbs
