@@ -79,8 +79,8 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 * Once the next required batch is available (by _batch_idx_), return batch to caller function
 
 #### **Item_worker Flow**
-* Get item from _index_queue_
-* Run `dataset.__getitem__(item_index)`
+* Get item metadata from _index_queue_
+* Run `dataset.__getitem__(item_index)` to generate item
 * Send item to the appropriate _item_queue_ (by item's bw_idx)
 
 #### **Batch_worker Flow**
