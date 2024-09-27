@@ -1,4 +1,4 @@
-# DataLoader-Economic Pipline Suggestion
+# DataLoader-Economic Multiprocessing Pipeline Suggestion
 
 **Authors:**
 * @yoadbs
