@@ -52,14 +52,14 @@ The new flow is introducing only minor modifications in dataloader interface, ma
 ### **High Level Description**
 
 By the current multiprocessing pipeline, a single level of workers is used. 
-The main process sends _prefetch_factor_ batches to each worker, by index_queue.
+The main process sends _prefetch_factor_ batches to each worker, by _index_queue_.
 Each worker prepares one batch at a time, and sends it back to the main process by _worker_result_queue_.
 After a batch is retrieved by the main process, another batch is sent.
 
 In the suggested pipeline, there are 2 levels of workers: 
-* Item_worker - Generates one item at a time (by running `dataset.__getitem__`), and send it to a designated batch_worker, by item_queue 
+* Item_worker - Generates one item at a time (by running `dataset.__getitem__`), and send it to a designated batch_worker, by _item_queue_ 
   * The item_worker is similar to the workers in the current design, but it receives and sends one item at a time (and not one batch at a time) 
-* Batch_worker - Retrives items from item_queue, prepare batches by running `collate_fn`, and sends them back to the main process by item_results_queue
+* Batch_worker - Retrives items from _item_queue_, prepare batches by running `collate_fn`, and sends them back to the main process by _item_results_queue_
 
 Current design dataflow: main_process -> workers -> main_process
 
@@ -68,7 +68,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 #### **Main Process Flow**
 * Retrieve and store prepared batches from _worker_result_queue_
   * Track number of items at work (workload) by each worker. Make sure to reduce workload counter for the relevant batch_worker, and for each of the relevant item-workers, when retrieving the batch 
-* Send batches of items for preparation to _index_queues_, one batch at a time
+* Send batches of items for preparation to index_queues, one batch at a time
   * Each item should include the following metadata: (_item_idx_in_batch_, _batch_idx_, _item_index_, _iw_idx_, _bw_idx_, _batch_size_):
   * A possibly different item_worker should be assigned to each item
     * Select iw_idx by the item_worker with the minimal workload
