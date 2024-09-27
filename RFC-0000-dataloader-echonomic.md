@@ -57,9 +57,9 @@ Each worker prepares one batch at a time, and sends it back to the main process 
 After a batch is retrieved by the main process, another batch is sent.
 
 In the suggested pipeline, there are 2 levels of workers: 
-* Item_worker - Generates one item at a time (by running `dataset.__getitem__`), and sends it to a designated batch_worker, by _item_queue_ 
+* Item_worker - Generate one item at a time (by running `dataset.__getitem__`), and send it to a designated batch_worker, by _item_queue_ 
   * The item_worker is similar to the workers in the current design, but it receives and sends one item at a time (and not one batch at a time) 
-* Batch_worker - Retrives items from _item_queue_, prepares batches by running `collate_fn`, and sends them back to the main process by _worker_result_queue_
+* Batch_worker - Retrive items from _item_queue_, prepare batches by running `collate_fn`, and send them back to the main process by _worker_result_queue_
 
 Current design dataflow: main_process -> workers -> main_process
 
