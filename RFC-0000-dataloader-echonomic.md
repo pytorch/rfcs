@@ -54,7 +54,7 @@ The new flow is introducing only minor modifications in dataloader interface, ma
 By the current multiprocessing pipeline, a single level of workers is used. 
 The main process sends _prefetch_factor_ batches to each worker, by index_queue.
 Each worker prepares one batch at a time, and sends it back to the main process by _worker_result_queue_.
-After a batch is retrieved by the main process, another batch is sent to the appropriate worker.
+After a batch is retrieved by the main process, another batch is sent.
 
 In the suggested pipeline, there are 2 levels of workers: 
 * item_worker - designated to generate one item at a time (by running `dataset.__getitem__`), and send it to shared memory 
