@@ -80,7 +80,7 @@ Suggested design dataflow: main_process -> item_workers -> batch_workers -> main
 
 #### **Item_worker Flow**
 * Get item metadata from _index_queue_
-* Run `dataset.__getitem__(item_index)` to generate item
+* Generate item, by running `dataset.__getitem__(item_index)`
 * Send item to the appropriate _item_queue_ (by item's bw_idx)
 
 #### **Batch_worker Flow**
