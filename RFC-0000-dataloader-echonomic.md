@@ -1,4 +1,4 @@
-# DataLoader-Economic 
+# DataLoader-Economic Feature Suggestion
 
 **Authors:**
 * @yoadbs
