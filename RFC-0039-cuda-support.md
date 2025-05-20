@@ -15,7 +15,7 @@ The proposal is to provide two main benefits
 
 ### We should introduce new version of CUDA when
 
-- It enables new important GPU architecture (For example A100 with CUDA-11.1)
+- It enables new important GPU architecture (For example Blackwell with CUDA-12.8)
 - It brings significant performance improvements
 - It fixes significant correctness issues
 - It significantly reduces binary/memory footprint
@@ -31,14 +31,14 @@ As soon as we introduce a new Experimental Version we should consider moving the
 ### Detailed Process of Introducing new CUDA version
 
 1. Evaluate CUDA update necessity
-  Goal: When Any of this is true:
-  - It enables new important GPU architecture (For example A100 with CUDA-11.1)
+  Goal: When any of this is true:
+  - It enables new important GPU architecture (For example Blackwell with CUDA-12.8)
   - It brings significant performance improvements
   - It fixes significant correctness issues
   - It significantly reduces binary/memory footprint
 
 2. Evaluate if we have all packages for update
-  When: As soon as Update determined to be necessary
+  When: As soon as Update determined to be necessary. Start by creating RFC [issue](https://github.com/pytorch/pytorch/issues/145544) with possible CUDA matrix to support for next release.
   Goal: Make sure everything is available to perform complete upgrade of CUDA and dependencies
 
 3. Update CUDA in CD (this is necessary condition to qualify for CUDA version be released as Experimental)
@@ -57,7 +57,7 @@ As soon as we introduce a new Experimental Version we should consider moving the
 ### Detailed Process of Deprecating CUDA version
 
 1. Evaluate deprecation of legacy CUDA version from CI/CD
-When: We completed CUDA update and previous experimental CUDA version is qualified to be stable and we have 3 supported versions (legacy, stable and experimental)
+When: We completed CUDA update and previous experimental CUDA version is qualified to be stable and we have 3 supported versions (legacy, stable and experimental). Start by creating RFC [issue](https://github.com/pytorch/pytorch/issues/147383) to deprecate legacy CUDA version from CI/CD.
 Goal: Make sure we support 2 versions of CUDA, supporting 3 versions can be an exception for certain release where we need to keep legacy version
 
 2. Deprecate legacy CUDA version from CI/CD
