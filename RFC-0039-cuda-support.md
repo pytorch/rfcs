@@ -72,14 +72,14 @@ So you wanna upgrade PyTorch to support a new CUDA? Follow these steps in order!
 ## 0. Before starting upgrade process
 
 ### A. Currently Supported CUDA and CUDNN Libraries
-Here is the supported matrix for CUDA and CUDNN (versions can be looked up in https://github.com/pytorch/pytorch/blob/main/.ci/docker/common/install_cudnn.sh)
+Here is the supported matrix for CUDA and CUDNN (versions can be looked up in [here](https://github.com/pytorch/pytorch/blob/main/.ci/docker/common/install_cudnn.sh) . Architecture support can be found [here](https://github.com/pytorch/pytorch/blob/main/.ci/manywheel/build_cuda.sh))
 
-| CUDA | CUDNN | additional details |
-| --- | --- | --- |
-| 11.8.0 | 9.1.0.70 | Legacy CUDA Release |
-| 12.6.3 | 9.5.1.17 | Stable CUDA Release |
-| 12.8.0 | 9.7.1.26 | Latest CUDA Release |
-|        | 9.8.0.87 | Latest CUDA Nightly |
+| CUDA | CUDNN | architectures supported | additional details |
+| --- | --- | --- | --- |
+| 11.8.0 | 9.1.0.70 | Kepler(3.7), Maxwell(5.0), Pascal(6.0), Volta(7.0), Turing(7.5), Ampere(8.0, 8.6), Hopper(9.0) | Legacy CUDA Release |
+| 12.6.3 | 9.5.1.17 | Maxwell(5.0), Pascal(6.0), Volta(7.0), Turing(7.5), Ampere(8.0, 8.6), Hopper(9.0)  | Stable CUDA Release |
+| 12.8.0 | 9.7.1.26 | Turing(7.5), Ampere(8.0, 8.6), Hopper(9.0), Blackwell(10.0, 12.0+PTX)  | Latest CUDA Release |
+|        | 9.8.0.87 | Turing(7.5), Ampere(8.0, 8.6), Hopper(9.0), Blackwell(10.0, 12.0+PTX)  | Latest CUDA Nightly |
 
 ### B. Check the package availability
 
