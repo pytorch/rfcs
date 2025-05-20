@@ -2,7 +2,8 @@
 # [CUDA version support]
 
 **Authors:**
-* @atalman @malfet
+* @atalman @malfet @tinglvv @nWEIdia @ptrblck
+
 
 ## **Motivation**
 
