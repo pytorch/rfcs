@@ -1,5 +1,5 @@
 
-# [CUDA version support]
+# [CUDA version for PyTorch CI/CD]
 
 **Authors:**
 * @atalman @malfet @tinglvv @nWEIdia @ptrblck
@@ -20,26 +20,22 @@ The proposal is to provide two main benefits
 - It brings significant performance improvements
 - It fixes significant correctness issues
 - It significantly reduces binary/memory footprint
+- It adds desired functionality or features
 
 ### We would deprecate version of CUDA when
 
-As soon as we introduce a new Experimental Version we should consider moving the previous Experimental Version to Stable, and decommission the previous Stable version. Typically we want to support 2-3 versions of CUDA as follows:
+As soon as we introduce a new Experimental Version we should consider moving the previous Experimental Version to Stable, and decommission the previous Stable version. Typically we want to support at least 2 versions of CUDA with an optional exception for Legacy Version (see below).
 
-- Optional Legacy Version: If we need to have 1 version for backend compatibility or to work around the current limitation. For example: CUDA older driver is incompatible with newer CUDA version
-- Stable Version: This is a stable CUDA version that is used most of the time. This is the version we want to upload to PyPI. Please note that if the stable version is equal or slightly older to the version then the version fbcode is using, we probably need to keep it in CI/CD system as Optional Legacy Version.
-- Latest Experimental Version: This is the latest version of CUDA that we want to support. Minimal requirement is to have it available in nightly releases (CD)
+- Optional Legacy Version: If we need to have 1 version for backend compatibility or to work around the current limitation. For example: CUDA older driver is incompatible with newer CUDA version. We should keep this version as static as possible (i.e. no cuDNN, NCCL, or other libraries) to avoid mixing the legacy stack with latest libs which can lead to unexpected behavior.
+- Stable Version: This is a stable CUDA version that is used most of the time. This is the version we want to upload to PyPI.
+- Latest Experimental Version: This is the latest version of CUDA that we want to support. Minimal requirement to qualify to be included in PyTorch OSS Release is to have it available in nightly releases (CD)
 
 ### Detailed Process of Introducing new CUDA version
 
-1. Evaluate CUDA update necessity
-  Goal: When any of this is true:
-  - It enables new important GPU architecture (For example Blackwell with CUDA-12.8)
-  - It brings significant performance improvements
-  - It fixes significant correctness issues
-  - It significantly reduces binary/memory footprint
+1. Evaluate CUDA update necessity. Please see section above: [We should introduce new version of CUDA when](https://github.com/pytorch/rfcs/blob/cuda_update/RFC-0039-cuda-support.md#we-should-introduce-new-version-of-cuda-when)
 
 2. Evaluate if we have all packages for update
-  When: As soon as Update determined to be necessary. Start by creating RFC [issue](https://github.com/pytorch/pytorch/issues/145544) with possible CUDA matrix to support for next release.
+  When: As soon as Update determined to be necessary. Start by creating RFC (see [example](https://github.com/pytorch/pytorch/issues/145544)) with possible CUDA matrix to support for next release.
   Goal: Make sure everything is available to perform complete upgrade of CUDA and dependencies
 
 3. Update CUDA in CD (this is necessary condition to qualify for CUDA version be released as Experimental)
@@ -66,7 +62,7 @@ When: Evaluate deprecation of legacy CUDA version from CI/CD is complete
 Goal: Support for legacy CUDA versions is dropped, starting from PyTorch Domain Libraries and then in PyTorch core. First we drop CD support and then CI support.
 
 
-# CUDA/CUDNN Upgrade Runbook
+# CUDA/cuDNN Upgrade Runbook
 
 So you wanna upgrade PyTorch to support a new CUDA? Follow these steps in order! They are adapted from previous CUDA upgrade processes.
 
@@ -91,11 +87,7 @@ https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_
 https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_12.8.0_570.86.10_linux_sbsa.run (aarch64)
 https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/
 
-2) CUDA is available on Docker hub images : https://hub.docker.com/r/nvidia/cuda
-   Following example is for cuda 12.4: https://gitlab.com/nvidia/container-images/cuda/-/tree/master/dist/12.4.0/ubuntu2204/devel?ref_type=heads (TODO: Update this for 12.8)
-   (Make sure to use version without CUDNN, it should be installed separately by install script)
-
-3) Validate new driver availability: https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html. Check following table: Table 3. CUDA Toolkit and Corresponding Driver Versions
+2) Validate new driver availability: https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html. Check following table: Table 3. CUDA Toolkit and Corresponding Driver Versions
 
 
 ## 1. Maintain Progress and Updates
