@@ -34,7 +34,7 @@ CorgiPile has garnered positive feedback and adoption in various communities and
 ## **Design**
 The following figure illustrates the implementation of CorgiPile with new operators and double-buffering optimization, in PyTorch.
 
-![](RFC-00xx-asset/SingleMachine.jpg)
+![](RFC-00xx-assets/SingleMachine.jpg)
 
 The key idea of CorgiPile lies in the following two-level hierarchical shuffling mechanism:
 
@@ -53,10 +53,10 @@ $$
 We have demonstrated that CorgiPile-SGD serves as an intermediate approach between full Gradient Descent (GD) and standard Stochastic Gradient Descent (SGD). Our analysis, detailed in Section 4.2 of the paper (https://link.springer.com/article/10.1007/s00778-024-00845-0), proves that CorgiPile achieves comparable convergence rates to standard SGD while requiring less randomization overhead. Additionally, we have shown that CorgiPile maintains similar convergence behavior in both single-machine and distributed settings, making it a robust solution for large-scale training scenarios.
 
 
-## **Implementation **
+## **Implementation**
 The main challenge is how to extend our single-process CorgiPile to work in the parallel/distributed environment of PyTorch, which usually use multiple processes with multiple GPUs to train models.  
 
-<img src="RFC-00xx-asset/Distributed.png" style="zoom: 50%;" />
+<img src="RFC-00xx-assets/Distributed.png" style="zoom: 50%;" />
 
 CorgiPile can be naturally extended to work in a multi-process mode, by enhancing the tuple-level shuffle under the data-parallel computation paradigm. We can naturally implement block-level shuffle by randomly distributing data blocks to different processes. For tuple-level shuffle, we can use multi-buffer based shuffling instead of single-buffer based shuffling — in each process we allocate a local buffer to read blocks and shuffle their tuples. PyTorch can then read the shuffled tuples when running SGD to perform the forward/backward/update computation as well as gradient/parameter communication /synchronization among different processes.
 
@@ -70,7 +70,7 @@ train(train_loader, model, other_args)
 
 **Similar** to usage of the original Dataset API, users only need to **initialize** the CorgiPileDataset with necessary parameters, including block_index, etc., and then use it as usual in the DataLoader API offered by PyTorch. The train() method constantly extracts a batch of tuples from DataLoader and then performs mini-batch SGD. Multi-process CorgiPile can achieve random data order similar to that of the single-process CorgiPile.
 
-## **Metrics **
+## **Metrics**
 
 **End-to-end exeuction time** to of training process with different data shuffle strategies
 
