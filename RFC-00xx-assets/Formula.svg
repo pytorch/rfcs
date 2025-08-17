@@ -20,6 +20,7 @@
 <use id='g5-0' xlink:href='#g2-0' transform='scale(.694445)'/>
 </defs>
 <g id='page1' transform='matrix(1.13 0 0 1.13 -165.091178 -82.716022)'>
+<g fill='#fff'>
 <use x='145.294334' y='83.686177' xlink:href='#g1-120'/>
 <use x='153.812388' y='77.762757' xlink:href='#g6-115'/>
 <use x='153.812388' y='87.232798' xlink:href='#g6-107'/>
@@ -46,5 +47,6 @@
 <use x='302.266316' y='87.232798' xlink:href='#g5-0'/>
 <use x='310.015064' y='87.232798' xlink:href='#g8-49'/>
 <use x='315.494525' y='83.686192' xlink:href='#g4-41'/>
+</g>
 </g>
 </svg>
