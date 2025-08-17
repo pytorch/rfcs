@@ -46,9 +46,7 @@ At each epoch (say, the s-th epoch), CorgiPile runs the following steps:
 2. **(Shuffle)** Shuffle all tuples in the buffer. We use ψ<sub>s </sub> to denote an ordered set, whose elements are the indices of the shuffled tuples at the s-th epoch. The size of ψ<sub>s </sub> is bn, where b is the number of tuples per block. ψ<sub>s </sub>(k) is the k-th element in ψ<sub>s </sub> .
 3. **(Update)** Perform gradient descent by scanning each tuple with the shuffle indices in ψ<sub>s </sub>, yielding the updating rule
 
-$$
-\mathbf{x}_k^s=\mathbf{x}_{k-1}^s-\eta_s \nabla f_{\boldsymbol{\psi}_s(k)}\left(\mathbf{x}_{k-1}^s\right)
-$$
+![](RFC-00xx-assets/Formula1.svg)
 
 We have demonstrated that CorgiPile-SGD serves as an intermediate approach between full Gradient Descent (GD) and standard Stochastic Gradient Descent (SGD). Our analysis, detailed in Section 4.2 of the paper (https://link.springer.com/article/10.1007/s00778-024-00845-0), proves that CorgiPile achieves comparable convergence rates to standard SGD while requiring less randomization overhead. Additionally, we have shown that CorgiPile maintains similar convergence behavior in both single-machine and distributed settings, making it a robust solution for large-scale training scenarios.
 
