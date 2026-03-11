@@ -266,37 +266,46 @@ jobs:
     runs-on: [self-hosted]
     steps:
 
-      # Step 1: Check out PyTorch PR code
+      # Step 1: Report the startup status to the relay server so that a check run with a status of "In Progress" can be created for the PR
+      - name: Report startup to Relay Server
+        uses: pytorch/actions/report-ci-result@v1
+        if: always()  # Must report regardless of success or failure
+        with:
+          conclusion: ${{ job.status }}
+          url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # other parameters...
+
+      # Step 2: Check out PyTorch PR code
       - name: Checkout PyTorch PR
         uses: pytorch/actions/checkout-pr@v1
         with:
           head-sha: ${{ github.event.client_payload.head_sha }}
           path: pytorch  # Check out to ./pytorch directory
 
-      # Step 2: Build PyTorch
+      # Step 3: Build PyTorch
       - name: Build PyTorch
         working-directory: pytorch
         run: |
           pip3 install -vvv --no-build-isolation -e . # Example only
 
-      # Step 3: Check out downstream repo
+      # Step 4: Check out downstream repo
       - name: Checkout downstream repo
         uses: actions/checkout@v4
         with:
           path: backend
 
-      # Step 4: Build backend plugin
+      # Step 5: Build backend plugin
       - name: Build backend
         working-directory: backend
         run: |
           python setup.py develop
 
-      # Step 5: Run tests
+      # Step 6: Run tests
       - name: Test backend
         run: |
           pytest tests/
 
-      # Step 6: Report results to Relay Server
+      # Step 7: Report results to Relay Server
       - name: Report CI result
         uses: pytorch/actions/report-ci-result@v1
         if: always()  # Must report regardless of success or failure
