@@ -149,7 +149,7 @@ After a downstream repo receives the `repository_dispatch` event from the Relay 
 5. Run tests
 6. Report results to the Relay Server
 
-**Step 1** and **Step 6** are common needs shared by all downstream backends, and the logic is identical. To avoid requiring downstream repos to understand the Relay Server integration details (such as callback URLs and auth tokens), and to standardize the result reporting format, this proposal suggests creating two reusable Actions in the PyTorch repo for all downstream repos to reference directly.
+**Step 1** and **Step 6** are common needs shared by all downstream repos, and the logic is identical. To avoid requiring downstream repos to understand the Relay Server integration details (such as callback URLs and auth tokens), and to standardize the result reporting format, this proposal suggests creating two reusable Actions in the PyTorch repo for all downstream repos to reference directly.
 
 #### Action 1: `pytorch/.github/actions/checkout-pr`
 
@@ -210,31 +210,22 @@ L4:
     - org5/repo5: @oncall1,oncall2
 ```
 
-To maintain the stability of the PyTorch CI system and user experience, it is necessary to downgrade unhealthy downstream repos:
-
-| Change | Description |
-| :--- | :--- |
-| `L4 -> L3` | 1. Unstable CI / false positives <br/> 2. Slow or unresponsive oncall |
-| `L2 -> L1` | 1. Insufficient CI stability <br/> 2. Sending excessive or abusive requests to the Relay Server, affecting system stability |
-
-> \[!NOTE\]
-> - Specific metrics may be adjusted based on real-world conditions.
-
 ### Evolution Path
 
-The allowlist is designed to naturally support gradual progression from experimental participation to mature participation. The table below lists the requirements for advancing to each level.
+The allowlist is designed to naturally support gradual progression from experimental participation to mature participation, downstream repos that meet the requirements can apply to advance level by level (L1 → L2 → L3 → L4). The table below lists the requirements for advancing to each level.
 
 | Phase | Level | Requirements |
 | :--- | :--- | :--- |
-| **Onboarding** | `L1` | 1. Provide verifiable accelerator hardware information <br/> 2. Provide a downstream adaptation repo for the accelerator |
-| **Observation** | `L2` | 1. Weekly downstream CI success rate > 70% <br/> 2. All workflow runs complete within 3h/PR |
-| **Stable** | `L3` | 1. Pass the PyTorch core test suite, related [RFC](https://github.com/pytorch/pytorch/issues/174469) @mikaylagawarecki <br/> 2. Weekly downstream CI success rate > 90% |
-| **Mature** | `L4` | 1. Recognized and supported by the PyTorch community for the accelerator & CI/CD <br/> 2. Weekly downstream CI success rate > 99% <br/> 3. Effective and stable oncall rotation, issue triage SLA < 48h |
+| **Onboarding** | `L1` | 1. GitHub App installed <br/> 2. Provide verifiable accelerator hardware information <br/> 3. Provide a downstream adaptation repo for the accelerator |
+| **Observation** | `L2` | 1. Follow the standard [Workflow Configuration](#workflow-configuration) to receive events and report results <br/> 2. Must not send excessive or invalid requests to the Relay Server |
+| **Stable** | `L3` | 1. CI infrastructure must keep job queue time under `X min` per workflow <br/> 2. CI infrastructure must keep total run time under `X hour` per PR <br/> 3. Weekly CI success rate > `X %` (including both infra failures and test failures) |
+| **Mature** | `L4` | Fully determined by Core Maintainer, considering factors including but not limited to: <br/> - `community adoption`, <br/> - `hardware usage`, <br/> - `test coverage` (whether the PyTorch core test suite is required, @mikaylagawarecki), <br/> - `test pass rate`, <br/> - `oncall responsiveness`, etc. |
 
 > \[!NOTE\]
-> - Downstream repos that meet the requirements can apply to advance level by level (L1 → L2 → L3 → L4).
-> - `L2`: Most downstream repos should be at this level.
-> - `L4`: Only applies to a small number of downstream repos, ensuring that only backends demonstrating sustained commitment, technical maturity, and broad adoption can affect the PyTorch merge process.
+> - The requirements above are an **initial reference** and may **be adjusted over time based on real-world conditions** (e.g., determining the specific values of `X`).
+> - To maintain the PyTorch community's user experience, **downstream repos that no longer meet the requirements of their current level will be downgraded to the level that matches their actual status.**
+> - `L3` is the recommended long-term target for most downstream repos, as it provides a good balance between signal depth and minimal negative impact on upstream.
+> - `L4`: Only applies to a small number of downstream repos. Detailed requirements will be defined before any backend approaches the `L4` bar.
 
 ## Downstream Repos
 
@@ -321,6 +312,7 @@ The PyTorch CI HUD (hud.pytorch.org) is a CI status dashboard maintained by the 
 
 - **Dedicated OOT repo page (`hud.pytorch.org/oot/[org]/[repo]`):** Available from L2 onwards. Downstream CI results are shown on a dedicated page for the downstream repo. The layout is similar to the main HUD page, but focused only on the test history of a single downstream repo. It gives OOT Maintainers a self-service CI health dashboard without affecting any upstream views.
 - **Global OOT CI summary page:** Primarily for PyTorch CI Maintainers. Provides a global view of OOT CI health across all repos. Makes it easy to spot widespread OOT infrastructure issues or identify repos that may need to be downgraded.
+- **HUD PR view (`hud.pytorch.org/pr/<number>`):** For L3/L4 repos, OOT check results are displayed in the PR-level HUD view under a dedicated "Out-of-Tree Backends" section, grouped alongside standard CI results. This ensures developers and Maintainers can see OOT CI status in their normal PR review workflow without switching to a separate page.
 - **Main HUD page:** Only shows `L4` (required) Check Runs, ensuring the main dashboard stays focused on signals that every PyTorch contributor needs to care about.
 
 The Relay Server writes all results from `L2` and above into `ClickHouse`, which powers the dedicated OOT HUD pages described above.
