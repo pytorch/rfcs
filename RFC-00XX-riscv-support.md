@@ -28,18 +28,16 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 To actively help enable the Python ecosystem on RISC-V, the [RISE project](https://riseproject.dev/), a consortium of companies interested in the success of RISC-V, has been openly building, testing, and distributing many Python packages on RISC-V, and made them freely available at https://riseproject.gitlab.io/python/wheel_builder/. It is meant as a stop-gap solution, as the Python ecosystem gradually improves its support for RISC-V. See [pypa/manylinux#1426](https://github.com/pypa/manylinux/discussions/1426) for more details.
 
 * **RISC-V support in PyPA tooling:** Work is ongoing to add RISC-V support to the Python packaging ecosystem, with [manylinux_2_39_riscv64](https://quay.io/repository/pypa/manylinux_2_39_riscv64) recently introduced. The discussion is tracked in [pypa/manylinux#1426](https://github.com/pypa/manylinux/discussions/1426).
-* **PyTorch dependencies on RISC-V:** RISE is actively working to provide PyTorch dependencies for RISC-V, as demonstrated by their [wheel builder](https://riseproject.gitlab.io/python/wheel_builder/). While this proves that packaging is feasible, it remains a temporary solution as upstream support for RISC-V is being integrated into these dependencies.
-* **CI/CD hardware availability:** Access to RISC-V hardware in CI/CD environments is currently limited. RISE is addressing this by making available free RISC-V runners for GitHub and GitLab projects, and is committed to sponsoring hardware resources for key projects like PyTorch to ensure adequate testing and build capacity.
+* **PyTorch dependencies on RISC-V:** A growing number of PyTorch's Python and native dependencies are being enabled natively on `riscv64` upstream. In the meantime, RISE maintains a [wheel builder](https://riseproject.gitlab.io/python/wheel_builder/) and PyPI index (`https://gitlab.com/api/v4/projects/riseproject%2Fpython%2Fwheel_builder/packages/pypi/simple`) that builds, tests, and distributes the remaining packages on `riscv64`. This index is a stop-gap and will be retired as upstream support lands.
+* **CI/CD hardware availability:** RISE now operates the [RISE RISC-V Runners](https://riseproject-dev.github.io/riscv-runner/), a free managed GitHub Actions service that runs jobs on real RISC-V hardware (Scaleway EM-RV1 bare-metal nodes) via the [`rise-risc-v-runners`](https://github.com/apps/rise-risc-v-runners) GitHub App. Workflows opt in by setting `runs-on: ubuntu-24.04-riscv`, and Docker-in-Docker is supported out of the box. See the [announcement from 2026-03-24](https://riseproject.dev/2026/03/24/announcing-the-rise-risc-v-runners-free-native-risc-v-ci-on-github/) for background. Each node runs at most one job at a time, so overall capacity remains the primary gating factor for scaling PyTorch CI onto this fleet — see *Unresolved questions* for sizing discussion.
 
 ### Work to be done
 
-> **Note:** This section needs to be largely modified to go into many more details. I would highly value having feedback from existing maintainers to help me scope it properly.
+PyTorch already builds on RISC-V without code modifications, and a prototype of PyTorch's upstream CI running on the RISE RISC-V Runners is maintained at [`riseproject-dev/pytorch@manywheel-riscv64-1`](https://github.com/riseproject-dev/pytorch/tree/manywheel-riscv64-1). On that branch, the `docker-build` and `linux-riscv64` jobs build successfully end-to-end; test execution is not yet wired up but is close. A manual step-by-step build guide (useful for local reproduction) is available at https://gist.github.com/luhenry/ffa8158ab6b8a4c56f354b3f0f5a61a7.
 
-PyTorch can already be built on RISC-V, and this is currently being done internally. Efforts are underway at RISE to add automated building, testing, and packaging for RISC-V. However, this approach is intended as a temporary measure; the long-term goal is for upstream PyTorch to provide official RISC-V distributions without relying on intermediaries like RISE.
+The current status was presented at PyTorch Conference EU 2026 in the lightning talk "ExecuTorch on Microcontrollers: Deploying PyTorch to the smallest edge" ([session page](https://pytorchconferenceeu2026.sched.com/event/2HinF/lightning-talk-executorch-on-microcontrollers-deploying-pytorch-to-the-smallest-edge-rj-ascani-matthias-cremon-meta), [slides (PDF)](https://hosted-files.sched.co/pytorchconferenceeu2026/0b/PyTorch%20Conf%20EU%20-%202026%20-%20PyTorch%20on%20RISC-V.pdf)).
 
-At present, PyTorch builds successfully on RISC-V without code modifications. A step-by-step guide is available at https://gist.github.com/luhenry/ffa8158ab6b8a4c56f354b3f0f5a61a7.
-
-A key challenge remains around testing and the hardware resources required to support comprehensive CI for PyTorch, given the scale of contributions. This topic has been discussed with members of the PyTorch Foundation and is recognized as the primary area needing work: determining the necessary machine capacity and identifying suitable providers.
+Automated building, testing, and packaging on RISC-V is intended as a bring-up step; the long-term goal is for upstream PyTorch to produce official RISC-V distributions directly, without relying on RISE as an intermediary. To that end, RISE is engaging with the PyTorch Multi-Cloud Working Group to scope what resources (hardware, runners, build infrastructure) it can contribute and how they integrate with the existing PyTorch CI infrastructure.
 
 ## **Metrics**
 
@@ -73,7 +71,11 @@ No significant changes are needed for existing users, aside from communicating t
 
 ### What parts of the design do you expect to resolve through the RFC process before this gets merged?
 
-Key questions include determining the required pool of RISC-V machines for the PyTorch project, estimating necessary machine capacity, identifying infrastructure changes, supporting the Infrastructure team, and integrating RISC-V support into the developer workflow with minimal disruption.
+The main open items are already in flight rather than fully open:
+
+* **Runner capacity and performance:** faster RISC-V runners are expected in the coming weeks/months via RISE, and interim stop-gaps are possible depending on the machine count PyTorch CI actually requires. Sizing and integration are under discussion with the PyTorch Multi-Cloud Working Group.
+* **Dependencies:** continue pushing upstream native `riscv64` support in PyTorch's Python and native dependencies so that the RISE wheel-builder index can eventually be retired. PyPA's [manylinux_2_39_riscv64](https://quay.io/repository/pypa/manylinux_2_39_riscv64) is the forward path for wheel distribution.
+* **Conda:** engaging with conda-forge to add a `linux-riscv64` platform so that PyTorch's conda channel has a viable path on RISC-V, tracked in [conda-forge/conda-forge.github.io#1744](https://github.com/conda-forge/conda-forge.github.io/issues/1744).
 
 ### What parts of the design do you expect to resolve through the implementation of this feature before stabilization?
 
