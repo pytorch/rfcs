@@ -99,7 +99,7 @@ The GitHub App is the **authentication and decoupling hub** of the entire design
 - **Upstream/downstream decoupling:** Downstream repos **only need to install this App to join the cross-repo CI coordination**. Downstream repos do not need an upstream token, and the upstream does not need to know about the downstream. All interactions are bridged through the GitHub App and Relay Server.
 
 > \[!NOTE\]
-> This GitHub App should be created under the `pytorch` organization and owned by the PyTorch team or the LF AI & Data Foundation team, to ensure credibility. An App created by a third party will face trust issues during installation and adoption.
+> This GitHub App should be created under the `pytorch` organization and owned by the PyTorch team or the LF Pytorch Foundation, to ensure credibility. An App created by a third party will face trust issues during installation and adoption.
 
 ### Permissions / Events
 
