@@ -229,7 +229,6 @@ the shape key changes, allowing a new axis/symbol bound to be minted.
 For loop-carried pointer arithmetic, expression simplifications and the full implementation
 ill defer to the [PR's description](https://github.com/pytorch/pytorch/pull/179149#issue-4195425124).
 
-
 As a measure of the added compilation overhead, the following benchmarks 
 `identify_accesses_tensor` against upstream across a selection of kernels from Liger and
 the [Triton tutorials](https://triton-lang.org/main/getting-started/tutorials/).
@@ -241,20 +240,32 @@ Downstream usage of these extracted index expressions requires reasoning beyond 
 the syntactic equality of expressions. This arises from tension between `SchedulerNode`'s
 expression, in terms of shapes and strides, and the user kernel's, in terms of kernel
 configuration. Typically, we would rely on tooling such as [ISL](https://www.jeremykun.com/2025/10/19/isl-a-primer/).
-A more practical path is to extend Inductor's existing `sizevar`, to bridge the two 
-expression domains.
+A more practical path is to extend Inductor's existing `sizevars` / `SizeVarAllocator`, 
+to bridge between the two expression domains.
 
 
-#### UB Restriction
+#### In-place Kernels (non-empty mutated buffer)
+For kernels operating on non-empty tensors, we may formally reason about index
+expression / quasi-affine map equality. For unary pointwise epilogues, the compute/arithmetic
+operations inherit the user kernel's schedule. Thus, loop order is not a concern in this case.
+Typically, we would need to prove both injectivity of the write, and coverage in relation
+to the read. In Triton, we assume we have injectivity for all non-atomic writes.
+In any other case, the kernel will have undefined behaviour.
+For coverage, without using the mask as a constraint on the domain, we normalise both index 
+expressions and assert both syntactic equality of expressions and such that the bounds of the
+remaining symbols of the user-kernel are at least as large as the epilogue's. This will require
+the normalisation in `sizevars` to be complete for this new class of expressions.
+
+> TODO: Normalisation here would be sound and complete for constant divisors.
 
 
 #### Non-unary Pointwise Epilogues
 
 
+#### Pointwise Prologue Fusion
+
+
 #### Persistent Reduction Epilogues
-
-
-#### Prologue Fusion
 
 
 ## **Metrics**
@@ -262,5 +273,3 @@ expression domains.
 
 ## **Drawbacks and Alternatives**
 
-
-## **Unresolved Questions**
