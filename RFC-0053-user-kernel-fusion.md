@@ -124,33 +124,33 @@ The strategy is to incrementally broaden fusion cases.
 Registering a user kernel in the compute graph relies on two representations of the user kernel.
 For buffer mutation tracking, the TTIR representation is flattened into a linear def-use chain,
 then a simple upward traversal from read/write sinks to the kernel’s parameters is performed.
-The Python AST of the kernel’s source is traversed both during initialisation and code generation
-to locate all `tl.store` expressions. All downstream logic (legality checks, code generation) is
-predicated on a single mutated buffer.
+The Python AST is traversed both at initialisation and during code generation to locate `tl.store`
+expressions. During `UserDefinedTritonKernel` initialisation, a kernel-level `can_fuse_epilogue` 
+flag is set, derived from information from both the TTIR and AST traversals. All downstream logic 
+(additional legality checks, code generation) is then predicated on a single mutated buffer.
+To support multi-output kernels, where a single output may have a fused epilogue, all fusion legality
+checks must be deferred until the fusion candidate pair is known. The AST traversal during code
+generation locates the `tl.store` AST node, and replaces it with the fused epilogue's computational
+results.
 
-Several changes are required to relax this. In the scheduler, the mutated buffer can no longer
-be assumed. It must be resolved per fusion-pair candidate, as the intersection of the user kernel’s
-writes and the epilogue’s reads. Fusion legality checks and intermediate buffer pruning must then
-be operated on this resolved buffer. On the AST side, the single `tl.store` restriction can be lifted,
-and the empty-tensor check must be deferred until the target buffer is known. During code generation,
-each `tl.store` node must be attributed to its corresponding buffer so that the correct store 
-is rewritten with the fused epilogue’s variable.
+[#181138](https://github.com/pytorch/pytorch/pull/181138) is a NFC refactor for cleaner seperation.
+TTIR parsing gathers buffer access information, AST traversal is deferred to code generation,
+and all fusion legality checks are consolidated to the scheduler. Single `tl.store` kernels remain
+the only supported case. 
 
-Resolving the intermediate buffer of fusion candidates is straightforward. However, bridging the output
-buffer to the correct `tl.store` AST node is slightly more involved. During TTIR parsing, we may 
-retrieve the line number of each `tl.store` from Triton’s MLIR bindings. Then, during the upward
-traversal, we attach it to a new dependency type, `UserTritonDep`, in place of `StarDep`. Finally,
-during code generation, the line number serves as the canonical reference between the resolved
-buffer’s `UserTritonDep` and its corresponding AST node, allowing the correct `tl.store` to be 
-located and rewritten.
-
-In summary, all fusion-specific legality checks are deferred from initialisation to scheduling, where the
-fusion candidate pair is known. AST manipulation is deferred to code generation, where it is performed
-if fusion proceeds.
+Building ontop these changes, for multi-output kernels, the target buffer may be resolved as the
+intersection of the user kernel's writes and epilogue's read. Bridging the resolved buffer to the
+correct `tl.store` AST node during code generation is more involved. The AST contains multiple 
+`tl.store` nodes, so naive traversal cannot identify which node corresponds to the fused buffer when
+rewriting the kernel. During TTIR parsing, we may retrieve the line number of each `tl.store` from
+Triton’s MLIR bindings. Then, during the upward traversal of the flattened def-use chain, we store it
+to the corresponding dependency, `UserTritonDep` (introduced in [#181138](https://github.com/pytorch/pytorch/pull/181138)). 
+Finally, during code generation, the line number serves as the canonical reference between the resolved buffer’s
+`UserTritonDep` and its corresponding AST node, allowing the correct `tl.store` to be located and rewritten.
 
 > There may be opinions about removing AST parsing/unparsing entirely. My initial implementation of
 user-kernel fusion (prior to what's been landed) did not rely on AST and instead involved string
-manipulation of the kernel source, which may be less stable.
+manipulation of the kernel source, which may be hacky/less stable.
 
 ### **Multiple Epilogue Operations**
 In the case of an epilogue representated as multiple `SchedulerNode`s or a `FusedSchedulerNode`,
