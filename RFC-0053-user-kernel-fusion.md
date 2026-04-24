@@ -227,7 +227,189 @@ traversal, but more importantly provides semantics for our iteration symbols/bou
 When encountering a shape-context op (e.g. `tt.expand_dims`, `tt.broadcast`, `tt.reshape`)
 the shape key changes, allowing a new axis/symbol bound to be minted.
 For loop-carried pointer arithmetic, expression simplifications and the full implementation
-ill defer to the [PR's description](https://github.com/pytorch/pytorch/pull/179149#issue-4195425124).
+i'll defer to the [PR's description](https://github.com/pytorch/pytorch/pull/179149#issue-4195425124).
+
+See the below examples of kernels (grouped matmul and normalisation) and their extracted
+index expressions.
+
+<details>
+<summary>Examples</summary>
+
+#### Grouped MatMul
+
+```python
+# Kernel adapted from:
+# https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html
+@triton.jit
+def grouped_matmul(
+    a_ptr,
+    b_ptr,
+    c_ptr,
+    M,
+    N,
+    K,
+    stride_am,
+    stride_ak,
+    stride_bk,
+    stride_bn,
+    stride_cm,
+    stride_cn,
+    BLOCK_SIZE_M: tl.constexpr,
+    BLOCK_SIZE_N: tl.constexpr,
+    BLOCK_SIZE_K: tl.constexpr,
+    GROUP_SIZE_M: tl.constexpr,
+):
+    pid = tl.program_id(axis=0)
+    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
+    num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
+    num_pid_in_group = GROUP_SIZE_M * num_pid_n
+    group_id = pid // num_pid_in_group
+    first_pid_m = group_id * GROUP_SIZE_M
+    group_size_m = min(num_pid_m - first_pid_m, GROUP_SIZE_M)
+    pid_m = first_pid_m + ((pid % num_pid_in_group) % group_size_m)
+    pid_n = (pid % num_pid_in_group) // group_size_m
+
+    tl.assume(pid_m >= 0)
+    tl.assume(pid_n >= 0)
+    tl.assume(stride_am > 0)
+    tl.assume(stride_ak > 0)
+    tl.assume(stride_bn > 0)
+    tl.assume(stride_bk > 0)
+    tl.assume(stride_cm > 0)
+    tl.assume(stride_cn > 0)
+
+    offs_am = (pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)) % M
+    offs_bn = (pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)) % N
+    offs_k = tl.arange(0, BLOCK_SIZE_K)
+    a_ptrs = a_ptr + (
+        offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak
+    )
+    b_ptrs = b_ptr + (
+        offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn
+    )
+
+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
+    for k in range(tl.cdiv(K, BLOCK_SIZE_K)):
+        a = tl.load(
+            a_ptrs, mask=offs_k[None, :] < K - k * BLOCK_SIZE_K, other=0.0
+        )
+        b = tl.load(
+            b_ptrs, mask=offs_k[:, None] < K - k * BLOCK_SIZE_K, other=0.0
+        )
+        accumulator = tl.dot(a, b, accumulator)
+
+        a_ptrs += BLOCK_SIZE_K * stride_ak
+        b_ptrs += BLOCK_SIZE_K * stride_bk
+
+    c = accumulator.to(tl.float16)
+
+    offs_cm = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
+    offs_cn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
+    c_ptrs = c_ptr + stride_cm * offs_cm[:, None] + stride_cn * offs_cn[None, :]
+    c_mask = (offs_cm[:, None] < M) & (offs_cn[None, :] < N)
+    tl.store(c_ptrs, c, mask=c_mask)
+```
+
+**Reads & Writes**
+
+```python
+# Reads
+UserTritonDep(
+    name='a_ptr',
+    index=4096*i3 + i4 + 32*i5 + 262144*(PythonMod(i0, 8)),
+    var_names=(i0, i3, i4, i5),
+    size=(512, 64, 32, 128),
+    mask=None
+)
+
+UserTritonDep(
+    name='b_ptr',
+    index=131072*i5 + 4096*i6 + i7 + 64*((i0//8)),
+    var_names=(i0, i5, i6, i7),
+    size=(512, 128, 32, 64),
+    mask=None
+)
+
+# Writes
+UserTritonDep(
+    name='c_ptr',
+    index=4096*i1 + i2 + 64*((i0//8)) + 262144*(PythonMod(i0, 8)),
+    var_names=(i0, i1, i2),
+    size=(512, 64, 64),
+    mask=None
+)
+
+```
+#### Normalisation
+
+```python
+@triton.jit
+def normalization_fwd(
+    X,
+    X_row_stride: tl.constexpr,
+    Y,
+    Y_row_stride: tl.constexpr,
+    W,
+    r,
+    r_row_stride: tl.constexpr,
+    n_cols_X: tl.constexpr,
+    eps: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
+):
+    row_idx = tl.program_id(0)
+    col_offsets = tl.arange(0, BLOCK_SIZE)
+    mask = col_offsets < n_cols_X
+
+    X += row_idx * X_row_stride
+    Y += row_idx * Y_row_stride
+    r += row_idx * r_row_stride
+
+    X_row = tl.load(X + col_offsets, mask=mask, other=0).to(tl.float32)
+    W_row = tl.load(W + col_offsets, mask=mask, other=0).to(tl.float32)
+
+    row_var = tl.sum(X_row * X_row, axis=0) / n_cols_X
+    inv_var = tl.math.rsqrt(row_var + eps)
+    tl.store(r, inv_var)
+
+    normed = X_row * inv_var * W_row
+    tl.store(Y + col_offsets, normed.to(X_row.dtype), mask=mask)
+```
+
+**Reads & Writes**
+
+```python
+# Reads
+UserTritonDep(
+    name='X',
+    index=4096*i1 + i2,
+    var_names=(i1, i2),
+    size=(512, 4096),
+)
+
+UserTritonDep(
+    name='W',
+    index=i2,
+    var_names=(i2,),
+    size=(4096,),
+)
+
+# Writes
+UserTritonDep(
+    name='Y',
+    index=4096*i1 + i2,
+    var_names=(i1, i2),
+    size=(512, 4096),
+)
+
+UserTritonDep(
+    name='r',
+    index=i0,
+    var_names=(i0,),
+    size=(512,),
+)
+```
+</details>
+
 
 As a measure of the added compilation overhead, the following benchmarks 
 `identify_accesses_tensor` against upstream across a selection of kernels from Liger and
@@ -237,35 +419,53 @@ the [Triton tutorials](https://triton-lang.org/main/getting-started/tutorials/).
 ![triton-tuts](RFC-0053-assets/triton-tuts.png)
 
 Downstream usage of these extracted index expressions requires reasoning beyond just
-the syntactic equality of expressions. This arises from tension between `SchedulerNode`'s
-expression, in terms of shapes and strides, and the user kernel's, in terms of kernel
-configuration. Typically, we would rely on tooling such as [ISL](https://www.jeremykun.com/2025/10/19/isl-a-primer/).
+the structurual SymPy equality of expressions. This arises from tension between
+`SchedulerNode`'s expression, in terms of shapes and strides, and the user kernel's,
+in terms of kernel configuration. Typically, we would rely on tooling such as [ISL](https://www.jeremykun.com/2025/10/19/isl-a-primer/).
 A more practical path is to extend Inductor's existing `sizevars` / `SizeVarAllocator`, 
 to bridge between the two expression domains.
 
+#### In-place User Kernels (non-empty mutated buffer)
+With Triton, we assume injectivity of the write for all non-atomic writes. In any other
+case, the kernel will produce undefined behaviour for non-injective writes. Additionally,
+for unary pointwise epilogues, the arithmetic operations inherit the user kernel's schedule. 
+Thus, loop order is not a concern. It follows that for fusion to be legal, we enforce 
+non-atomic writes, and need to prove at least equal coverage user's write in relation to the
+read. In other words, the image of the `UserTritonDep` write index map contains the image of the
+`MemoryDep` read index map. We may acheive this by comparing the normalised flattened bounds,
+informally:
 
-#### In-place Kernels (non-empty mutated buffer)
-For kernels operating on non-empty tensors, we may formally reason about index
-expression / quasi-affine map equality. For unary pointwise epilogues, the compute/arithmetic
-operations inherit the user kernel's schedule. Thus, loop order is not a concern in this case.
-Typically, we would need to prove both injectivity of the write, and coverage in relation
-to the read. In Triton, we assume we have injectivity for all non-atomic writes.
-In any other case, the kernel will have undefined behaviour.
-For coverage, without using the mask as a constraint on the domain, we normalise both index 
-expressions and assert both syntactic equality of expressions and such that the bounds of the
-remaining symbols of the user-kernel are at least as large as the epilogue's. This will require
-the normalisation in `sizevars` to be complete for this new class of expressions.
+```
+flat_size(write) >= flat_size(read)
+```
 
-> TODO: Normalisation here would be sound and complete for constant divisors.
+For linear / affine `UserTritonDep` expression, e.g. the expression from `normalization_fwd` above,
+normalising both expressions (`normalize_with_stride_order`, by merging loops) and comparing 
+structural equality coverage is sufficient.
 
+For quasi-affine expressions, e.g. the expression related to `grouped_matmul` containing both
+`PythonMod` and `FloorDiv`, requires linearising the expression first. This is achievable through
+via convertions via the quoteint remainder theorem, similiar to MLIR's [`addLocalFloorDiv`](https://mlir.llvm.org/doxygen/classmlir_1_1presburger_1_1IntegerRelation.html#a98fc55bbe5ecfebc98eb2e4a7860e2a2)
+and [`addLocalModulo`](https://mlir.llvm.org/doxygen/classmlir_1_1presburger_1_1IntegerRelation.html#a1d13523c706a90609cdea16f327d622c) 
+operations in [`mlir::presburger::IntegerRelation`](https://mlir.llvm.org/doxygen/classmlir_1_1presburger_1_1IntegerRelation.html).
+`FloorDiv` and `PythonMod` expressions are replaced as linear integer contraints, resulting in 
+an affine expression.
 
-#### Non-unary Pointwise Epilogues
+Masks are restricted to the common `BinOp` case of simple out-of-bounds guards of the form `expr < N`,
+under which the write's true image is exactly the buffer's valid range and the check remains sound.
+More complex mask expressions are conservatively rejected.
 
+Pointwise unary prologues, without introducing any additional load expressions, would follow the same 
+fusion legality constraints as described above. However, of course code generation would differ in that
+the arithemtic operations are injected after the appropriate `tl.load`, and modification of the user kernel's
+signature would have to be modified.
 
-#### Pointwise Prologue Fusion
+> Inductor's current existing expression normalisation handles quasi-affine forms that arise from 
+its own IR (`ModularIndexing`), but cannot generally handle the combinations that arise from user-defined
+pid remappings, where the interaction between terms does no match Inductor's own decompositions.
+This will require the normalisation in `sizevars` to be complete for this new class of expressions.
 
-
-#### Persistent Reduction Epilogues
+#### Additional Load and Store Expressions
 
 
 ## **Metrics**
@@ -273,3 +473,5 @@ the normalisation in `sizevars` to be complete for this new class of expressions
 
 ## **Drawbacks and Alternatives**
 
+
+## Next Steps
