@@ -252,15 +252,18 @@ export interface RelayPayload {
         repository?: { full_name: string };
       };
       workflow: {
+        schema_version?: string;
         status: string;
         conclusion?: string | null;
         name: string;
         url: string;
         job_name?: string;
+        check_run_id?: string;
+        run_id?: string;
         run_attempt?: number;
         started_at?: string;
         completed_at?: string;
-        test_results?: {
+        "test-results"?: {
           total?: number;
           passed?: number;
           failed?: number;
@@ -283,8 +286,9 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
   const pr = cb.payload?.pull_request;
 
   const jobName = wf.job_name ?? "default";
+  const checkRunId = wf.check_run_id ?? "unknown";
   const runAttempt = wf.run_attempt ?? 1;
-  const dynamoKey = `${trusted.verified_repo}/${cb.delivery_id}/${wf.name}/${jobName}/${runAttempt}`;
+  const dynamoKey = `${trusted.verified_repo}/${cb.delivery_id}/${wf.name}/${jobName}/${checkRunId}`;
 
   const record: OotWorkflowJobRecord = {
     dynamoKey,
@@ -297,6 +301,8 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
     workflow_run_url: wf.url ?? "",
     workflow_name: wf.name,
     job_name: jobName,
+    check_run_id: checkRunId,
+    run_id: wf.run_id ?? "",
     run_attempt: runAttempt,
   };
 
@@ -325,8 +331,9 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
     if (wf.completed_at) {
       record.completed_at = wf.completed_at;
     }
-    if (wf.test_results) {
-      const tr = wf.test_results;
+    // L2 uses "test-results" (hyphenated key)
+    const tr = wf["test-results"];
+    if (tr) {
       if (typeof tr.total === "number") record.total_tests = tr.total;
       if (typeof tr.passed === "number") record.passed_tests = tr.passed;
       if (typeof tr.failed === "number") record.failed_tests = tr.failed;
@@ -394,6 +401,8 @@ Table: `torchci-oot-workflow-job`
 | `workflow_run_url` | String | Link to downstream GHA workflow run |
 | `workflow_name` | String | Downstream workflow name (`github.workflow`) |
 | `job_name` | String | Downstream job name (`github.job`) |
+| `check_run_id` | String | GitHub-assigned unique ID per job execution (`job.check_run_id`) |
+| `run_id` | String | GitHub workflow run ID (`github.run_id`), same across retries |
 | `run_attempt` | Number | Workflow run attempt number (`github.run_attempt`) |
 | `conclusion` | String | `success`, `failure`, `cancelled`, `timed_out` (set on "completed") |
 | `queue_time` | Number | Relay-measured dispatch-to-in_progress time in seconds |
@@ -433,6 +442,8 @@ CREATE TABLE default.oot_workflow_job
     `workflow_run_url` String COMMENT 'Link to downstream GHA workflow run',
     `workflow_name` String COMMENT 'Downstream workflow name (github.workflow)',
     `job_name` String DEFAULT '' COMMENT 'Downstream job name (github.job)',
+    `check_run_id` String DEFAULT '' COMMENT 'GitHub-assigned unique ID per job execution (job.check_run_id)',
+    `run_id` String DEFAULT '' COMMENT 'GitHub workflow run ID (github.run_id), same across retries',
     `run_attempt` UInt32 DEFAULT 1 COMMENT 'Workflow run attempt number (github.run_attempt)',
     `conclusion` String COMMENT 'success, failure, cancelled, timed_out (set on completed)',
     `queue_time` Nullable(Float64) COMMENT 'Relay-measured dispatch-to-in_progress time in seconds',
@@ -812,11 +823,14 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
         "repository": { "full_name": "pytorch/pytorch" }
       },
       "workflow": {
+        "schema_version": "1.0",
         "status": "in_progress",
         "conclusion": null,
         "name": "xpu-ci",
         "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
         "job_name": "test-xpu-float32",
+        "check_run_id": "98765432100",
+        "run_id": "24033272679",
         "run_attempt": 1,
         "started_at": "2025-04-28T10:15:30Z"
       }
@@ -846,14 +860,17 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
         "repository": { "full_name": "pytorch/pytorch" }
       },
       "workflow": {
+        "schema_version": "1.0",
         "status": "completed",
         "conclusion": "failure",
         "name": "xpu-ci",
         "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
         "job_name": "test-xpu-float32",
+        "check_run_id": "98765432100",
+        "run_id": "24033272679",
         "run_attempt": 1,
         "completed_at": "2025-04-28T10:45:12Z",
-        "test_results": {
+        "test-results": {
           "total": 8432,
           "passed": 8430,
           "failed": 2,
