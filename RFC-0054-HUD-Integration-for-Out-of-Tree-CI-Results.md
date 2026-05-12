@@ -25,7 +25,7 @@ The complete pipeline is: Downstream CI → Result Handler → HUD API → Dynam
 
 ## Motivation
 
-With PyTorch's growing ecosystem of OOT backends (Intel XPU, Huawei Ascend, custom accelerators, etc.), there is increasing need for visibility into how upstream changes affect downstream projects. The relay system (RFC-0050) solves the *dispatch* problem — triggering downstream CI when a PyTorch PR is opened. But dispatch alone is not enough: results need to flow back and be displayed where maintainers and contributors can see them.
+With PyTorch's growing ecosystem of OOT backends (custom accelerators, partner hardware, etc.), there is increasing need for visibility into how upstream changes affect downstream projects. The relay system (RFC-0050) solves the *dispatch* problem — triggering downstream CI when a PyTorch PR is opened. But dispatch alone is not enough: results need to flow back and be displayed where maintainers and contributors can see them.
 
 Without a standardized HUD integration:
 
@@ -417,7 +417,7 @@ Table: `torchci-oot-workflow-job`
 | `skipped_tests` | Number | Skipped test count |
 | `failed_tests_json` | String | JSON array of failed/errored test details |
 | `artifact_url` | String | URL to downstream-hosted artifacts |
-| `environment` | String | JSON: `{"cuda": "12.8", "device": "H100", ...}` |
+| `environment` | String | JSON: `{"sdk": "<version>", "device": "<hardware>", ...}` |
 | `downstream_repo_level` | String | Repo's relay level: `L2`, `L3`, `L4` |
 
 Table configuration:
@@ -458,7 +458,7 @@ CREATE TABLE default.oot_workflow_job
     `skipped_tests` UInt64 DEFAULT 0,
     `failed_tests_json` String DEFAULT '' COMMENT 'JSON array of failed/errored test details',
     `artifact_url` String DEFAULT '' COMMENT 'URL to downstream-hosted artifacts (logs, reports)',
-    `environment` String DEFAULT '' COMMENT 'JSON: {"cuda": "12.8", "device": "H100", ...}',
+    `environment` String DEFAULT '' COMMENT 'JSON: {"sdk": "<version>", "device": "<hardware>", ...}',
     `downstream_repo_level` String DEFAULT '' COMMENT 'Relay level at dispatch time: L2, L3, L4',
     `_inserted_at` DateTime MATERIALIZED now(),
     `repository_full_name` String ALIAS downstream_repo COMMENT 'Alias for consistency with workflow_job queries',
@@ -781,9 +781,9 @@ The reusable GitHub Action builds this payload from `github.event.client_payload
   "workflow": {
     "status": "in_progress",
     "conclusion": null,
-    "name": "xpu-ci",
+    "name": "<hardware>-ci",
     "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-    "job_name": "test-xpu-float32",
+    "job_name": "test-<hardware>-float32",
     "run_attempt": 1,
     "started_at": "2025-04-28T10:15:30Z"
   }
@@ -803,9 +803,9 @@ The reusable GitHub Action builds this payload from `github.event.client_payload
   "workflow": {
     "status": "completed",
     "conclusion": "failure",
-    "name": "xpu-ci",
+    "name": "<hardware>-ci",
     "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-    "job_name": "test-xpu-float32",
+    "job_name": "test-<hardware>-float32",
     "run_attempt": 1,
     "completed_at": "2025-04-28T10:45:12Z",
     "test_results": {
@@ -814,8 +814,8 @@ The reusable GitHub Action builds this payload from `github.event.client_payload
       "failed": 2,
       "skipped": 20,
       "failures": [
-        {"name": "test_conv2d_xpu_float32", "classname": "TestConv2dXPU", "message": "AssertionError: Tensor mismatch", "duration_s": 1.23},
-        {"name": "test_relu_backward_xpu_float16", "classname": "TestActivationsXPU", "message": "RuntimeError: expected scalar type Float but found Half", "duration_s": 0.45}
+        {"name": "test_conv2d_<hardware>_float32", "classname": "TestConv2d<Hardware>", "message": "AssertionError: Tensor mismatch", "duration_s": 1.23},
+        {"name": "test_relu_backward_<hardware>_float16", "classname": "TestActivations<Hardware>", "message": "RuntimeError: expected scalar type Float but found Half", "duration_s": 0.45}
       ]
     }
   }
@@ -850,9 +850,9 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
         "schema_version": "1.0",
         "status": "in_progress",
         "conclusion": null,
-        "name": "xpu-ci",
+        "name": "<hardware>-ci",
         "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-        "job_name": "test-xpu-float32",
+        "job_name": "test-<hardware>-float32",
         "check_run_id": "98765432100",
         "run_id": "24033272679",
         "run_attempt": 1,
@@ -887,9 +887,9 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
         "schema_version": "1.0",
         "status": "completed",
         "conclusion": "failure",
-        "name": "xpu-ci",
+        "name": "<hardware>-ci",
         "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-        "job_name": "test-xpu-float32",
+        "job_name": "test-<hardware>-float32",
         "check_run_id": "98765432100",
         "run_id": "24033272679",
         "run_attempt": 1,
@@ -900,7 +900,7 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
           "failed": 2,
           "skipped": 20,
           "failures": [
-            {"name": "test_conv2d_xpu_float32", "classname": "TestConv2dXPU", "message": "AssertionError: Tensor mismatch", "duration_s": 1.23}
+            {"name": "test_conv2d_<hardware>_float32", "classname": "TestConv2d<Hardware>", "message": "AssertionError: Tensor mismatch", "duration_s": 1.23}
           ]
         }
       }
