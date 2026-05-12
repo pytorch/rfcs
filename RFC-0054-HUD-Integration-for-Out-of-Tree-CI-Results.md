@@ -367,13 +367,15 @@ except (KeyError, TypeError) as exc:
 The HUD API writes the flattened workflow job record to DynamoDB using `UpdateItem` with `SET` expressions (not `PutItem`):
 
 ```
-dynamoKey = `${trusted.verified_repo}/${delivery_id}/${workflow_name}/${job_name}/${run_attempt}`
+dynamoKey = `${trusted.verified_repo}/${delivery_id}/${workflow_name}/${job_name}/${check_run_id}`
 ```
 
 - For "in_progress" callbacks: creates the record with initial fields (`status`, `started_at`, `queue_time`, etc.) via `UpdateItem`
 - For "completed" callbacks: merges `completed` fields (`conclusion`, `completed_at`, `execution_time`, test counts, artifact URL) into the existing record via `UpdateItem` — only non-null fields are set, so `queue_time` (set during `in_progress`) is preserved
 
 Using `UpdateItem` instead of `PutItem` ensures that the `completed` callback does not overwrite fields that were set during `in_progress` (e.g. `queue_time`, `started_at`) with `null` values.
+
+**`queue_time` on retries:** When `run_attempt > 1`, the relay's `DISPATCHED` record timestamp is from the original dispatch — potentially hours or days old. Computing `queue_time = dispatch_timestamp → rerun_in_progress_timestamp` would produce a misleading metric. The relay should set `queue_time = null` for retries (`run_attempt > 1`). HUD already only writes `queue_time` when the relay provides a non-null value, so no HUD-side changes are needed.
 
 #### Hop 4: DynamoDB → ClickHouse (Automatic)
 
@@ -405,7 +407,7 @@ Table: `torchci-oot-workflow-job`
 | `run_id` | String | GitHub workflow run ID (`github.run_id`), same across retries |
 | `run_attempt` | Number | Workflow run attempt number (`github.run_attempt`) |
 | `conclusion` | String | `success`, `failure`, `cancelled`, `timed_out` (set on "completed") |
-| `queue_time` | Number | Relay-measured dispatch-to-in_progress time in seconds |
+| `queue_time` | Number | Relay-measured dispatch-to-in_progress time in seconds (null on retries) |
 | `execution_time` | Number | Relay-measured in_progress-to-completed time in seconds |
 | `started_at` | String | ISO 8601 timestamp (downstream-reported, set on "in_progress") |
 | `completed_at` | String | ISO 8601 timestamp (downstream-reported, set on "completed") |
