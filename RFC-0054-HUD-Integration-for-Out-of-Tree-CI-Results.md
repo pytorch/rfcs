@@ -263,12 +263,11 @@ export interface RelayPayload {
         run_attempt?: number;
         started_at?: string;
         completed_at?: string;
-        "test-results"?: {
+        test_results?: {
           total?: number;
           passed?: number;
           failed?: number;
           skipped?: number;
-          failures?: any[];
         };
       };
     };
@@ -331,16 +330,12 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
     if (wf.completed_at) {
       record.completed_at = wf.completed_at;
     }
-    // L2 uses "test-results" (hyphenated key)
-    const tr = wf["test-results"];
-    if (tr) {
+    if (wf.test_results) {
+      const tr = wf.test_results;
       if (typeof tr.total === "number") record.total_tests = tr.total;
       if (typeof tr.passed === "number") record.passed_tests = tr.passed;
       if (typeof tr.failed === "number") record.failed_tests = tr.failed;
       if (typeof tr.skipped === "number") record.skipped_tests = tr.skipped;
-      if (tr.failures) {
-        record.failed_tests_json = JSON.stringify(tr.failures);
-      }
     }
   }
 
@@ -812,12 +807,9 @@ The reusable GitHub Action builds this payload from `github.event.client_payload
       "total": 8432,
       "passed": 8430,
       "failed": 2,
-      "skipped": 20,
-      "failures": [
-        {"name": "test_conv2d_<hardware>_float32", "classname": "TestConv2d<Hardware>", "message": "AssertionError: Tensor mismatch", "duration_s": 1.23},
-        {"name": "test_relu_backward_<hardware>_float16", "classname": "TestActivations<Hardware>", "message": "RuntimeError: expected scalar type Float but found Half", "duration_s": 0.45}
-      ]
-    }
+      "skipped": 20
+    },
+    "artifact_url": "https://<company-a>.github.io/ci-results/183512/"
   }
 }
 ```
@@ -894,15 +886,13 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
         "run_id": "24033272679",
         "run_attempt": 1,
         "completed_at": "2025-04-28T10:45:12Z",
-        "test-results": {
+        "test_results": {
           "total": 8432,
           "passed": 8430,
           "failed": 2,
-          "skipped": 20,
-          "failures": [
-            {"name": "test_conv2d_<hardware>_float32", "classname": "TestConv2d<Hardware>", "message": "AssertionError: Tensor mismatch", "duration_s": 1.23}
-          ]
-        }
+          "skipped": 20
+        },
+        "artifact_url": "https://<company-a>.github.io/ci-results/183512/"
       }
     }
   }
