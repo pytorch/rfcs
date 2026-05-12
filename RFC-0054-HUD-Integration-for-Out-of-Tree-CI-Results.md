@@ -614,24 +614,46 @@ L2 Callback:
 | L3/L4 merge gating | Unsafe (self-reported) | Cryptographic proof of dispatch |
 
 > [!NOTE]
-> The callback token is not strictly required for L2 (dashboard only). However, L1 is where the token gets minted, and once L1 is deployed and downstream repos depend on the current `client_payload` shape, retrofitting it becomes a breaking change. We recommend adding it now as optional groundwork for L3/L4.
+> The `DISPATCHED` state in the 3-state machine (below) partially addresses dispatch provenance — it proves the relay dispatched to this repo, rejecting fabricated callbacks even from allowlisted repos. The signed callback token adds stronger guarantees (cryptographic proof locked to specific PR/SHA, tamper-proof queue time) and remains recommended for L3/L4 merge gating. However, the `DISPATCHED` prerequisite handles the most critical L2 use cases without requiring the full token mechanism.
 
 #### State Machine for Status Transitions
 
-To prevent rollback and replay attacks at the relay level, we propose a Redis-backed state machine for status transitions:
+The relay enforces a strict 3-state Redis-backed state machine to prevent rollback, replay, and fabricated callbacks:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> DISPATCHED: webhook sends
+    DISPATCHED --> IN_PROGRESS: first callback
+    IN_PROGRESS --> COMPLETED: completion
+    IN_PROGRESS --> IN_PROGRESS: ❌ duplicate
+    DISPATCHED --> COMPLETED: ❌ skip IN_PROGRESS
+    COMPLETED --> COMPLETED: ❌ duplicate
+    COMPLETED --> IN_PROGRESS: ❌ wrong direction
+    [*] --> IN_PROGRESS: ❌ no dispatch
+    [*] --> COMPLETED: ❌ no dispatch
+```
+
+**State types:**
+- `DISPATCHED` — repo-level state, set by the webhook handler at dispatch time using a sentinel `check_run_id = "dispatched"`. Proves the relay actually dispatched to this repo.
+- `IN_PROGRESS` / `COMPLETED` — job-level states, keyed per `check_run_id` (GitHub-assigned unique ID per job execution).
+
+**Valid flow:** `DISPATCHED → IN_PROGRESS → COMPLETED` (linear, no shortcuts)
 
 | Transition | Action |
 |------------|--------|
-| No record → `in_progress` | Accepted |
-| No record → `completed` | Accepted (handles missed `in_progress` callback) |
-| `in_progress` → `completed` | Accepted (normal flow) |
-| `completed` → `in_progress` | **Rejected** (no rollback) |
-| Duplicate `completed` | **Rejected** (no replay) |
+| `DISPATCHED` → `IN_PROGRESS` | Accepted (normal first callback) |
+| `IN_PROGRESS` → `COMPLETED` | Accepted (normal completion) |
+| No dispatch record → any callback | **Rejected** (no matching dispatch) |
+| No `IN_PROGRESS` → `COMPLETED` | **Rejected** (skipped in_progress) |
+| `COMPLETED` → `IN_PROGRESS` | **Rejected** (no rollback) |
+| Duplicate `IN_PROGRESS` | **Rejected** (replay) |
+| Duplicate `COMPLETED` | **Rejected** (replay) |
 
-The state key includes `run_id` to support legitimate workflow reruns:
+The state key uses `check_run_id` for per-execution uniqueness. Since `check_run_id` is GitHub-assigned and changes on reruns, each job execution is independently tracked. `run_attempt` is still present in the workflow dict for informational purposes but is not used by the relay's state machine.
 
 ```
-Key: crcr:state:{delivery_id}:{downstream_repo}:{run_id}
+Key: oot:state:{delivery_id}:{downstream_repo}:{check_run_id}
 TTL: 3 days (matching relay Redis TTL)
 ```
 
