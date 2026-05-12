@@ -157,7 +157,7 @@ This ensures:
 
 The relay's Result Handler validates the callback body and produces a `{trusted, untrusted}` payload:
 
-- `trusted` — relay-generated fields: `verified_repo` (OIDC-proven identity) and `ci_metrics` (relay-measured `queue_time`, `execution_time`)
+- `trusted` — relay-generated fields: `verified_repo` (OIDC-proven identity), `ci_metrics` (relay-measured `queue_time`, `execution_time`), and `downstream_repo_level` (allowlist-determined level: `L1`–`L4`)
 - `untrusted` — downstream-reported data: `callback_payload` (the full callback body, passed through verbatim)
 
 HUD always prefers `trusted.verified_repo` over anything self-reported in the body.
@@ -237,6 +237,7 @@ The relay sends a `{trusted, untrusted}` payload. The HUD utility library extrac
 export interface RelayPayload {
   trusted: {
     verified_repo: string;
+    downstream_repo_level?: string; // "L1" | "L2" | "L3" | "L4" — relay-determined from allowlist
     ci_metrics?: {
       queue_time?: number | null;
       execution_time?: number | null;
@@ -298,6 +299,10 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
     job_name: jobName,
     run_attempt: runAttempt,
   };
+
+  if (trusted.downstream_repo_level) {
+    record.downstream_repo_level = trusted.downstream_repo_level;
+  }
 
   // Only set timing metrics when the relay provides a non-null value.
   // in_progress sets queue_time; completed sets execution_time.
@@ -792,6 +797,7 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
 {
   "trusted": {
     "verified_repo": "{org}/{repo}",
+    "downstream_repo_level": "L2",
     "ci_metrics": {
       "queue_time": 12.345,
       "execution_time": null
@@ -825,6 +831,7 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
 {
   "trusted": {
     "verified_repo": "{org}/{repo}",
+    "downstream_repo_level": "L2",
     "ci_metrics": {
       "queue_time": null,
       "execution_time": 1782.0
