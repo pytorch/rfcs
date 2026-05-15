@@ -724,74 +724,157 @@ The `OotPrSection` React component is integrated into the existing PR page (`tor
 
 ### Sample Payloads
 
-#### In-Progress Callback
+These samples show the actual wire format at each stage of the pipeline.
+
+#### Stage 1: Downstream → Relay (sent by the callback action)
+
+The reusable GitHub Action (`cross-repo-ci-relay-callback`) builds this payload from `github.event.client_payload` (the L1 dispatch envelope) plus a `workflow` dict with downstream-reported fields:
+
+**In-Progress:**
 
 ```json
 {
-  "status": "in_progress",
-  "head_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "pr_number": 179565,
-  "downstream_repo": "{org}/{repo}",
-  "upstream_repo": "pytorch/pytorch",
-  "workflow_run_id": 24033272679,
-  "workflow_name": "{accelerator}",
-  "workflow_url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-  "run_id": 24033272679,
-  "job_id": 67890123,
-  "conclusion": null,
-  "downstream_repo_level": "L2"
+  "event_type": "pull_request",
+  "delivery_id": "a8f5f167-6e5b-4c3d-8a2e-4b5c6d7e8f9a",
+  "payload": {
+    "pull_request": { "number": 179565, "head": { "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" } },
+    "repository": { "full_name": "pytorch/pytorch" }
+  },
+  "workflow": {
+    "schema_version": "1",
+    "status": "in_progress",
+    "conclusion": null,
+    "name": "<hardware>-ci",
+    "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
+    "job_name": "test-<hardware>-float32",
+    "check_run_id": "98765432100",
+    "run_id": "24033272679",
+    "run_attempt": "1",
+    "started_at": "2025-04-28T10:15:30Z",
+    "completed_at": null
+  }
 }
 ```
 
-#### Completed — Success
+**Completed (failure):**
 
 ```json
 {
-  "status": "completed",
-  "conclusion": "success",
-  "head_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "pr_number": 179565,
-  "downstream_repo": "{org}/{repo}",
-  "upstream_repo": "pytorch/pytorch",
-  "workflow_run_id": 24033272679,
-  "workflow_name": "{accelerator}",
-  "workflow_url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-  "run_id": 24033272679,
-  "job_id": 67890123,
-  "total_tests": 8432,
-  "passed_tests": 8432,
-  "failed_tests": 0,
-  "skipped_tests": 47,
-  "failed_tests_json": "[]",
-  "downstream_repo_level": "L2",
-  "artifact_url": "https://github.com/{org}/{repo}/actions/runs/24033272679/artifacts"
+  "event_type": "pull_request",
+  "delivery_id": "a8f5f167-6e5b-4c3d-8a2e-4b5c6d7e8f9a",
+  "payload": {
+    "pull_request": { "number": 179565, "head": { "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" } },
+    "repository": { "full_name": "pytorch/pytorch" }
+  },
+  "workflow": {
+    "schema_version": "1",
+    "status": "completed",
+    "conclusion": "failure",
+    "name": "<hardware>-ci",
+    "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
+    "job_name": "test-<hardware>-float32",
+    "check_run_id": "98765432100",
+    "run_id": "24033272679",
+    "run_attempt": "1",
+    "started_at": null,
+    "completed_at": "2025-04-28T10:45:12Z",
+    "test_results": {
+      "total": 8432,
+      "passed": 8430,
+      "failed": 2,
+      "skipped": 20
+    },
+    "artifact_url": "https://{org}.github.io/ci-results/183512/"
+  }
 }
 ```
 
-#### Completed — Failure
+#### Stage 2: Relay → HUD API (sent by `forward_to_hud`)
+
+The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` fields are relay-generated; `untrusted` is the raw downstream payload passed through verbatim:
+
+**In-Progress:**
 
 ```json
 {
-  "status": "completed",
-  "conclusion": "failure",
-  "head_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-  "pr_number": 179565,
-  "downstream_repo": "{org}/{repo}",
-  "upstream_repo": "pytorch/pytorch",
-  "workflow_run_id": 24033272679,
-  "workflow_name": "{accelerator}",
-  "workflow_url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-  "run_id": 24033272679,
-  "job_id": 67890123,
-  "total_tests": 8432,
-  "passed_tests": 8410,
-  "failed_tests": 2,
-  "skipped_tests": 20,
-  "failed_tests_json": "[{\"name\":\"test_conv2d_xpu_float32\",\"classname\":\"TestConv2dXPU\",\"message\":\"AssertionError: Tensor mismatch\",\"duration_s\":1.23},{\"name\":\"test_relu_backward_xpu_float16\",\"classname\":\"TestActivationsXPU\",\"message\":\"RuntimeError: expected scalar type Float but found Half\",\"duration_s\":0.45}]",
-  "downstream_repo_level": "L2",
-  "artifact_url": "https://{org}-ci-artifacts.s3.amazonaws.com/pytorch/24033272679/"
+  "trusted": {
+    "verified_repo": "{org}/{repo}",
+    "downstream_repo_level": "L2",
+    "ci_metrics": {
+      "queue_time": 12.345,
+      "execution_time": null
+    }
+  },
+  "untrusted": {
+    "callback_payload": {
+      "event_type": "pull_request",
+      "delivery_id": "a8f5f167-6e5b-4c3d-8a2e-4b5c6d7e8f9a",
+      "payload": {
+        "pull_request": { "number": 179565, "head": { "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" } },
+        "repository": { "full_name": "pytorch/pytorch" }
+      },
+      "workflow": {
+        "schema_version": "1",
+        "status": "in_progress",
+        "conclusion": null,
+        "name": "<hardware>-ci",
+        "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
+        "job_name": "test-<hardware>-float32",
+        "check_run_id": "98765432100",
+        "run_id": "24033272679",
+        "run_attempt": "1",
+        "started_at": "2025-04-28T10:15:30Z"
+      }
+    }
+  }
 }
 ```
+
+**Completed (failure):**
+
+```json
+{
+  "trusted": {
+    "verified_repo": "{org}/{repo}",
+    "downstream_repo_level": "L2",
+    "ci_metrics": {
+      "queue_time": null,
+      "execution_time": 1782.0
+    }
+  },
+  "untrusted": {
+    "callback_payload": {
+      "event_type": "pull_request",
+      "delivery_id": "a8f5f167-6e5b-4c3d-8a2e-4b5c6d7e8f9a",
+      "payload": {
+        "pull_request": { "number": 179565, "head": { "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" } },
+        "repository": { "full_name": "pytorch/pytorch" }
+      },
+      "workflow": {
+        "schema_version": "1",
+        "status": "completed",
+        "conclusion": "failure",
+        "name": "<hardware>-ci",
+        "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
+        "job_name": "test-<hardware>-float32",
+        "check_run_id": "98765432100",
+        "run_id": "24033272679",
+        "run_attempt": "1",
+        "completed_at": "2025-04-28T10:45:12Z",
+        "test_results": {
+          "total": 8432,
+          "passed": 8430,
+          "failed": 2,
+          "skipped": 20
+        },
+        "artifact_url": "https://{org}.github.io/ci-results/183512/"
+      }
+    }
+  }
+}
+```
+
+> **Note on `run_attempt`**: The L2 callback action sends `run_attempt` as a string (from `github.run_attempt` env var). The HUD API coerces it to a number via `Number()` before writing to DynamoDB.
 
 ### Comparison: In-Tree vs OOT Pipeline
 
