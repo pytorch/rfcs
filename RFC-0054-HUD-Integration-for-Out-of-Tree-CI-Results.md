@@ -25,7 +25,7 @@ The complete pipeline is: Downstream CI → Result Handler → HUD API → Dynam
 
 ## Motivation
 
-With PyTorch's growing ecosystem of OOT backends (Intel XPU, Huawei Ascend, custom accelerators, etc.), there is increasing need for visibility into how upstream changes affect downstream projects. The relay system (RFC-0050) solves the *dispatch* problem — triggering downstream CI when a PyTorch PR is opened. But dispatch alone is not enough: results need to flow back and be displayed where maintainers and contributors can see them.
+With PyTorch's growing ecosystem of OOT backends (custom accelerators, partner hardware, etc.), there is increasing need for visibility into how upstream changes affect downstream projects. The relay system (RFC-0050) solves the *dispatch* problem — triggering downstream CI when a PyTorch PR is opened. But dispatch alone is not enough: results need to flow back and be displayed where maintainers and contributors can see them.
 
 Without a standardized HUD integration:
 
