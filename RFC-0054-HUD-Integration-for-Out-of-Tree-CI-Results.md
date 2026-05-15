@@ -25,7 +25,7 @@ The complete pipeline is: Downstream CI → Result Handler → HUD API → Dynam
 
 ## Motivation
 
-With PyTorch's growing ecosystem of OOT backends (custom accelerators, partner hardware, etc.), there is increasing need for visibility into how upstream changes affect downstream projects. The relay system (RFC-0050) solves the *dispatch* problem — triggering downstream CI when a PyTorch PR is opened. But dispatch alone is not enough: results need to flow back and be displayed where maintainers and contributors can see them.
+With PyTorch's growing ecosystem of OOT backends (Intel XPU, Huawei Ascend, custom accelerators, etc.), there is increasing need for visibility into how upstream changes affect downstream projects. The relay system (RFC-0050) solves the *dispatch* problem — triggering downstream CI when a PyTorch PR is opened. But dispatch alone is not enough: results need to flow back and be displayed where maintainers and contributors can see them.
 
 Without a standardized HUD integration:
 
@@ -71,7 +71,7 @@ flowchart TD
         subgraph relay [Relay Server]
             CB1 --> RH[result_handler]
             CB2 --> RH
-            RH -->|"Verify OIDC\nCheck allowlist\nRate limit\nValidate schema"| FWD["Forward to\nHUD API"]
+            RH -->|"Verify OIDC\nCheck allowlist\nRate limit"| FWD["Forward to\nHUD API"]
         end
 
         subgraph hud [HUD]
@@ -103,11 +103,11 @@ flowchart TD
 | Phase | Source | Destination | Auth | What Happens |
 |-------|--------|-------------|------|--------------|
 | **Callback 1 (start)** | First downstream job | Result Handler | OIDC token | POST `in_progress` status |
-| | Result Handler | HUD API | `X-OOT-Relay-Token` | Validate schema, forward `in_progress` payload |
+| | Result Handler | HUD API | `X-OOT-Relay-Token` | Forward `{trusted, untrusted}` payload |
 | | HUD API | DynamoDB | Service role | UpdateItem with `in_progress` status |
 | | DynamoDB | ClickHouse | Stream + replicator | Replicated to ClickHouse |
 | **Callback 2 (end)** | Last downstream job | Result Handler | OIDC token | POST `completed` status + test counts + failures + artifact URLs |
-| | Result Handler | HUD API | `X-OOT-Relay-Token` | Validate schema, forward full payload |
+| | Result Handler | HUD API | `X-OOT-Relay-Token` | Forward `{trusted, untrusted}` payload |
 | | HUD API | DynamoDB | Service role | UpdateItem — merges `completed` fields into existing record |
 | | DynamoDB | ClickHouse | Stream + replicator | Replicated to ClickHouse (replaces `in_progress` row via `SharedReplacingMergeTree`) |
 | **Read** | HUD Frontend | ClickHouse | Read-only | Dashboard queries: status, pass rates, durations |
@@ -151,11 +151,10 @@ This ensures:
 | 1 | Verify OIDC token signature against GitHub JWKS | `401 Unauthorized` |
 | 2 | Check `repository` claim against cached allowlist | `403 Forbidden` |
 | 3 | Verify repo is authorized at L2 or above | `403 Forbidden` |
-| 4 | Per-repo rate limit check (20 req/min default) | `429 Too Many Requests` |
-| 5 | Validate required fields: `delivery_id`, `workflow.status` | `400 Bad Request` |
-| 6 | Forward validated payload to HUD API | — |
+| 4 | Per-repo rate limit check | `429 Too Many Requests` |
+| 5 | Forward validated payload to HUD API | — |
 
-The relay's Result Handler validates the callback body and produces a `{trusted, untrusted}` payload:
+The relay's Result Handler receives the callback and produces a `{trusted, untrusted}` payload:
 
 - `trusted` — relay-generated fields: `verified_repo` (OIDC-proven identity), `ci_metrics` (relay-measured `queue_time`, `execution_time`), and `downstream_repo_level` (allowlist-determined level: `L1`–`L4`)
 - `untrusted` — downstream-reported data: `callback_payload` (the full callback body, passed through verbatim)
@@ -169,9 +168,7 @@ HUD always prefers `trusted.verified_repo` over anything self-reported in the bo
 | 1 | Validate `X-OOT-Relay-Token` header | `401 Unauthorized` |
 | 2 | Payload cap check (2MB max body) | `413 Payload Too Large` |
 | 3 | Extract and flatten record from `{trusted, untrusted}` payload | `400 Bad Request` |
-| 4 | Write to DynamoDB via `UpdateItem` | `502 Bad Gateway` |
-
-Schema validation (required fields, status enum, conclusion presence) is performed by the relay at Hop 1 before the payload reaches HUD. The HUD API trusts that the relay has already validated the structure and focuses on auth, payload caps, and writing.
+| 4 | Write to DynamoDB via `UpdateItem` | `500 Internal Server Error` |
 
 The HUD API endpoint (`torchci/pages/api/oot/results.ts`) follows the existing `webhookToDynamo` pattern:
 
@@ -201,15 +198,19 @@ export default async function handler(
   }
 
   try {
+    // Auth: dedicated X-OOT-Relay-Token header
     const relayToken = req.headers["x-oot-relay-token"];
     if (!relayToken || relayToken !== process.env.OOT_RELAY_TOKEN) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    // Payload size cap (safety net — relay should also enforce this)
     const rawBody =
       typeof req.body === "string" ? req.body : JSON.stringify(req.body);
     validatePayloadSize(rawBody);
 
+    // Extract and write to DynamoDB via UpdateItem
+    // Schema validation is done by the relay before forwarding.
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const record = extractDynamoRecord(body);
     await writeToDynamo(record);
@@ -224,7 +225,7 @@ export default async function handler(
       return res.status(err.statusCode).json({ error: err.message });
     }
     console.error("OOT results handler error:", err);
-    return res.status(502).json({ error: "Internal error writing to DynamoDB" });
+    return res.status(500).json({ error: "Internal error writing to DynamoDB" });
   }
 }
 ```
@@ -237,7 +238,7 @@ The relay sends a `{trusted, untrusted}` payload. The HUD utility library extrac
 export interface RelayPayload {
   trusted: {
     verified_repo: string;
-    downstream_repo_level?: string; // "L1" | "L2" | "L3" | "L4" — relay-determined from allowlist
+    downstream_repo_level?: string; // "L1" | "L2" | "L3" | "L4"
     ci_metrics?: {
       queue_time?: number | null;
       execution_time?: number | null;
@@ -260,7 +261,7 @@ export interface RelayPayload {
         job_name?: string;
         check_run_id?: string;
         run_id?: string;
-        run_attempt?: number;
+        run_attempt?: number | string;
         started_at?: string;
         completed_at?: string;
         test_results?: {
@@ -269,6 +270,7 @@ export interface RelayPayload {
           failed?: number;
           skipped?: number;
         };
+        artifact_url?: string;
       };
     };
   };
@@ -286,7 +288,7 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
 
   const jobName = wf.job_name ?? "default";
   const checkRunId = wf.check_run_id ?? "unknown";
-  const runAttempt = wf.run_attempt ?? 1;
+  const runAttempt = Number(wf.run_attempt ?? 1) || 1;
   const dynamoKey = `${trusted.verified_repo}/${cb.delivery_id}/${wf.name}/${jobName}/${checkRunId}`;
 
   const record: OotWorkflowJobRecord = {
@@ -310,9 +312,6 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
   }
 
   // Only set timing metrics when the relay provides a non-null value.
-  // in_progress sets queue_time; completed sets execution_time.
-  // Using UpdateItem ensures the completed callback doesn't clobber
-  // queue_time with null.
   if (trusted.ci_metrics?.queue_time != null) {
     record.queue_time = trusted.ci_metrics.queue_time;
   }
@@ -320,9 +319,12 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
     record.execution_time = trusted.ci_metrics.execution_time;
   }
 
-  // Use downstream-reported timestamps, not HUD wall-clock time
   if (wf.started_at) {
     record.started_at = wf.started_at;
+  }
+
+  if (wf.artifact_url) {
+    record.artifact_url = wf.artifact_url;
   }
 
   if (wf.status === "completed") {
@@ -347,16 +349,6 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
 
 Schema validation is performed by the relay's Result Handler before forwarding to HUD. The relay validates required fields (`delivery_id`, `workflow.status`), status enum values, and conclusion presence on completed callbacks. HUD trusts that the relay has already validated the structure.
 
-The relay's validation logic (Python, in `result_handler.py`):
-
-```python
-try:
-    delivery_id = body["delivery_id"]
-    status = body["workflow"]["status"]
-except (KeyError, TypeError) as exc:
-    raise HTTPException(400, f"callback body missing required field: {exc}")
-```
-
 #### Hop 3: HUD API → DynamoDB
 
 The HUD API writes the flattened workflow job record to DynamoDB using `UpdateItem` with `SET` expressions (not `PutItem`):
@@ -367,10 +359,6 @@ dynamoKey = `${trusted.verified_repo}/${delivery_id}/${workflow_name}/${job_name
 
 - For "in_progress" callbacks: creates the record with initial fields (`status`, `started_at`, `queue_time`, etc.) via `UpdateItem`
 - For "completed" callbacks: merges `completed` fields (`conclusion`, `completed_at`, `execution_time`, test counts, artifact URL) into the existing record via `UpdateItem` — only non-null fields are set, so `queue_time` (set during `in_progress`) is preserved
-
-Using `UpdateItem` instead of `PutItem` ensures that the `completed` callback does not overwrite fields that were set during `in_progress` (e.g. `queue_time`, `started_at`) with `null` values.
-
-**`queue_time` on retries:** When `run_attempt > 1`, the relay's `DISPATCHED` record timestamp is from the original dispatch — potentially hours or days old. Computing `queue_time = dispatch_timestamp → rerun_in_progress_timestamp` would produce a misleading metric. The relay should set `queue_time = null` for retries (`run_attempt > 1`). HUD already only writes `queue_time` when the relay provides a non-null value, so no HUD-side changes are needed.
 
 #### Hop 4: DynamoDB → ClickHouse (Automatic)
 
@@ -388,7 +376,7 @@ Table: `torchci-oot-workflow-job`
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `dynamoKey` (hash key) | String | `{repo}/{delivery_id}/{workflow_name}/{job_name}/{run_attempt}` |
+| `dynamoKey` (hash key) | String | `{repo}/{delivery_id}/{workflow_name}/{job_name}/{check_run_id}` |
 | `status` | String | `in_progress` or `completed` |
 | `downstream_repo` | String | Downstream repo `org/name` (from `trusted.verified_repo`) |
 | `upstream_repo` | String | Upstream repo (e.g. `pytorch/pytorch`) |
@@ -401,7 +389,7 @@ Table: `torchci-oot-workflow-job`
 | `check_run_id` | String | GitHub-assigned unique ID per job execution (`job.check_run_id`) |
 | `run_id` | String | GitHub workflow run ID (`github.run_id`), same across retries |
 | `run_attempt` | Number | Workflow run attempt number (`github.run_attempt`) |
-| `conclusion` | String | `success`, `failure`, `cancelled`, `timed_out` (set on "completed") |
+| `conclusion` | String | `success`, `failure` (set on "completed") |
 | `queue_time` | Number | Relay-measured dispatch-to-in_progress time in seconds (null on retries) |
 | `execution_time` | Number | Relay-measured in_progress-to-completed time in seconds |
 | `started_at` | String | ISO 8601 timestamp (downstream-reported, set on "in_progress") |
@@ -437,23 +425,19 @@ CREATE TABLE default.oot_workflow_job
     `pytorch_head_sha` String COMMENT 'PyTorch PR commit SHA',
     `delivery_id` String COMMENT 'GitHub webhook delivery ID from L1 dispatch',
     `workflow_run_url` String COMMENT 'Link to downstream GHA workflow run',
-    `workflow_name` String COMMENT 'Downstream workflow name (github.workflow)',
-    `job_name` String DEFAULT '' COMMENT 'Downstream job name (github.job)',
-    `check_run_id` String DEFAULT '' COMMENT 'GitHub-assigned unique ID per job execution (job.check_run_id)',
-    `run_id` String DEFAULT '' COMMENT 'GitHub workflow run ID (github.run_id), same across retries',
-    `run_attempt` UInt32 DEFAULT 1 COMMENT 'Workflow run attempt number (github.run_attempt)',
+    `workflow_name` String COMMENT 'Downstream workflow name',
     `conclusion` String COMMENT 'success, failure, cancelled, timed_out (set on completed)',
     `queue_time` Nullable(Float64) COMMENT 'Relay-measured dispatch-to-in_progress time in seconds',
     `execution_time` Nullable(Float64) COMMENT 'Relay-measured in_progress-to-completed time in seconds',
-    `started_at` DateTime64(9) COMMENT 'Downstream-reported timestamp when job started',
-    `completed_at` DateTime64(9) COMMENT 'Downstream-reported timestamp when job completed',
+    `started_at` DateTime64(9) COMMENT 'ISO 8601 timestamp when record was created',
+    `completed_at` DateTime64(9) COMMENT 'ISO 8601 timestamp when job completed',
     `total_tests` UInt64 DEFAULT 0,
     `passed_tests` UInt64 DEFAULT 0,
     `failed_tests` UInt64 DEFAULT 0,
     `skipped_tests` UInt64 DEFAULT 0,
     `failed_tests_json` String DEFAULT '' COMMENT 'JSON array of failed/errored test details',
     `artifact_url` String DEFAULT '' COMMENT 'URL to downstream-hosted artifacts (logs, reports)',
-    `environment` String DEFAULT '' COMMENT 'JSON: {"sdk": "<version>", "device": "<hardware>", ...}',
+    `environment` String DEFAULT '' COMMENT 'JSON: {"cuda": "12.8", "device": "H100", ...}',
     `downstream_repo_level` String DEFAULT '' COMMENT 'Relay level at dispatch time: L2, L3, L4',
     `_inserted_at` DateTime MATERIALIZED now(),
     `repository_full_name` String ALIAS downstream_repo COMMENT 'Alias for consistency with workflow_job queries',
@@ -493,7 +477,7 @@ Key design decisions:
 Key:    oot:rate:{repo}
 Value:  counter (atomic INCR)
 TTL:    1 minute sliding window
-Limit:  20 requests/minute per repo (configurable via RATE_LIMIT_PER_MIN)
+Limit:  10 requests/minute per repo
 ```
 
 Rejects at the relay before any HUD/DB traffic. First line of defense against runaway CI loops.
@@ -516,8 +500,6 @@ Rejects at the relay before any HUD/DB traffic. First line of defense against ru
 | 3 | HUD API → DynamoDB | Service role | Write to `torchci-oot-workflow-job` only |
 | 4 | DynamoDB → ClickHouse | Replicator service role | Existing replicator credentials |
 
-The relay uses a dedicated `X-OOT-Relay-Token` header rather than the shared `X-Hud-Internal-Bot` header used by DrCI/trymerge. This isolates the OOT write path: rotating or revoking the relay token does not affect other internal HUD consumers, and the token can be scoped to only the `/api/oot/results` endpoint.
-
 Security properties:
 
 | Property | How |
@@ -525,7 +507,7 @@ Security properties:
 | Downstream never gets DB/HUD credentials | OIDC only |
 | Unknown repos rejected before HUD | Allowlist at relay (cached) |
 | HUD only accepts relay traffic | Dedicated `X-OOT-Relay-Token` header |
-| Runaway CI caught early | Rate limit at relay (20 req/min per repo) |
+| Runaway CI caught early | Rate limit at relay |
 | DB overload prevented | Payload caps |
 | Artifact storage not PyTorch's burden | Each downstream org manages their own |
 
@@ -562,18 +544,16 @@ HUD always prefers `trusted.verified_repo` over anything self-reported.
 
 #### Error Handling Strategy
 
-The relay's `forward_to_hud` function handles HUD API errors with retry and escalation:
+HUD API errors are handled with the following strategy:
 
-- **4xx errors** (validation, auth failures): **not retried** — propagated back to downstream immediately so workflow authors see a red CI step and can fix their payload
-- **5xx and network failures**: retried with exponential backoff (1s, 2s, 4s, up to `HUD_MAX_RETRIES` attempts, default 3). If all retries are exhausted, the error is raised — the downstream CI step fails
+- **4xx errors** (validation, auth failures): propagated back to downstream so workflow authors see a red CI step and can fix their payload
+- **5xx and network failures**: the Result Handler retries N times, then returns the status to downstream:
+  - `"delivered"` — HUD received the data
+  - `"hud_rejected"` — HUD returned 4xx (validation failure)
+  - `"hud_unavailable"` — all retries failed (HUD outage)
+  - `"skipped"` — no HUD URL configured
 
-The relay returns `{"ok": true, "status": "<status>"}` on success:
-- `"in_progress"` — HUD received and stored the in_progress callback
-- `"completed"` — HUD received and stored the completed callback
-- `"ignored"` — repo is not configured for L2+ features
-- `"skipped"` — no `HUD_API_URL` configured (local dev)
-
-If `HUD_API_URL` is not configured, the relay logs and no-ops (returns `skipped`) rather than failing.
+This ensures a HUD outage does not turn every downstream L2 CI red, while still giving downstream visibility into the HUD push status.
 
 #### Proposal: Signed One-Shot Callback Token
 
@@ -609,46 +589,24 @@ L2 Callback:
 | L3/L4 merge gating | Unsafe (self-reported) | Cryptographic proof of dispatch |
 
 > [!NOTE]
-> The `DISPATCHED` state in the 3-state machine (below) partially addresses dispatch provenance — it proves the relay dispatched to this repo, rejecting fabricated callbacks even from allowlisted repos. The signed callback token adds stronger guarantees (cryptographic proof locked to specific PR/SHA, tamper-proof queue time) and remains recommended for L3/L4 merge gating. However, the `DISPATCHED` prerequisite handles the most critical L2 use cases without requiring the full token mechanism.
+> The callback token is not strictly required for L2 (dashboard only). However, L1 is where the token gets minted, and once L1 is deployed and downstream repos depend on the current `client_payload` shape, retrofitting it becomes a breaking change. We recommend adding it now as optional groundwork for L3/L4.
 
 #### State Machine for Status Transitions
 
-The relay enforces a strict 3-state Redis-backed state machine to prevent rollback, replay, and fabricated callbacks:
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> DISPATCHED: webhook sends
-    DISPATCHED --> IN_PROGRESS: first callback
-    IN_PROGRESS --> COMPLETED: completion
-    IN_PROGRESS --> IN_PROGRESS: ❌ duplicate
-    DISPATCHED --> COMPLETED: ❌ skip IN_PROGRESS
-    COMPLETED --> COMPLETED: ❌ duplicate
-    COMPLETED --> IN_PROGRESS: ❌ wrong direction
-    [*] --> IN_PROGRESS: ❌ no dispatch
-    [*] --> COMPLETED: ❌ no dispatch
-```
-
-**State types:**
-- `DISPATCHED` — repo-level state, set by the webhook handler at dispatch time using a sentinel `check_run_id = "dispatched"`. Proves the relay actually dispatched to this repo.
-- `IN_PROGRESS` / `COMPLETED` — job-level states, keyed per `check_run_id` (GitHub-assigned unique ID per job execution).
-
-**Valid flow:** `DISPATCHED → IN_PROGRESS → COMPLETED` (linear, no shortcuts)
+To prevent rollback and replay attacks at the relay level, we propose a Redis-backed state machine for status transitions:
 
 | Transition | Action |
 |------------|--------|
-| `DISPATCHED` → `IN_PROGRESS` | Accepted (normal first callback) |
-| `IN_PROGRESS` → `COMPLETED` | Accepted (normal completion) |
-| No dispatch record → any callback | **Rejected** (no matching dispatch) |
-| No `IN_PROGRESS` → `COMPLETED` | **Rejected** (skipped in_progress) |
-| `COMPLETED` → `IN_PROGRESS` | **Rejected** (no rollback) |
-| Duplicate `IN_PROGRESS` | **Rejected** (replay) |
-| Duplicate `COMPLETED` | **Rejected** (replay) |
+| No record → `in_progress` | Accepted |
+| No record → `completed` | Accepted (handles missed `in_progress` callback) |
+| `in_progress` → `completed` | Accepted (normal flow) |
+| `completed` → `in_progress` | **Rejected** (no rollback) |
+| Duplicate `completed` | **Rejected** (no replay) |
 
-The state key uses `check_run_id` for per-execution uniqueness. Since `check_run_id` is GitHub-assigned and changes on reruns, each job execution is independently tracked. `run_attempt` is still present in the workflow dict for informational purposes but is not used by the relay's state machine.
+The state key includes `run_id` to support legitimate workflow reruns:
 
 ```
-Key: oot:state:{delivery_id}:{downstream_repo}:{check_run_id}
+Key: crcr:state:{delivery_id}:{downstream_repo}:{run_id}
 TTL: 3 days (matching relay Redis TTL)
 ```
 
@@ -665,6 +623,7 @@ ClickHouse saved query (`oot_summary`):
 ```sql
 SELECT
     downstream_repo AS repo,
+    anyLast(downstream_repo_level) AS downstream_repo_level,
     countIf(conclusion = 'success') AS successes,
     countIf(conclusion = 'failure') AS failures,
     count() AS total,
@@ -699,7 +658,11 @@ ClickHouse saved query (`oot_backend_dashboard`):
 SELECT
     pr_number,
     pytorch_head_sha,
-    workflow_name AS job_name,
+    workflow_name,
+    job_name,
+    check_run_id,
+    run_id,
+    run_attempt,
     status,
     conclusion,
     started_at,
@@ -736,7 +699,11 @@ ClickHouse saved query (`oot_pr_results`):
 ```sql
 SELECT
     downstream_repo,
-    workflow_name AS job_name,
+    workflow_name,
+    job_name,
+    check_run_id,
+    run_id,
+    run_attempt,
     status,
     conclusion,
     duration_seconds,
@@ -757,149 +724,74 @@ The `OotPrSection` React component is integrated into the existing PR page (`tor
 
 ### Sample Payloads
 
-These samples show the actual wire format at each stage of the pipeline.
-
-#### Stage 1: Downstream → Relay (sent by the callback action)
-
-The reusable GitHub Action builds this payload from `github.event.client_payload` (the L1 dispatch envelope) plus a `workflow` dict with downstream-reported fields:
-
-**In-Progress:**
+#### In-Progress Callback
 
 ```json
 {
-  "event_type": "pull_request",
-  "delivery_id": "a8f5f167-6e5b-4c3d-8a2e-4b5c6d7e8f9a",
-  "payload": {
-    "pull_request": { "number": 179565, "head": { "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" } },
-    "repository": { "full_name": "pytorch/pytorch" }
-  },
-  "workflow": {
-    "status": "in_progress",
-    "conclusion": null,
-    "name": "<hardware>-ci",
-    "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-    "job_name": "test-<hardware>-float32",
-    "run_attempt": 1,
-    "started_at": "2025-04-28T10:15:30Z"
-  }
+  "status": "in_progress",
+  "head_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "pr_number": 179565,
+  "downstream_repo": "{org}/{repo}",
+  "upstream_repo": "pytorch/pytorch",
+  "workflow_run_id": 24033272679,
+  "workflow_name": "{accelerator}",
+  "workflow_url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
+  "run_id": 24033272679,
+  "job_id": 67890123,
+  "conclusion": null,
+  "downstream_repo_level": "L2"
 }
 ```
 
-**Completed (failure):**
+#### Completed — Success
 
 ```json
 {
-  "event_type": "pull_request",
-  "delivery_id": "a8f5f167-6e5b-4c3d-8a2e-4b5c6d7e8f9a",
-  "payload": {
-    "pull_request": { "number": 179565, "head": { "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" } },
-    "repository": { "full_name": "pytorch/pytorch" }
-  },
-  "workflow": {
-    "status": "completed",
-    "conclusion": "failure",
-    "name": "<hardware>-ci",
-    "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-    "job_name": "test-<hardware>-float32",
-    "run_attempt": 1,
-    "completed_at": "2025-04-28T10:45:12Z",
-    "test_results": {
-      "total": 8432,
-      "passed": 8430,
-      "failed": 2,
-      "skipped": 20
-    },
-    "artifact_url": "https://<company-a>.github.io/ci-results/183512/"
-  }
+  "status": "completed",
+  "conclusion": "success",
+  "head_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "pr_number": 179565,
+  "downstream_repo": "{org}/{repo}",
+  "upstream_repo": "pytorch/pytorch",
+  "workflow_run_id": 24033272679,
+  "workflow_name": "{accelerator}",
+  "workflow_url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
+  "run_id": 24033272679,
+  "job_id": 67890123,
+  "total_tests": 8432,
+  "passed_tests": 8432,
+  "failed_tests": 0,
+  "skipped_tests": 47,
+  "failed_tests_json": "[]",
+  "downstream_repo_level": "L2",
+  "artifact_url": "https://github.com/{org}/{repo}/actions/runs/24033272679/artifacts"
 }
 ```
 
-#### Stage 2: Relay → HUD API (sent by `forward_to_hud`)
-
-The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` fields are relay-generated; `untrusted` is the raw downstream payload passed through verbatim:
-
-**In-Progress:**
+#### Completed — Failure
 
 ```json
 {
-  "trusted": {
-    "verified_repo": "{org}/{repo}",
-    "downstream_repo_level": "L2",
-    "ci_metrics": {
-      "queue_time": 12.345,
-      "execution_time": null
-    }
-  },
-  "untrusted": {
-    "callback_payload": {
-      "event_type": "pull_request",
-      "delivery_id": "a8f5f167-6e5b-4c3d-8a2e-4b5c6d7e8f9a",
-      "payload": {
-        "pull_request": { "number": 179565, "head": { "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" } },
-        "repository": { "full_name": "pytorch/pytorch" }
-      },
-      "workflow": {
-        "schema_version": "1.0",
-        "status": "in_progress",
-        "conclusion": null,
-        "name": "<hardware>-ci",
-        "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-        "job_name": "test-<hardware>-float32",
-        "check_run_id": "98765432100",
-        "run_id": "24033272679",
-        "run_attempt": 1,
-        "started_at": "2025-04-28T10:15:30Z"
-      }
-    }
-  }
+  "status": "completed",
+  "conclusion": "failure",
+  "head_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "pr_number": 179565,
+  "downstream_repo": "{org}/{repo}",
+  "upstream_repo": "pytorch/pytorch",
+  "workflow_run_id": 24033272679,
+  "workflow_name": "{accelerator}",
+  "workflow_url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
+  "run_id": 24033272679,
+  "job_id": 67890123,
+  "total_tests": 8432,
+  "passed_tests": 8410,
+  "failed_tests": 2,
+  "skipped_tests": 20,
+  "failed_tests_json": "[{\"name\":\"test_conv2d_xpu_float32\",\"classname\":\"TestConv2dXPU\",\"message\":\"AssertionError: Tensor mismatch\",\"duration_s\":1.23},{\"name\":\"test_relu_backward_xpu_float16\",\"classname\":\"TestActivationsXPU\",\"message\":\"RuntimeError: expected scalar type Float but found Half\",\"duration_s\":0.45}]",
+  "downstream_repo_level": "L2",
+  "artifact_url": "https://{org}-ci-artifacts.s3.amazonaws.com/pytorch/24033272679/"
 }
 ```
-
-**Completed (failure):**
-
-```json
-{
-  "trusted": {
-    "verified_repo": "{org}/{repo}",
-    "downstream_repo_level": "L2",
-    "ci_metrics": {
-      "queue_time": null,
-      "execution_time": 1782.0
-    }
-  },
-  "untrusted": {
-    "callback_payload": {
-      "event_type": "pull_request",
-      "delivery_id": "a8f5f167-6e5b-4c3d-8a2e-4b5c6d7e8f9a",
-      "payload": {
-        "pull_request": { "number": 179565, "head": { "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" } },
-        "repository": { "full_name": "pytorch/pytorch" }
-      },
-      "workflow": {
-        "schema_version": "1.0",
-        "status": "completed",
-        "conclusion": "failure",
-        "name": "<hardware>-ci",
-        "url": "https://github.com/{org}/{repo}/actions/runs/24033272679",
-        "job_name": "test-<hardware>-float32",
-        "check_run_id": "98765432100",
-        "run_id": "24033272679",
-        "run_attempt": 1,
-        "completed_at": "2025-04-28T10:45:12Z",
-        "test_results": {
-          "total": 8432,
-          "passed": 8430,
-          "failed": 2,
-          "skipped": 20
-        },
-        "artifact_url": "https://<company-a>.github.io/ci-results/183512/"
-      }
-    }
-  }
-}
-```
-
-> **Note on `job_name`, `run_attempt`, `started_at`, `completed_at`**: These fields are not yet present in the L2 PR's callback action (`action.yml`). They need to be added to the action to support per-job granularity and accurate timestamps. Currently, the action sends `name` (= `github.workflow`) and `url` but not `github.job`, `github.run_attempt`, or wall-clock timestamps.
 
 ### Comparison: In-Tree vs OOT Pipeline
 
@@ -907,7 +799,7 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
 |---|---------|-----------------|
 | **Hops to ClickHouse** | 6 (job → S3 → workflow_run → upload_stats → S3 → replicator → CH) | 4 (downstream → handler → HUD → DynamoDB → stream → replicator → CH) |
 | **Write target** | S3 (`ossci-raw-job-status`) → `clickhouse-replicator-s3` | DynamoDB (`torchci-oot-workflow-job`) → `clickhouse-replicator-dynamo` |
-| **Mutability** | Immutable (write once) | Mutable (in_progress → completed via DynamoDB `UpdateItem`) |
+| **Mutability** | Immutable (write once) | Mutable (in_progress → completed via DynamoDB upsert) |
 | **Artifact storage** | Centralized storage (LF Foundation managed) | Downstream org's own storage (any public URL) |
 | **Auth model** | Service roles (trusted same-org infra) | OIDC → internal token → service role |
 | **Rate limiting** | None (relies on GHA concurrency) | Per-repo at relay |
@@ -934,7 +826,7 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
 - **Ingestion latency**: time from callback to ClickHouse availability (target: < 60s)
 - **OOT pass rate**: per-backend success rate over 7d rolling window
 - **HUD API error rate**: 4xx/5xx rate on `/api/oot/results`
-- **Daily callback volume**: per-repo and aggregate, to monitor traffic patterns
+- **Daily callback volume**: per-repo and aggregate, to validate budget thresholds
 - **Queue time**: relay-measured dispatch-to-in_progress (identifies downstream infra bottlenecks)
 - **Execution time**: relay-measured in_progress-to-completed (identifies test suite performance trends)
 
@@ -1014,10 +906,10 @@ No documentation reorganization is needed. The `/oot` pages are self-discoverabl
 
 | Task | What | Depends on |
 |------|------|------------|
-| 2a | Create `torchci/lib/oot/ootUtils.ts` — types, extraction logic, `UpdateItem` write helper | — |
+| 2a | Create `torchci/lib/oot/ootUtils.ts` — types, payload validation, extraction logic | — |
 | 2b | Create `torchci/pages/api/oot/results.ts` — POST handler with auth (`X-OOT-Relay-Token`), 2MB payload cap, DynamoDB `UpdateItem` | 2a, Phase 1 |
 | 2c | Unit tests for `extractDynamoRecord`, `writeToDynamo` (verify `UpdateItem` SET expressions) | 2a |
-| 2d | Integration test: POST valid `{trusted, untrusted}` payload → confirm DynamoDB record created, then POST `completed` → confirm `queue_time` preserved | 2b |
+| 2d | Integration test: POST valid `{trusted, untrusted}` payload → confirm DynamoDB record created | 2b |
 
 **Deliverable**: `/api/oot/results` endpoint accepts relay payloads and writes to DynamoDB.
 
@@ -1028,10 +920,9 @@ No documentation reorganization is needed. The `/oot` pages are self-discoverabl
 | Task | What | Depends on |
 |------|------|------------|
 | 3a | Update Result Handler to forward validated callbacks to HUD API with `X-OOT-Relay-Token` header | Phase 2 |
-| 3b | Add per-repo rate limiting at the relay (20 req/min default, configurable) | — |
-| 3c | Implement error handling: retry on 5xx with exponential backoff, raise on exhaustion | 3a |
-| 3d | Add schema validation at the relay: validate `delivery_id`, `workflow.status`, `conclusion` presence | 3a |
-| 3e | Update reusable callback GitHub Action to include `job_name`, `run_attempt`, `started_at`/`completed_at` | — |
+| 3b | Add per-repo rate limiting at the relay | — |
+| 3c | Implement error handling: retry on 5xx, return status (`delivered` / `hud_rejected` / `hud_unavailable` / `skipped`) to downstream | 3a |
+| 3d | Create reusable GitHub Action for downstream: `report-oot-status` (sends `in_progress` / `completed` callbacks) | — |
 
 **Deliverable**: End-to-end write path works: Downstream CI → Result Handler → HUD API → DynamoDB → ClickHouse.
 
