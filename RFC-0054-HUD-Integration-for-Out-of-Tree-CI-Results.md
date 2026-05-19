@@ -265,7 +265,6 @@ export interface RelayPayload {
         started_at?: string;
         completed_at?: string;
         test_results?: {
-          total?: number;
           passed?: number;
           failed?: number;
           skipped?: number;
@@ -334,10 +333,14 @@ export function extractDynamoRecord(payload: RelayPayload): OotWorkflowJobRecord
     }
     if (wf.test_results) {
       const tr = wf.test_results;
-      if (typeof tr.total === "number") record.total_tests = tr.total;
       if (typeof tr.passed === "number") record.passed_tests = tr.passed;
       if (typeof tr.failed === "number") record.failed_tests = tr.failed;
       if (typeof tr.skipped === "number") record.skipped_tests = tr.skipped;
+      // L2 action sends {passed, failed, skipped} without total — compute it
+      record.total_tests =
+        typeof tr.total === "number"
+          ? tr.total
+          : (tr.passed ?? 0) + (tr.failed ?? 0) + (tr.skipped ?? 0);
     }
   }
 
@@ -779,7 +782,6 @@ The reusable GitHub Action (`cross-repo-ci-relay-callback`) builds this payload 
     "started_at": null,
     "completed_at": "2025-04-28T10:45:12Z",
     "test_results": {
-      "total": 8432,
       "passed": 8430,
       "failed": 2,
       "skipped": 20
@@ -862,7 +864,6 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
         "run_attempt": "1",
         "completed_at": "2025-04-28T10:45:12Z",
         "test_results": {
-          "total": 8432,
           "passed": 8430,
           "failed": 2,
           "skipped": 20
