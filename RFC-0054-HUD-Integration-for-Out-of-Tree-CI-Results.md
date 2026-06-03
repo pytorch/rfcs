@@ -429,6 +429,10 @@ CREATE TABLE default.oot_workflow_job
     `delivery_id` String COMMENT 'GitHub webhook delivery ID from L1 dispatch',
     `workflow_run_url` String COMMENT 'Link to downstream GHA workflow run',
     `workflow_name` String COMMENT 'Downstream workflow name',
+    `job_name` String DEFAULT '' COMMENT 'Downstream job name (github.job)',
+    `check_run_id` String DEFAULT '' COMMENT 'GitHub-assigned unique ID per job execution (job.check_run_id)',
+    `run_id` String DEFAULT '' COMMENT 'GitHub workflow run ID (github.run_id), same across retries',
+    `run_attempt` UInt32 DEFAULT 1 COMMENT 'Workflow run attempt number (github.run_attempt)',
     `conclusion` String COMMENT 'success, failure, cancelled, timed_out (set on completed)',
     `queue_time` Nullable(Float64) COMMENT 'Relay-measured dispatch-to-in_progress time in seconds',
     `execution_time` Nullable(Float64) COMMENT 'Relay-measured in_progress-to-completed time in seconds',
@@ -477,10 +481,10 @@ Key design decisions:
 **At the relay (per-repo)**
 
 ```
-Key:    oot:rate:{repo}
+Key:    oot:rate:{verified_repo}
 Value:  counter (atomic INCR)
 TTL:    1 minute sliding window
-Limit:  10 requests/minute per repo
+Limit:  20 requests/minute per repo (configurable via RATE_LIMIT_PER_MIN)
 ```
 
 Rejects at the relay before any HUD/DB traffic. First line of defense against runaway CI loops.
@@ -596,22 +600,39 @@ L2 Callback:
 
 #### State Machine for Status Transitions
 
-To prevent rollback and replay attacks at the relay level, we propose a Redis-backed state machine for status transitions:
+The relay implements a strict 3-state machine enforced via Redis. Each callback is validated against the current state before processing:
 
-| Transition | Action |
-|------------|--------|
-| No record → `in_progress` | Accepted |
-| No record → `completed` | Accepted (handles missed `in_progress` callback) |
-| `in_progress` → `completed` | Accepted (normal flow) |
-| `completed` → `in_progress` | **Rejected** (no rollback) |
-| Duplicate `completed` | **Rejected** (no replay) |
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> DISPATCHED: webhook sends
+    DISPATCHED --> IN_PROGRESS: first callback
+    IN_PROGRESS --> COMPLETED: completion
+    IN_PROGRESS --> IN_PROGRESS: ❌ duplicate
+    DISPATCHED --> COMPLETED: ❌ skip IN_PROGRESS
+    COMPLETED --> COMPLETED: ❌ duplicate
+    COMPLETED --> IN_PROGRESS: ❌ wrong direction
+    [*] --> IN_PROGRESS: ❌ no dispatch
+    [*] --> COMPLETED: ❌ no dispatch
+```
 
-The state key includes `run_id` to support legitimate workflow reruns:
+**State types:**
+
+- `DISPATCHED`: Repo-level state (`check_run_id=DISPATCH_CHECK_RUN_ID`) — one per `{delivery_id, repo}`, set by the webhook handler at dispatch time
+- `IN_PROGRESS` / `COMPLETED`: Job-level states — independent per `check_run_id`
+
+**Valid flow:** `DISPATCHED → IN_PROGRESS → COMPLETED` (linear, no shortcuts)
+
+**Rejected:** Skipping `IN_PROGRESS`, duplicate `COMPLETED`, missing `DISPATCHED`, or wrong-direction transitions
+
+The state key uses `check_run_id` (GitHub-assigned, unique per job execution) rather than `run_id`:
 
 ```
-Key: crcr:state:{delivery_id}:{downstream_repo}:{run_id}
-TTL: 3 days (matching relay Redis TTL)
+Key: oot:state:{delivery_id}:{verified_repo}:{check_run_id}
+TTL: 3 days (configurable via OOT_STATUS_TTL, default 259200s)
 ```
+
+Reruns get a new `check_run_id` and are treated as separate jobs, so they don't violate the state machine.
 
 ### Read Path: HUD Pages
 
@@ -959,100 +980,84 @@ No documentation reorganization is needed. The `/oot` pages are self-discoverabl
 
 ## Unresolved Questions
 
-1. **Failed test detail storage**: Embedding as `failed_tests_json` String column is simpler (one table). A separate DynamoDB/ClickHouse table for test-level rows would be more queryable but adds infra. Start with embedding; add a separate table later if needed for cross-repo flaky test detection.
+1. ~~**Failed test detail storage**~~ **Resolved**: Embedded as `failed_tests_json` String column in both DynamoDB and ClickHouse. A separate table can be added later if needed for cross-repo flaky test detection.
 
-2. **Redis TTL for relay state**: 3-hour vs 3-day TTL. GitHub can queue jobs for up to 3 days, so 3-day TTL is recommended.
+2. ~~**Redis TTL for relay state**~~ **Resolved**: 3 days (259,200 seconds), configurable via `OOT_STATUS_TTL` env var on the Lambda.
 
 3. **Non-GHA CI support**: OIDC auth is GHA-specific. Jenkins/Buildkite would need pre-shared API keys. Deferred to a future RFC.
 
-4. **Backfill on failure**: If DynamoDB write fails, should the handler retry? DynamoDB is highly available so failures are rare. Start without a dead-letter queue; add one if needed.
+4. ~~**Backfill on failure**~~ **Resolved**: The callback handler retries HUD 5xx/network errors with exponential backoff (up to 3 retries). HUD 4xx errors propagate immediately. No dead-letter queue for now.
 
 5. **Callback token adoption timeline**: the signed callback token strengthens security significantly but requires coordination with L1 deployment. Can be added incrementally.
 
+6. **Silent HUD forward skip** (discovered during E2E validation): When `HUD_API_URL` is not set as a Lambda environment variable, `forward_to_hud()` silently skips the write and the Lambda still returns HTTP 200 to the caller. Consider adding a `hud_forwarded` field to the response body.
+
+7. **`timed_out`/`cancelled` conclusion support**: The composite action (`cross-repo-ci-relay-callback`) only accepts `success` or `failure` as valid `conclusion` values when `status=completed`. Downstream workflows producing other GitHub-standard conclusions need to map these to `failure` before calling the action, or the action needs to be updated.
+
 ## Implementation Plan
 
-### Phase 1: Storage Layer
+### Phase 1: Storage Layer — COMPLETE
 
-**Goal**: Set up the data stores so the write path has somewhere to land.
+| Task | PR | Status |
+|------|-----|--------|
+| Provision `torchci-oot-workflow-job` DynamoDB table | [meta-pytorch/pytorch-gha-infra#1064](https://github.com/meta-pytorch/pytorch-gha-infra/pull/1064) | Provisioned |
+| Create `default.oot_workflow_job` ClickHouse table | [test-infra#8105](https://github.com/pytorch/test-infra/pull/8105) | **Merged** (2026-05-21) |
+| Add replicator mapping | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
 
-| Task | What | Depends on |
-|------|------|------------|
-| 1a | Provision `torchci-oot-workflow-job` DynamoDB table with streams enabled | — |
-| 1b | Create `default.oot_workflow_job` ClickHouse table from schema file | — |
-| 1c | Add `"torchci-oot-workflow-job": "default.oot_workflow_job"` to replicator `SUPPORTED_TABLES` | 1a, 1b |
-| 1d | Validate: insert a test record into DynamoDB, confirm it appears in ClickHouse | 1c |
+### Phase 2: HUD API Endpoint — COMPLETE
 
-**Deliverable**: DynamoDB → Stream → Replicator → ClickHouse pipeline is live and verified.
+| Task | PR | Status |
+|------|-----|--------|
+| `ootUtils.ts` — types, extraction, `UpdateItem` write logic, unit tests | [test-infra#8110](https://github.com/pytorch/test-infra/pull/8110) | **Merged** (2026-05-22) |
+| `/api/oot/results` — POST handler with `X-OOT-Relay-Token` auth, 2MB cap | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
 
-### Phase 2: HUD API Endpoint
+### Phase 3: Relay Integration — COMPLETE
 
-**Goal**: Build the ingestion endpoint that receives relay callbacks and writes to DynamoDB.
+| Task | PR | Status |
+|------|-----|--------|
+| Callback handler with OIDC auth, allowlist, rate limiting, HUD forwarding, Redis state machine | [test-infra#7967](https://github.com/pytorch/test-infra/pull/7967) | **Merged** (2026-05-22) |
+| Composite action (`cross-repo-ci-relay-callback`) with default callback URL | [test-infra#8133](https://github.com/pytorch/test-infra/pull/8133) | **Merged** (2026-06-02) |
 
-| Task | What | Depends on |
-|------|------|------------|
-| 2a | Create `torchci/lib/oot/ootUtils.ts` — types, payload validation, extraction logic | — |
-| 2b | Create `torchci/pages/api/oot/results.ts` — POST handler with auth (`X-OOT-Relay-Token`), 2MB payload cap, DynamoDB `UpdateItem` | 2a, Phase 1 |
-| 2c | Unit tests for `extractDynamoRecord`, `writeToDynamo` (verify `UpdateItem` SET expressions) | 2a |
-| 2d | Integration test: POST valid `{trusted, untrusted}` payload → confirm DynamoDB record created | 2b |
+### Phase 4: HUD Frontend Pages — COMPLETE
 
-**Deliverable**: `/api/oot/results` endpoint accepts relay payloads and writes to DynamoDB.
+| Task | PR | Status |
+|------|-----|--------|
+| ClickHouse queries (`oot_summary`, `oot_backend_dashboard`, `oot_pr_results`) | [test-infra#8110](https://github.com/pytorch/test-infra/pull/8110) | **Merged** (2026-05-22) |
+| `/oot` summary page, `/oot/[org]/[repo]` dashboard, `OotPrSection` component | [test-infra#8111](https://github.com/pytorch/test-infra/pull/8111) | **Merged** (2026-05-26) |
+| PR page integration | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
 
-### Phase 3: Relay Integration
+### Phase 5: End-to-End Validation — IN PROGRESS
 
-**Goal**: Connect the relay's Result Handler to the HUD API endpoint.
-
-| Task | What | Depends on |
-|------|------|------------|
-| 3a | Update Result Handler to forward validated callbacks to HUD API with `X-OOT-Relay-Token` header | Phase 2 |
-| 3b | Add per-repo rate limiting at the relay | — |
-| 3c | Implement error handling: retry on 5xx, return status (`delivered` / `hud_rejected` / `hud_unavailable` / `skipped`) to downstream | 3a |
-| 3d | Create reusable GitHub Action for downstream: `report-oot-status` (sends `in_progress` / `completed` callbacks) | — |
-
-**Deliverable**: End-to-end write path works: Downstream CI → Result Handler → HUD API → DynamoDB → ClickHouse.
-
-### Phase 4: HUD Frontend Pages
-
-**Goal**: Build the read path — three views that query ClickHouse and display OOT results.
-
-| Task | What | Depends on |
-|------|------|------------|
-| 4a | Create saved ClickHouse queries: `oot_summary`, `oot_backend_dashboard`, `oot_pr_results` | Phase 1 |
-| 4b | Build `/oot` — global OOT summary page (table of repos sorted by pass rate, time range selector) | 4a |
-| 4c | Build `/oot/[org]/[repo]` — per-backend dashboard (matrix view: PRs × jobs, failure drill-down, external artifact links) | 4a |
-| 4d | Build `OotPrSection` component — collapsible accordion for PR pages | 4a |
-| 4e | Integrate `OotPrSection` into existing PR detail page (`/pr/[number]`) | 4d |
-
-**Deliverable**: All three HUD views render OOT data from ClickHouse.
-
-### Phase 5: End-to-End Validation
-
-**Goal**: Validate the full pipeline with a real downstream repo.
-
-| Task | What | Depends on |
-|------|------|------------|
-| 5a | Set up a test downstream repo with the reusable GitHub Action | Phase 3 |
-| 5b | Trigger a PyTorch PR → verify dispatch → downstream CI runs → callbacks sent → DynamoDB → ClickHouse → HUD pages show results | All phases |
-| 5c | Test two-callback flow: verify `in_progress` appears in DynamoDB, then `completed` overwrites it and appears in ClickHouse and HUD | 5b |
-| 5d | Test external artifact links render correctly on HUD pages | 5b |
-| 5e | Test rate limiting: verify relay rejects requests beyond threshold | 5b |
-| 5f | Test error cases: invalid auth, malformed payload, oversized payload, HUD unavailable | 5b |
-
-**Deliverable**: Full pipeline validated end-to-end with a real downstream repo.
+| Task | PR / Item | Status |
+|------|-----------|--------|
+| L2 test workflow (`pytorch/crcr-test`) with simulated tests and callbacks | [crcr-test#4](https://github.com/pytorch/crcr-test/pull/4) | **Merged** (2026-06-02) |
+| Callback → Lambda | Working | Callbacks reporting HTTP 200 |
+| Lambda → HUD forwarding | **Blocked** | `HUD_API_URL` not yet provisioned as Lambda env var. Fix: configure via `crcr-prod` GitHub Environment Secrets |
+| DynamoDB → ClickHouse → HUD display | Untested | Blocked on Lambda env var provisioning |
 
 ### Phase 6: Security Hardening (Future)
 
-**Goal**: Add dispatch provenance and replay prevention.
+| Task | Status |
+|------|--------|
+| Signed callback token minting at L1 dispatch | Planned |
+| Token verification at callback handler | Planned |
+| Orphaned job detection (unconsumed tokens → auto-mark as `timed_out`) | Planned |
 
-| Task | What | Depends on |
-|------|------|------------|
-| 6a | Implement signed callback token minting at L1 dispatch | Phase 3 |
-| 6b | Add token verification at Result Handler | 6a |
-| 6c | Implement Redis-backed state machine for status transitions | 6a |
-| 6d | Add orphaned job detection (unconsumed tokens → auto-mark as `timed_out`) | 6c |
+> **Note:** The 3-state machine (`DISPATCHED → IN_PROGRESS → COMPLETED`) is already implemented in Phase 3 (PR #7967). Phase 6 covers the additional callback token for dispatch provenance and replay prevention.
 
-**Deliverable**: Callback token provides dispatch provenance, replay prevention, and orphaned job detection.
+### Remaining Work
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Provision `HUD_API_URL` + `HUD_BOT_KEY` via GitHub Environment Secrets | Pending | Coordinating with infra team |
+| Set `OOT_RELAY_TOKEN` on Vercel | Pending | Must match `HUD_BOT_KEY` |
+| Rename `/oot` → `/crcr` in HUD pages | Planned | Per feedback from @malfet and @jathu |
+| L3/L4 check run management | [test-infra#8119](https://github.com/pytorch/test-infra/pull/8119) | WIP |
+| Onboard real downstream repos | Pending | After E2E validation |
 
 ## Resolution
 
-TBD — this RFC is a work in progress.
+Phases 1–4 are **complete** — all code is merged into `pytorch/test-infra`. The end-to-end pipeline is blocked on Lambda environment variable provisioning (`HUD_API_URL`), which is being coordinated with the infra team. Once provisioned, data will flow from the `pytorch/crcr-test` L2 test workflow through DynamoDB and ClickHouse to the HUD pages.
+
+Naming rename (`/oot` → `/crcr`) is planned as a follow-up PR per maintainer feedback.
 
