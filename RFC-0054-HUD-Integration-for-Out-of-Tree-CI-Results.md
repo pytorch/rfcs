@@ -44,15 +44,15 @@ The system has four components on the write path and three views on the read pat
 **Write path:**
 
 1. **Result Handler** (existing, from relay): receives callbacks from downstream CI, verifies OIDC, checks allowlist, forwards to HUD
-2. **HUD API** (`/api/oot/results`): validates auth (`X-OOT-Relay-Token`), enforces payload caps, writes to DynamoDB via `UpdateItem`
+2. **HUD API** (`/api/oot/results`): validates auth (`x-hud-internal-bot`), enforces payload caps, writes to DynamoDB via `UpdateItem`
 3. **DynamoDB** (`torchci-oot-workflow-job`): mutable storage supporting the two-callback model (`in_progress` → `completed`)
 4. **ClickHouse** (`default.oot_workflow_job`): analytical storage, replicated automatically via the existing `clickhouse-replicator-dynamo` replicator
 
 **Read path:**
 
-1. **Global OOT Summary** (`/oot`): cross-repo health overview for CI maintainers
-2. **Per-Backend Dashboard** (`/oot/[org]/[repo]`): detailed job grid for a single downstream repo
-3. **PR View Integration** (`/pr/[number]`): collapsible OOT section on existing PR pages
+1. **Global CRCR Summary** (`/crcr`): cross-repo health overview for CI maintainers
+2. **Per-Backend Dashboard** (`/crcr/[org]/[repo]`): detailed job grid for a single downstream repo
+3. **PR View Integration** (`/pr/[number]`): collapsible CRCR section on existing PR pages
 
 ```mermaid
 flowchart TD
@@ -75,7 +75,7 @@ flowchart TD
         end
 
         subgraph hud [HUD]
-            FWD -->|"X-OOT-Relay-Token"| API["HUD API\n/api/oot/results"]
+            FWD -->|"x-hud-internal-bot"| API["HUD API\n/api/oot/results"]
             API -->|"Auth + write"| DDB[("DynamoDB\ntorchci-oot-workflow-job")]
         end
 
@@ -94,7 +94,7 @@ flowchart TD
     subgraph readPath [Read Path - HUD Frontend]
         CH --> DASH["Dashboard queries\n(workflow status, pass rates)"]
         STORE -.->|"External links\n(from artifact_url in CH)"| HUDFE
-        DASH --> HUDFE["hud.pytorch.org\n/oot  /oot/org/repo  /pr/N"]
+        DASH --> HUDFE["hud.pytorch.org\n/crcr  /crcr/org/repo  /pr/N"]
     end
 ```
 
@@ -103,11 +103,11 @@ flowchart TD
 | Phase | Source | Destination | Auth | What Happens |
 |-------|--------|-------------|------|--------------|
 | **Callback 1 (start)** | First downstream job | Result Handler | OIDC token | POST `in_progress` status |
-| | Result Handler | HUD API | `X-OOT-Relay-Token` | Forward `{trusted, untrusted}` payload |
+| | Result Handler | HUD API | `x-hud-internal-bot` | Forward `{trusted, untrusted}` payload |
 | | HUD API | DynamoDB | Service role | UpdateItem with `in_progress` status |
 | | DynamoDB | ClickHouse | Stream + replicator | Replicated to ClickHouse |
 | **Callback 2 (end)** | Last downstream job | Result Handler | OIDC token | POST `completed` status + test counts + failures + artifact URLs |
-| | Result Handler | HUD API | `X-OOT-Relay-Token` | Forward `{trusted, untrusted}` payload |
+| | Result Handler | HUD API | `x-hud-internal-bot` | Forward `{trusted, untrusted}` payload |
 | | HUD API | DynamoDB | Service role | UpdateItem — merges `completed` fields into existing record |
 | | DynamoDB | ClickHouse | Stream + replicator | Replicated to ClickHouse (replaces `in_progress` row via `SharedReplacingMergeTree`) |
 | **Read** | HUD Frontend | ClickHouse | Read-only | Dashboard queries: status, pass rates, durations |
@@ -165,7 +165,7 @@ HUD always prefers `trusted.verified_repo` over anything self-reported in the bo
 
 | Step | Action | Failure Response |
 |------|--------|------------------|
-| 1 | Validate `X-OOT-Relay-Token` header | `401 Unauthorized` |
+| 1 | Validate `x-hud-internal-bot` header via `checkAuthWithApiToken()` | `401 Unauthorized` |
 | 2 | Payload cap check (2MB max body) | `413 Payload Too Large` |
 | 3 | Extract and flatten record from `{trusted, untrusted}` payload | `400 Bad Request` |
 | 4 | Write to DynamoDB via `UpdateItem` | `500 Internal Server Error` |
@@ -173,13 +173,14 @@ HUD always prefers `trusted.verified_repo` over anything self-reported in the bo
 The HUD API endpoint (`torchci/pages/api/oot/results.ts`) follows the existing `webhookToDynamo` pattern:
 
 ```typescript
-import type { NextApiRequest, NextApiResponse } from "next";
+import { checkAuthWithApiToken } from "lib/auth/auth";
 import {
   ApiError,
-  validatePayloadSize,
   extractDynamoRecord,
+  validatePayloadSize,
   writeToDynamo,
 } from "lib/oot/ootUtils";
+import type { NextApiRequest, NextApiResponse } from "next";
 
 export const config = {
   api: {
@@ -198,9 +199,9 @@ export default async function handler(
   }
 
   try {
-    // Auth: dedicated X-OOT-Relay-Token header
-    const relayToken = req.headers["x-oot-relay-token"];
-    if (!relayToken || relayToken !== process.env.OOT_RELAY_TOKEN) {
+    // Auth: standard HUD internal-bot check (shared with DrCI, trymerge)
+    const auth = await checkAuthWithApiToken(req, res);
+    if (!auth.ok) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -503,7 +504,7 @@ Rejects at the relay before any HUD/DB traffic. First line of defense against ru
 | Hop | From → To | Auth Mechanism | Credential Scope |
 |-----|-----------|----------------|------------------|
 | 1 | Downstream → Result Handler | OIDC token (GHA-issued, 5 min TTL) | No secrets needed by downstream |
-| 2 | Result Handler → HUD API | `X-OOT-Relay-Token` header | Dedicated token for OOT relay write path |
+| 2 | Result Handler → HUD API | `x-hud-internal-bot` header | Standard HUD internal API token (`INTERNAL_API_TOKEN`) |
 | 3 | HUD API → DynamoDB | Service role | Write to `torchci-oot-workflow-job` only |
 | 4 | DynamoDB → ClickHouse | Replicator service role | Existing replicator credentials |
 
@@ -513,7 +514,7 @@ Security properties:
 |----------|-----|
 | Downstream never gets DB/HUD credentials | OIDC only |
 | Unknown repos rejected before HUD | Allowlist at relay (cached) |
-| HUD only accepts relay traffic | Dedicated `X-OOT-Relay-Token` header |
+| HUD only accepts internal-bot traffic | `x-hud-internal-bot` header checked via `checkAuthWithApiToken()` |
 | Runaway CI caught early | Rate limit at relay |
 | DB overload prevented | Payload caps |
 | Artifact storage not PyTorch's burden | Each downstream org manages their own |
@@ -551,16 +552,17 @@ HUD always prefers `trusted.verified_repo` over anything self-reported.
 
 #### Error Handling Strategy
 
-HUD API errors are handled with the following strategy:
+The relay's `forward_to_hud` function handles HUD API errors:
 
 - **4xx errors** (validation, auth failures): propagated back to downstream so workflow authors see a red CI step and can fix their payload
-- **5xx and network failures**: the Result Handler retries N times, then returns the status to downstream:
-  - `"delivered"` — HUD received the data
-  - `"hud_rejected"` — HUD returned 4xx (validation failure)
-  - `"hud_unavailable"` — all retries failed (HUD outage)
-  - `"skipped"` — no HUD URL configured
+- **5xx and network failures**: retried by the relay's internal retry loop (in `hud.py`). If all retries fail, the error is raised — the downstream CI step fails
 
-This ensures a HUD outage does not turn every downstream L2 CI red, while still giving downstream visibility into the HUD push status.
+The relay returns `{"ok": true, "status": "<status>"}` on success:
+- `"in_progress"` / `"completed"` — HUD received and stored the callback
+- `"ignored"` — repo is not configured for L2+ features
+- `"skipped"` — no `HUD_API_URL` configured (local dev)
+
+> **Note:** The composite callback action (`cross-repo-ci-relay-callback`) does **not** retry independently — retries were removed ([#8145](https://github.com/pytorch/test-infra/pull/8145)) because they caused duplicate state transitions in the Redis state machine (the same `check_run_id` would re-attempt an already-completed transition). The relay's `hud.py` handles retries internally.
 
 #### Proposal: Signed One-Shot Callback Token
 
@@ -636,7 +638,7 @@ Reruns get a new `check_run_id` and are treated as separate jobs, so they don't 
 
 ### Read Path: HUD Pages
 
-#### Page 1: Global OOT Summary — `/oot`
+#### Page 1: Global CRCR Summary — `/crcr`
 
 Cross-repo overview for CI maintainers. Displays a table of all OOT backend repositories sorted by pass rate (worst first), with columns for pass rate, success/failure counts, average duration, and last run time. Includes a time range selector (24h / 7d / 30d).
 
@@ -667,7 +669,7 @@ ORDER BY
 
 Frontend implementation uses `useSWR` with the ClickHouse query API and renders a Material-UI table with color-coded pass rate chips (green ≥ 95%, yellow ≥ 80%, red < 80%).
 
-#### Page 2: Per-Backend Dashboard — `/oot/[org]/[repo]`
+#### Page 2: Per-Backend Dashboard — `/crcr/[org]/[repo]`
 
 Detailed CI health view for a single downstream backend. Displays:
 
@@ -918,8 +920,8 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
 | `torchci/lib/oot/ootUtils.ts` | New — types, validation, extraction |
 | `clickhouse_db_schema/default.oot_workflow_job/schema.sql` | New — ClickHouse schema |
 | `aws/lambda/clickhouse-replicator-dynamo/lambda_function.py` | Edit — +1 line to `SUPPORTED_TABLES` |
-| `torchci/pages/oot/index.tsx` | New — global summary page |
-| `torchci/pages/oot/[org]/[repo].tsx` | New — per-backend dashboard |
+| `torchci/pages/crcr/index.tsx` | New — global CRCR summary page |
+| `torchci/pages/crcr/[org]/[repo].tsx` | New — per-backend dashboard |
 | `torchci/components/oot/OotPrSection.tsx` | New — PR view OOT section |
 | `torchci/pages/[repoOwner]/[repoName]/pull/[prNumber].tsx` | Edit — added OotPrSection |
 | `torchci/clickhouse_queries/oot_summary/*` | New — saved query |
@@ -963,12 +965,12 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
 ## How we teach this
 
 - **Downstream developers** need to know:
-  - Their CI results will appear on `hud.pytorch.org/oot/{org}/{repo}` once they reach L2
+  - Their CI results will appear on `hud.pytorch.org/crcr/{org}/{repo}` once they reach L2
   - They should include artifact URLs in their "completed" callback for debugging links on HUD
   - Test counts and failed test details are optional but recommended for richer dashboard views
 
 - **PyTorch CI maintainers** need to know:
-  - `/oot` provides a global health overview of all OOT backends
+  - `/crcr` provides a global health overview of all CRCR backends
   - Rate limits at the relay protect ClickHouse from OOT traffic spikes
   - The replicator mapping is a single line change when adding new downstream tables
 
@@ -976,7 +978,7 @@ The relay wraps the callback into `{trusted, untrusted}` namespaces. `trusted` f
   - OOT CI results appear in a collapsible section on their PR page (when results exist)
   - At L2, these are informational only and do not block merging
 
-No documentation reorganization is needed. The `/oot` pages are self-discoverable from HUD navigation.
+No documentation reorganization is needed. The `/crcr` pages are self-discoverable from HUD navigation.
 
 ## Unresolved Questions
 
@@ -990,9 +992,9 @@ No documentation reorganization is needed. The `/oot` pages are self-discoverabl
 
 5. **Callback token adoption timeline**: the signed callback token strengthens security significantly but requires coordination with L1 deployment. Can be added incrementally.
 
-6. **Silent HUD forward skip** (discovered during E2E validation): When `HUD_API_URL` is not set as a Lambda environment variable, `forward_to_hud()` silently skips the write and the Lambda still returns HTTP 200 to the caller. Consider adding a `hud_forwarded` field to the response body.
+6. ~~**Silent HUD forward skip**~~ **Resolved**: `HUD_API_URL` is now provisioned as a Lambda default ([#8147](https://github.com/pytorch/test-infra/pull/8147)). The relay logs and returns `"skipped"` when the URL is not set (local dev only).
 
-7. **`timed_out`/`cancelled` conclusion support**: The composite action (`cross-repo-ci-relay-callback`) only accepts `success` or `failure` as valid `conclusion` values when `status=completed`. Downstream workflows producing other GitHub-standard conclusions need to map these to `failure` before calling the action, or the action needs to be updated.
+7. **`timed_out`/`cancelled` conclusion support**: The composite action (`cross-repo-ci-relay-callback`) only accepts `success` or `failure` as valid `conclusion` values when `status=completed`. Clarification of accepted values is being addressed in [#8173](https://github.com/pytorch/test-infra/pull/8173).
 
 ## Implementation Plan
 
@@ -1009,7 +1011,7 @@ No documentation reorganization is needed. The `/oot` pages are self-discoverabl
 | Task | PR | Status |
 |------|-----|--------|
 | `ootUtils.ts` — types, extraction, `UpdateItem` write logic, unit tests | [test-infra#8110](https://github.com/pytorch/test-infra/pull/8110) | **Merged** (2026-05-22) |
-| `/api/oot/results` — POST handler with `X-OOT-Relay-Token` auth, 2MB cap | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
+| `/api/oot/results` — POST handler with `x-hud-internal-bot` auth, 2MB cap | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
 
 ### Phase 3: Relay Integration — COMPLETE
 
@@ -1023,17 +1025,27 @@ No documentation reorganization is needed. The `/oot` pages are self-discoverabl
 | Task | PR | Status |
 |------|-----|--------|
 | ClickHouse queries (`oot_summary`, `oot_backend_dashboard`, `oot_pr_results`) | [test-infra#8110](https://github.com/pytorch/test-infra/pull/8110) | **Merged** (2026-05-22) |
-| `/oot` summary page, `/oot/[org]/[repo]` dashboard, `OotPrSection` component | [test-infra#8111](https://github.com/pytorch/test-infra/pull/8111) | **Merged** (2026-05-26) |
+| `/crcr` summary page, `/crcr/[org]/[repo]` dashboard, `OotPrSection` component | [test-infra#8111](https://github.com/pytorch/test-infra/pull/8111) | **Merged** (2026-05-26) |
 | PR page integration | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
 
-### Phase 5: End-to-End Validation — IN PROGRESS
+### Phase 4.5: Post-Merge Improvements — COMPLETE
+
+| Task | PR | Status |
+|------|-----|--------|
+| Fix relay auth header: send `HUD_BOT_KEY` via `x-hud-internal-bot` (fixed 429 rate-limit errors) | [test-infra#8143](https://github.com/pytorch/test-infra/pull/8143) | **Merged** (2026-06-04) |
+| HUD API: use standard `checkAuthWithApiToken()` instead of custom `OOT_RELAY_TOKEN` auth | [test-infra#8144](https://github.com/pytorch/test-infra/pull/8144) | **Merged** (2026-06-04) |
+| Remove `max-retries`/`retry-delay` from callback action (caused duplicate state transitions) | [test-infra#8145](https://github.com/pytorch/test-infra/pull/8145) | **Merged** (2026-06-04) |
+| Set default `HUD_API_URL` on Lambda (unblocked E2E pipeline) | [test-infra#8147](https://github.com/pytorch/test-infra/pull/8147) | **Merged** (2026-06-04) |
+| Rename HUD page routes `/oot` → `/crcr` | [test-infra#8142](https://github.com/pytorch/test-infra/pull/8142) | **Merged** (2026-06-08) |
+
+### Phase 5: End-to-End Validation — COMPLETE
 
 | Task | PR / Item | Status |
 |------|-----------|--------|
 | L2 test workflow (`pytorch/crcr-test`) with simulated tests and callbacks | [crcr-test#4](https://github.com/pytorch/crcr-test/pull/4) | **Merged** (2026-06-02) |
 | Callback → Lambda | Working | Callbacks reporting HTTP 200 |
-| Lambda → HUD forwarding | **Blocked** | `HUD_API_URL` not yet provisioned as Lambda env var. Fix: configure via `crcr-prod` GitHub Environment Secrets |
-| DynamoDB → ClickHouse → HUD display | Untested | Blocked on Lambda env var provisioning |
+| Lambda → HUD forwarding | Working | `HUD_API_URL` provisioned via [#8147](https://github.com/pytorch/test-infra/pull/8147) |
+| DynamoDB → ClickHouse → HUD display | Working | E2E pipeline active — `pytorch/crcr-test` dispatches are flowing through to ClickHouse |
 
 ### Phase 6: Security Hardening (Future)
 
@@ -1049,15 +1061,18 @@ No documentation reorganization is needed. The `/oot` pages are self-discoverabl
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Provision `HUD_API_URL` + `HUD_BOT_KEY` via GitHub Environment Secrets | Pending | Coordinating with infra team |
-| Set `OOT_RELAY_TOKEN` on Vercel | Pending | Must match `HUD_BOT_KEY` |
-| Rename `/oot` → `/crcr` in HUD pages | Planned | Per feedback from @malfet and @jathu |
-| L3/L4 check run management | [test-infra#8119](https://github.com/pytorch/test-infra/pull/8119) | WIP |
-| Onboard real downstream repos | Pending | After E2E validation |
+| L3/L4 upstream check run management | [test-infra#8119](https://github.com/pytorch/test-infra/pull/8119) | Open — device-based allowlist, check run creation, re-run support |
+| State machine key: `check_run_id` → `{run_id}:{run_attempt}` | [test-infra#8170](https://github.com/pytorch/test-infra/pull/8170) | Open |
+| Clarify accepted `conclusion` values in callback action | [test-infra#8173](https://github.com/pytorch/test-infra/pull/8173) | Open |
+| On-call bot for downstream CI failures | [test-infra#8183](https://github.com/pytorch/test-infra/pull/8183) | Open |
+| Add CRCR CI Summary link to HUD navigation bar | [test-infra#8158](https://github.com/pytorch/test-infra/pull/8158) | Open |
+| Onboard real downstream repos | Pending | After L3/L4 lands |
 
 ## Resolution
 
-Phases 1–4 are **complete** — all code is merged into `pytorch/test-infra`. The end-to-end pipeline is blocked on Lambda environment variable provisioning (`HUD_API_URL`), which is being coordinated with the infra team. Once provisioned, data will flow from the `pytorch/crcr-test` L2 test workflow through DynamoDB and ClickHouse to the HUD pages.
+Phases 1–5 are **complete** — all code is merged into `pytorch/test-infra` and the end-to-end pipeline is live. The `pytorch/crcr-test` L2 test workflow dispatches are flowing through the full pipeline: Downstream CI → Callback Lambda → HUD API → DynamoDB → ClickHouse → HUD pages at `hud.pytorch.org/crcr`.
 
-Naming rename (`/oot` → `/crcr`) is planned as a follow-up PR per maintainer feedback.
+Key post-merge improvements (Phase 4.5) addressed production issues discovered during E2E validation: auth header alignment to avoid HUD rate-limiting, removal of action-level retries that conflicted with the state machine, and provisioning the `HUD_API_URL` Lambda environment variable.
+
+Active work is focused on L3/L4 check run management ([#8119](https://github.com/pytorch/test-infra/pull/8119)) and onboarding real downstream backends.
 
