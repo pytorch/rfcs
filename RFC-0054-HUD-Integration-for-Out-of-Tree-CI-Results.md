@@ -485,7 +485,7 @@ Key design decisions:
 Key:    oot:rate:{verified_repo}
 Value:  counter (atomic INCR)
 TTL:    1 minute sliding window
-Limit:  20 requests/minute per repo (configurable via RATE_LIMIT_PER_MIN)
+Limit:  60 requests/minute per repo (configurable via RATE_LIMIT_PER_MIN)
 ```
 
 Rejects at the relay before any HUD/DB traffic. First line of defense against runaway CI loops.
