@@ -998,81 +998,30 @@ No documentation reorganization is needed. The `/crcr` pages are self-discoverab
 
 ## Implementation Plan
 
-### Phase 1: Storage Layer — COMPLETE
+The implementation follows a 6-phase rollout:
 
-| Task | PR | Status |
-|------|-----|--------|
-| Provision `torchci-oot-workflow-job` DynamoDB table | [meta-pytorch/pytorch-gha-infra#1064](https://github.com/meta-pytorch/pytorch-gha-infra/pull/1064) | Provisioned |
-| Create `default.oot_workflow_job` ClickHouse table | [test-infra#8105](https://github.com/pytorch/test-infra/pull/8105) | **Merged** (2026-05-21) |
-| Add replicator mapping | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
+| Phase | Scope | Status |
+|-------|-------|--------|
+| **1. Storage Layer** | DynamoDB table, ClickHouse table, replicator mapping | **Complete** |
+| **2. HUD API Endpoint** | Types, extraction, `UpdateItem` write logic, POST handler | **Complete** |
+| **3. Relay Integration** | Callback handler (OIDC, allowlist, rate limiting, state machine), composite action | **Complete** |
+| **4. HUD Frontend Pages** | ClickHouse queries, `/crcr` summary, `/crcr/[org]/[repo]` dashboard, PR page section | **Complete** |
+| **5. End-to-End Validation** | L2 test workflow, full pipeline verification (callback → Lambda → HUD → DynamoDB → ClickHouse) | **Complete** |
+| **6. Security Hardening** | Signed callback token, token verification, orphaned job detection | **Planned** |
 
-### Phase 2: HUD API Endpoint — COMPLETE
-
-| Task | PR | Status |
-|------|-----|--------|
-| `ootUtils.ts` — types, extraction, `UpdateItem` write logic, unit tests | [test-infra#8110](https://github.com/pytorch/test-infra/pull/8110) | **Merged** (2026-05-22) |
-| `/api/oot/results` — POST handler with `x-hud-internal-bot` auth, 2MB cap | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
-
-### Phase 3: Relay Integration — COMPLETE
-
-| Task | PR | Status |
-|------|-----|--------|
-| Callback handler with OIDC auth, allowlist, rate limiting, HUD forwarding, Redis state machine | [test-infra#7967](https://github.com/pytorch/test-infra/pull/7967) | **Merged** (2026-05-22) |
-| Composite action (`cross-repo-ci-relay-callback`) with default callback URL | [test-infra#8133](https://github.com/pytorch/test-infra/pull/8133) | **Merged** (2026-06-02) |
-
-### Phase 4: HUD Frontend Pages — COMPLETE
-
-| Task | PR | Status |
-|------|-----|--------|
-| ClickHouse queries (`oot_summary`, `oot_backend_dashboard`, `oot_pr_results`) | [test-infra#8110](https://github.com/pytorch/test-infra/pull/8110) | **Merged** (2026-05-22) |
-| `/crcr` summary page, `/crcr/[org]/[repo]` dashboard, `OotPrSection` component | [test-infra#8111](https://github.com/pytorch/test-infra/pull/8111) | **Merged** (2026-05-26) |
-| PR page integration | [test-infra#8112](https://github.com/pytorch/test-infra/pull/8112) | **Merged** (2026-05-30) |
-
-### Phase 4.5: Post-Merge Improvements — COMPLETE
-
-| Task | PR | Status |
-|------|-----|--------|
-| Fix relay auth header: send `HUD_BOT_KEY` via `x-hud-internal-bot` (fixed 429 rate-limit errors) | [test-infra#8143](https://github.com/pytorch/test-infra/pull/8143) | **Merged** (2026-06-04) |
-| HUD API: use standard `checkAuthWithApiToken()` instead of custom `OOT_RELAY_TOKEN` auth | [test-infra#8144](https://github.com/pytorch/test-infra/pull/8144) | **Merged** (2026-06-04) |
-| Remove `max-retries`/`retry-delay` from callback action (caused duplicate state transitions) | [test-infra#8145](https://github.com/pytorch/test-infra/pull/8145) | **Merged** (2026-06-04) |
-| Set default `HUD_API_URL` on Lambda (unblocked E2E pipeline) | [test-infra#8147](https://github.com/pytorch/test-infra/pull/8147) | **Merged** (2026-06-04) |
-| Rename HUD page routes `/oot` → `/crcr` | [test-infra#8142](https://github.com/pytorch/test-infra/pull/8142) | **Merged** (2026-06-08) |
-
-### Phase 5: End-to-End Validation — COMPLETE
-
-| Task | PR / Item | Status |
-|------|-----------|--------|
-| L2 test workflow (`pytorch/crcr-test`) with simulated tests and callbacks | [crcr-test#4](https://github.com/pytorch/crcr-test/pull/4) | **Merged** (2026-06-02) |
-| Callback → Lambda | Working | Callbacks reporting HTTP 200 |
-| Lambda → HUD forwarding | Working | `HUD_API_URL` provisioned via [#8147](https://github.com/pytorch/test-infra/pull/8147) |
-| DynamoDB → ClickHouse → HUD display | Working | E2E pipeline active — `pytorch/crcr-test` dispatches are flowing through to ClickHouse |
-
-### Phase 6: Security Hardening (Future)
-
-| Task | Status |
-|------|--------|
-| Signed callback token minting at L1 dispatch | Planned |
-| Token verification at callback handler | Planned |
-| Orphaned job detection (unconsumed tokens → auto-mark as `timed_out`) | Planned |
-
-> **Note:** The 3-state machine (`DISPATCHED → IN_PROGRESS → COMPLETED`) is already implemented in Phase 3 (PR #7967). Phase 6 covers the additional callback token for dispatch provenance and replay prevention.
+> **Note:** The 3-state machine (`DISPATCHED → IN_PROGRESS → COMPLETED`) is already implemented in Phase 3. Phase 6 covers the additional callback token for dispatch provenance and replay prevention.
 
 ### Remaining Work
 
-| Item | Status | Notes |
-|------|--------|-------|
-| L3/L4 upstream check run management | [test-infra#8119](https://github.com/pytorch/test-infra/pull/8119) | Open — device-based allowlist, check run creation, re-run support |
-| State machine key: `check_run_id` → `{run_id}:{run_attempt}` | [test-infra#8170](https://github.com/pytorch/test-infra/pull/8170) | Open |
-| Clarify accepted `conclusion` values in callback action | [test-infra#8173](https://github.com/pytorch/test-infra/pull/8173) | Open |
-| On-call bot for downstream CI failures | [test-infra#8183](https://github.com/pytorch/test-infra/pull/8183) | Open |
-| Add CRCR CI Summary link to HUD navigation bar | [test-infra#8158](https://github.com/pytorch/test-infra/pull/8158) | Open |
-| Onboard real downstream repos | Pending | After L3/L4 lands |
+- L3/L4 upstream check run management (device-based allowlist, check run creation, re-run support)
+- State machine key migration: `check_run_id` → `{run_id}:{run_attempt}`
+- Clarify accepted `conclusion` values in callback action
+- Add CRCR CI Summary link to HUD navigation bar
+- Onboard real downstream backends
 
 ## Resolution
 
-Phases 1–5 are **complete** — all code is merged into `pytorch/test-infra` and the end-to-end pipeline is live. The `pytorch/crcr-test` L2 test workflow dispatches are flowing through the full pipeline: Downstream CI → Callback Lambda → HUD API → DynamoDB → ClickHouse → HUD pages at `hud.pytorch.org/crcr`.
+Phases 1–5 are **complete** — all code is merged into `pytorch/test-infra` and the end-to-end pipeline is live. Dispatches from `pytorch/crcr-test` flow through the full pipeline: Downstream CI → Callback Lambda → HUD API → DynamoDB → ClickHouse → HUD pages at `hud.pytorch.org/crcr`.
 
-Key post-merge improvements (Phase 4.5) addressed production issues discovered during E2E validation: auth header alignment to avoid HUD rate-limiting, removal of action-level retries that conflicted with the state machine, and provisioning the `HUD_API_URL` Lambda environment variable.
-
-Active work is focused on L3/L4 check run management ([#8119](https://github.com/pytorch/test-infra/pull/8119)) and onboarding real downstream backends.
+Active work is focused on L3/L4 check run management and onboarding real downstream backends.
 
