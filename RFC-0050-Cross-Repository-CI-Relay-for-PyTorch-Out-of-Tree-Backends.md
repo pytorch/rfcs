@@ -176,7 +176,7 @@ The allowlist is the core control mechanism of the Relay Server. It determines h
 | Field | Type | Description | Default |
 | :--- | :--- | :--- | :--- |
 | `forward_event` | bool | Controls whether upstream PR events are forwarded to this downstream repo. Acts as a gate to prevent abuse from unauthorized large-scale installations. | `false` |
-| `display_on_hud` | bool | Controls whether downstream CI results are shown on the dedicated OOT HUD page (`hud.pytorch.org/oot/[org]/[repo]`). | `false` |
+| `display_on_hud` | bool | Controls whether downstream CI results are shown on the dedicated OOT HUD page (`hud.pytorch.org/crcr/[org]/[repo]`). | `false` |
 | `display_on_pr` | string | Controls whether downstream CI results can be shown as a Check Run in the **PR Checks** list. <br/> **Options:** <br/> `always`, `label_only`, `false` | `false` |
 | `block_pr` | bool | Controls whether the Check Run shown in **PR Checks** can block PR merges. | `false` |
 
@@ -310,8 +310,8 @@ jobs:
 
 The PyTorch CI HUD (hud.pytorch.org) is a CI status dashboard maintained by the PyTorch team. It shows all CI job runs for every commit and PR. To minimize the impact of downstream repo results on the PyTorch HUD, this proposal introduces the following HUD integration strategy:
 
-- **Dedicated OOT repo page (`hud.pytorch.org/oot/[org]/[repo]`):** Available from L2 onwards. Downstream CI results are shown on a dedicated page for the downstream repo. The layout is similar to the main HUD page, but focused only on the test history of a single downstream repo. It gives OOT Maintainers a self-service CI health dashboard without affecting any upstream views.
-- **Global OOT CI summary page:** Primarily for PyTorch CI Maintainers. Provides a global view of OOT CI health across all repos. Makes it easy to spot widespread OOT infrastructure issues or identify repos that may need to be downgraded.
+- **Dedicated OOT repo page (`hud.pytorch.org/crcr/[org]/[repo]`):** Available from L2 onwards. Downstream CI results are shown on a dedicated page for the downstream repo. The layout is similar to the main HUD page, but focused only on the test history of a single downstream repo. It gives OOT Maintainers a self-service CI health dashboard without affecting any upstream views.
+- **Global OOT CI summary page (`hud.pytorch.org/crcr`):** Primarily for PyTorch CI Maintainers. Provides a global view of OOT CI health across all repos. Makes it easy to spot widespread OOT infrastructure issues or identify repos that may need to be downgraded.
 - **HUD PR view (`hud.pytorch.org/pr/<number>`):** For L3/L4 repos, OOT check results are displayed in the PR-level HUD view under a dedicated "Out-of-Tree Backends" section, grouped alongside standard CI results. This ensures developers and Maintainers can see OOT CI status in their normal PR review workflow without switching to a separate page.
 - **Main HUD page:** Only shows `L4` (required) Check Runs, ensuring the main dashboard stays focused on signals that every PyTorch contributor needs to care about.
 
