@@ -99,7 +99,7 @@ The GitHub App is the **authentication and decoupling hub** of the entire design
 - **Upstream/downstream decoupling:** Downstream repos **only need to install this App to join the cross-repo CI coordination**. Downstream repos do not need an upstream token, and the upstream does not need to know about the downstream. All interactions are bridged through the GitHub App and Relay Server.
 
 > \[!NOTE\]
-> This GitHub App should be created under the `pytorch` organization and owned by the PyTorch team or the LF AI & Data Foundation team, to ensure credibility. An App created by a third party will face trust issues during installation and adoption.
+> This GitHub App should be created under the `pytorch` organization and owned by the PyTorch team or the LF Pytorch Foundation, to ensure credibility. An App created by a third party will face trust issues during installation and adoption.
 
 ### Permissions / Events
 
@@ -209,6 +209,193 @@ L3:
 L4:
     - org5/repo5: @oncall1,oncall2
 ```
+
+### Detailed Design
+
+The level table above defines policy. This section makes the intended `L1` through `L4` runtime behavior explicit, along with the related Check Run re-run flow, so that future `L1` through `L4` work can follow a single design reference.
+
+#### L1: Event Forwarding Only
+
+```mermaid
+%%{init: {"theme": "base"}}%%
+sequenceDiagram
+    participant U as UpStream Repo
+    participant W as webhook_handler
+    participant R as Redis
+    participant S as result_handler
+    participant D as DownStream Repo
+
+    U->>W: PR/Push event trigger
+    W->>R: Get Allowlist
+    W->>D: Passthrough Payload
+```
+
+`L1` is the most basic event forwarding layer. Its core goal is to allow the upstream PyTorch repository to safely forward PR and push events to onboarded downstream repositories, without writing any status back to the upstream side.
+
+The flow in the diagram is straightforward:
+
+1. An upstream PR event (`opened`/`reopened`/`synchronize`/`closed`) or push event triggers `webhook_handler` through the GitHub App.
+2. `webhook_handler` reads the `Allowlist` from a remote source and stores it in `Redis` to reduce follow-up calls, determining which downstream repositories should receive the event.
+3. The `payload` is then passed through directly to the downstream repositories.
+
+At `L1`, no HUD record is created and no upstream Check Run is created or updated.
+
+#### L2: HUD Reporting
+
+```mermaid
+%%{init: {"theme": "base"}}%%
+sequenceDiagram
+    participant U as UpStream Repo
+    participant W as webhook_handler
+    participant R as Redis
+    participant S as result_handler
+    participant D as DownStream Repo
+    participant H as HUD
+
+    U->>W: PR/Push event trigger
+    W->>R: Get Allowlist
+    W->>D: Passthrough Payload
+
+    rect rgb(240, 240, 240)
+    Note over S, D: Creating In Progress in HUD
+    D->>S: In progress call
+    S->>R: Get Allowlist
+    S->>H: Show in progress on HUD
+    end
+    rect rgb(240, 240, 240)
+    Note over S, D: Updating Status in HUD
+    D->>S: Completed workflow run call
+    S->>R: Get Allowlist
+    S->>H: Show completed on HUD
+    end
+```
+
+`L2` adds the ability to report results back to HUD on top of `L1`. The first half of the diagram is the same as `L1`: the upstream event enters `webhook_handler`, the `Allowlist` is read, and the downstream repository is triggered. The new behavior is the callback path from the downstream workflow back into the Relay Server:
+
+- When the downstream workflow run starts running, it sends an `in_progress` callback to `result_handler`.
+  1. `DownStream Repo` actively sends a callback request to `result_handler` from the first job in the workflow.
+  2. After authenticating the request, `result_handler` reads the `Allowlist` to verify whether the request from this `DownStream Repo` belongs to `L2` or above.
+  3. If the request is valid, the run information triggered by the workflow is written to HUD and marked as `in_progress`.
+- When the workflow run finishes, it sends a `completed` callback.
+  1. `DownStream Repo` actively sends a callback request to `result_handler` from the last job in the workflow.
+  2. After authenticating the request, `result_handler` reads the `Allowlist` to verify whether the request from this `DownStream Repo` belongs to `L2` or above.
+  3. If the request is valid, the run information triggered by the workflow is written to HUD and marked as `completed`.
+
+At `L2`, results are visible on HUD, but they still do not appear as upstream PR Check Runs.
+
+#### L3: Label-Gated PR Checks
+
+```mermaid
+%%{init: {"theme": "base"}}%%
+sequenceDiagram
+    participant U as UpStream Repo
+    participant W as webhook_handler
+    participant R as Redis
+    participant RH as result_handler
+    participant D as DownStream Repo
+    participant H as HUD
+
+    U->>W: PR/Push event trigger
+    W->>R: Get Allowlist
+    W->>D: Passthrough payload
+
+    rect rgb(240, 240, 240)
+        Note over R, D: Scenario 1: label add before workflow run create
+        U->>W: PR label add
+        W->>R: Cache PR label info
+    end
+
+    D->>RH: In progress workflow run call
+    RH->>R: Get Allowlist<br>Cache workflow run info
+    RH->>H: Show in progress workflow run on HUD
+
+    rect rgb(240, 240, 240)
+        Note over R, D: Scenario 1
+        RH->>R: Find PR label info record
+        RH->>U: Create PR in_progress check run
+    end
+
+    rect rgb(240, 240, 240)
+        Note over R, D: Scenario 2: label add during workflow run execute
+        U->>W: PR label add
+        W->>R: Find workflow run info
+        W->>U: Create PR in_progress check run
+    end
+
+    D->>RH: Completed workflow run call
+    RH->>R: Get Allowlist<br>Update workflow run info
+    RH->>H: Show completed workflow run on HUD
+
+    rect rgb(240, 240, 240)
+        Note over R, D: Scenario 1 & 2
+        RH->>U: Update PR completed check run
+    end
+
+    rect rgb(240, 240, 240)
+        Note over R, D: Scenario 3: label add after run complete
+        U->>W: PR label add
+        W->>R: Find workflow run info
+        W->>U: Create PR completed check run
+    end
+```
+
+`L3` keeps the HUD display capability from `L2` and further introduces on-demand upstream PR Check Runs. Consistent with the `label_only` design in this RFC, this layer does not attach downstream results to every PR by default. Instead, the status of the corresponding backend is shown as a non-blocking upstream check only after a label is explicitly added to the PR. The key of `L3` is whether the label event or the downstream workflow run status arrives first. Because of that, both sides of the information need to be temporarily stored in Redis, and the Check Run is created or updated when the timing is right.
+
+`L3` has the following three scenarios:
+
+- Scenario 1 means the label arrives before the workflow run.
+  1. `webhook_handler` first caches the label information in `Redis`.
+  2. The downstream workflow run starts and calls back to `result_handler`. After finding the matching label record in the cache, `result_handler` immediately creates an `in_progress` Check Run on the upstream PR.
+  3. After the workflow run completes and `DownStream Repo` sends the completed callback to `result_handler`, `result_handler` updates both the workflow run status in `Redis` and the Check Run status on the PR.
+- Scenario 2 means the workflow run is already executing and the label arrives later.
+  1. When `result_handler` receives the `in_progress` callback from `DownStream Repo`, it first caches the workflow run information.
+  2. After the user adds a label to the PR, `webhook_handler` looks up that workflow run record in reverse and backfills an `in_progress` Check Run.
+  3. After the workflow run completes and `DownStream Repo` sends the completed callback to `result_handler`, `result_handler` updates both the workflow run status in `Redis` and the Check Run status on the PR.
+- Scenario 3 is the later case where the downstream workflow run has already completed before the user adds the label.
+  1. In this case, `webhook_handler` directly creates a `completed` Check Run based on the workflow run result already stored in `Redis`, without re-triggering execution.
+  2. If the record for that workflow run has already been removed from `Redis`, the Check Run will not be created.
+
+> [!NOTE]
+> The Redis cache TTL is tentatively set to `3 days` to align with the workflow integration requirements, so Redis data will not grow indefinitely.
+
+#### L4: Always-On PR Checks
+
+`L4` uses the same callback and synchronization behavior as `L3`, but it does not wait for a label. The `L4` scenario is effectively the same as `L3` Scenario 1 except that the downstream result is represented in upstream PR Checks by default, without requiring explicit labeling.
+
+Since `L4` may also be merge-blocking, it should remain reserved for a small set of backends with sufficiently reliable infrastructure and clear ownership.
+
+#### Check Run Re-Run Flow
+
+```mermaid
+%%{init: {"theme": "base"}}%%
+sequenceDiagram
+    participant U as UpStream Repo
+    participant W as webhook_handler
+    participant R as Redis
+    participant RH as result_handler
+    participant D as DownStream Repo
+    participant H as HUD
+
+    U->>W: Re-run workflow run trigger
+    W->>R: Get Allowlist
+    W->>D: Re-run dispatch
+    D->>RH: In progress workflow run call
+    RH->>R: Get Allowlist
+    RH->>U: Update in progress check run
+    RH->>H: Update in progress workflow run in HUD
+    D->>RH: Completed workflow run call
+    RH->>R: Get Allowlist
+    RH->>U: Update completed check run
+    RH->>H: Update completed workflow run on HUD
+```
+
+This diagram focuses on the re-run scenario:
+
+1. After the upstream side triggers a workflow run re-run request from a Check Run, `webhook_handler` first reads the `Allowlist` and then dispatches the re-run request to the downstream side.
+2. After the downstream side re-runs the workflow run, it uses `result_handler` to synchronize the `in_progress` and `completed` states back to the upstream Check Run and HUD, which is almost the same as `L2` and `L3`.
+
+> [!NOTE]
+> When a Check Run is created, the workflow run's `run_id` is stored in the payload's `external_id`. When a re-run is triggered, the corresponding workflow run can be found by looking up the `external_id` in the Check Run payload.
 
 ### Evolution Path
 
