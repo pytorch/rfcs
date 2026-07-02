@@ -1,4 +1,4 @@
-This page contains instructions on how to propose and implement feature changes to PyTorch.
+This page contains instructions on how to propose and implement feature changes to PyTorch and its CI/CD infrastructure.
 
 # Proposing a Feature to Pytorch
 
