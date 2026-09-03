@@ -245,7 +245,7 @@ Need to include tests that verify:
 - An implemented multi-output operation returns the correct values
 
 
-## **Example Multi-Output Operations**
+## **Potential Use Cases**
 
 ### flex_attention Forward
 **Outputs:** (out, logsumexp, max_scores)
@@ -254,19 +254,36 @@ Need to include tests that verify:
 - Treats logsumexp and max_scores as mutated buffers, then lowering manually recombines output tuple
 - No ATen ExternKernelChoice is included in autotuning
 
+**With multi-output IR:**
+- Template would describe all three outputs directly, so autotuning would return the real outputs and the lowering could return them directly; makes the IR cleaner, matching the real output contract, no longer including non-inputs in the input list
+- Outputs would be normal produced buffers, rather than mutated input buffers; easier for scheduling, dependency tracking, and future transformations.
+- logsumexp and max_scores are currently allocated before template selection; after the change, lifetime of all outputs begin at flex_attention, giving the memory planner a clearer picture
+- Autotune contract would match the real output contract, so it would be possible to include an external choice (without including the copy-operation of the other outputs into the preallocated mutated buffers in the autotuning) and to compare different implementation families 
+
 ### flex_attention backward
-**Outputs:** (grad_query, grad_key, grad_value)
+**Outputs:** (grad_query, grad_key, grad_value, captured_grads)
 
 **Current behaviour:**
-- Treats grad_key and grad_value as mutated buffers, then lowering manually recombines output tuple
+- Treats grad_key, grad_value and captured_grads as mutated buffers, then lowering manually recombines output tuple
 - No ATen ExternKernelChoice is included in autotuning
+
+**With multi-output IR:**
+- The IR would match the real backward contract better
+- Mutation tracking becomes less noisy, because gradient outputs are no longer modeled as mutated inputs
+- Memory planning becomes clearer, because all gradient buffers are owned by the selected backward op
+- Autotune contract would match the real output contract, so it would be possible to include an external choice (without including the copy-operation of the other outputs into the preallocated mutated buffers in the autotuning) and to compare different implementation families 
+
 
 ### flex_flash_attention Forward
-**Outputs:** (template_output, lse)
+**Outputs:** (output, lse)
 
 **Current behaviour:**
-- Treats lse as a mutated buffer, then lowering manually recombines output tuple
+- Lowering allocates lse itself, passes it in as an input, marks it as mutated then manually recombines the output tuple
 - No ATen ExternKernelChoice is included in autotuning
+
+**With multi-output IR:**
+- lse would be treated as a direct output, rather than as an input that gets mutated; this would make it easier for scheduling, alias analysis, mutation tracking and reasoning about correctness
+- Autotune contract would match the real output contract, so it would be possible to include an external choice (without including the copy-operation of the returned lse into the preallocated mutated buffer in the autotuning) and to compare different implementation families 
 
 ### flex_flash_attention Backward
 **Outputs:** (grad_query, grad_key, grad_value)
@@ -274,6 +291,10 @@ Need to include tests that verify:
 **Current behaviour:**
 - Treats grad_key and grad_value as mutated buffers, then lowering manually recombines output tuple
 - No ATen ExternKernelChoice is included in autotuning
+
+**With multi-output IR:**
+- Template outputs would be (grad_query, grad_key, grad_value), and lowering could return them directly
+- Could include ExternKernelChoice in autotuning
 
 ### flex_decoding
 **Outputs:** (output, logsumexp)
@@ -283,12 +304,49 @@ Need to include tests that verify:
 - After autotuning, logsumexp and output are computed from intermediates using seperate lowerings/reductions
 - No ATen ExternKernelChoice is included in autotuning
 
+**With multi-output IR:**
+- Could return the intermediate buffers as real template outputs, rather than having the lowering receive one output and two mutated inputs; cleaner IR
+- In the future, could autotune a whole flex_decoding implementation (with ExternKernelChoice) that returns the final (output, logsumexp), but would require including the current post-template reductions in the benchmarked candidates
+
 ### convolution_backward
 **Outputs:** (dx, dw, db)
 
 **Current behaviour:**
 - Splits operation into three independent autotune problems, one for each output
 - aten.convolution_backward.out included in the autotuning with only one output requested at a time
+
+**With multi-output IR:**
+- Already sidesteps the multi-output problem by splitting the calculation
+- Opens up the possibility of refactoring this op so that the Triton candidate matches the multi-output form exposed by ATen.
+  
+
+### flex_gemm_hop with QUACK backend and tuple epilogue
+**Outputs:** (result, aux_out)
+
+**Current behaviour:**
+- In torch/_inductor/kernel/flex_gemm/lowering.py, the lowering inspects the FX subgraph; if the subgraph returns a tuple/list, it treats the first item as the main output and rest as aux outputs
+- The aux output is allocated manually in the lowering then appended to the template input list and marked as mutated
+- After autotuning, the Inductor gets back only the primary output, the lowering manually returns the aux_outs
+
+**With multi-output IR:**
+- It could describe result and aux_out as real outputs, then autotune all outputs as one contract
+- The selected choice owns both output nodes, and the lowering returns selected real outputs
+
+### Metal/MPS flex attention
+**Outputs:** (out, logsumexp, max_scores)
+
+**Current behaviour:**
+- In torch/_inductor/kernel/flex/flex_mps.py, decides whether Metal shader should write auxiliary outputs (i.e. only writing logsumexp and max_scores if those flags are enabled)
+- It uses the normal attention layout (which describes only the main out tensor); it then allocates the auxiliary buffers and, if the shader needs to write them, realises them and appends them to the node inputs
+- When it creates the MetalFlexAttention node, the num_mutated_outputs designates how many of the inputs are actually output buffers written in place
+- The lowering manually rebuilds the output tuple and returns that
+
+**With multi-output IR:**
+- Create output layouts for out, logsumexp and max_scores
+- Create one multi-output Metal node
+- Codegen allocates/passes all output buffers
+- Returns child output nodes directly
+- This path does not use autotune_select_algorithm; the value in implementing this change would be cleaner IR and dependency modelling
 
 ## **Metrics**
 What are the main metrics to measure the value of this feature? 
