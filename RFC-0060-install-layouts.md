@@ -15,9 +15,9 @@ extension) sit relative to the Python sources, so code that derives paths from
 the shipped 2.14.0 artifacts and of real editable installs; (2) state two
 resolution rules for in-tree code, one for resources it reads and one for
 directories it hands to external tools; (3) settle where the documentation
-lives; and (4) align the standalone
-`cmake --install` recipe and `tools/build_libtorch.py` with the libtorch zips
-through three build defaults.
+lives; and (4) align the standalone `cmake --install` recipe and
+`tools/build_libtorch.py` with the libtorch zips through three build
+defaults.
 
 
 ## **Motivation**
@@ -123,12 +123,13 @@ provides.
 
 ### What each shape puts under `torch/`
 
-Sources: the 2.14.0 CPU wheels for Linux x86_64, Linux aarch64, macOS arm64
-and Windows amd64 and the 2.14.0 libtorch zips for the three platforms (file
-lists from the zip central directories); editable installs on Linux (CUDA),
-macOS and Windows (scikit-build-core 1.0.x); and a `BUILD_PYTHON_ONLY=ON`
-configure with the destinations read out of every generated
-`cmake_install.cmake`.
+From listings of the 2.14.0 CPU wheels and libtorch zips for Linux, macOS
+and Windows, editable installs on the same three platforms, and a
+`BUILD_PYTHON_ONLY=ON` configure. Sources, the per-category counts, the
+consumer groups and the provenance of each directory are in
+[`RFC-0060-assets/artifact-inventory.md`](RFC-0060-assets/artifact-inventory.md);
+[`RFC-0060-assets/list-wheel-contents.py`](RFC-0060-assets/list-wheel-contents.py)
+regenerates the wheel and zip listings for any release.
 
 | directory | shape 1, wheel | shape 2, installed tree in site-packages | shape 2, checkout `torch/` | shape 3, libtorch zip | python-only modifier (derived) |
 |---|---|---|---|---|---|
@@ -147,51 +148,22 @@ Three notes:
   docs) from the wheel but not from the editable staging tree. A probe that
   keys on those files, or on file counts, misclassifies an editable install;
   a probe on `lib/` does not.
-* **Some Python files exist only because the build made them.** Measured on
-  the 2.14.0 Linux wheel against the `v2.14.0` tag and the editable trees.
-  Generated into the checkout (gitignored) and installed, so present in both
-  trees under shape 2: `torch/version.py`,
-  `torch/testing/_internal/generated/annotated_fn_args.py`, the seven `.pyi`
-  stubs generated from `.pyi.in` (`torch/_C/__init__.pyi`, `_nn.pyi`,
-  `_VariableFunctions.pyi`, `torch/_VF.pyi`, `torch/return_types.pyi`,
-  `torch/nn/functional.pyi`, `torch/utils/data/datapipes/datapipe.pyi`), the
-  CUPTI stub module under `torch/profiler/_cuspy/` on CUDA builds, and
-  `torch/_rocm_init.py` on ROCm builds. Install tree only: the cutedsl kernel
-  package under `torch/_inductor/kernel/vendored_templates/cutedsl/kernels/`,
-  mirrored from `third_party/cutlass`, and `torchgen/packaged/` (twelve
-  `.py` files from `tools/autograd` plus the ATen yaml and templates).
-  Imports of both classes are deterministic: the editable finder maps every
-  CMake-installed module to the install tree, and the gitignored checkout
-  copies never enter the package walk. `importlib.resources` on the first
-  class is the both-trees case: `files("torch") / "version.py"`, or a stub
-  read as data, goes to whichever tree the finder listed first, which today
-  varies with the hash seed. A stale checkout stub from an older build is how
-  this bites.
-* **The Linux wheels ship test artifacts** the other platforms do not:
-  `torch/test/` (C++ test binaries), test executables and upgrader models
-  under `bin/`, and `lib{jitbackend,torchbind}_test`,
-  `libbackend_with_compiler`, `libaoti_custom_ops` under `lib/`, about 150 MB.
-  The Linux zip inherits the four libraries. `BUILD_TEST` defaults to ON with
-  `INSTALL_TEST` following it; the macOS and Windows CD jobs turn it off, the
-  Linux manywheel jobs do not. A CD configuration gap, out of scope here.
-
-### Where each directory comes from
-
-* `bin/protoc(.exe)`: the vendored protobuf's own install rules
-  (`protobuf_INSTALL`, default ON, never overridden), whenever
-  `BUILD_CUSTOM_PROTOBUF=ON` (default); `USE_SYSTEM_LIBS` turns it off.
-* `bin/torch_shm_manager`: `torch/lib/libshm/CMakeLists.txt`, non-MSVC only,
-  gated on `BUILD_PYTHON`; `libshm_windows` installs only `lib/` and
-  `include/`. MSVC with system protobuf has no `bin/` at all.
-* `BUILD_TEST` (default ON; installed while `INSTALL_TEST` follows it) puts
-  test executables under `bin/` and `test/` and test libraries under `lib/`.
-  The other `bin/` producers are off by default: `BUILD_BINARY`,
-  `BUILD_BUNDLE_PTXAS` (CUDA manywheels only).
-* `lib/`: present in every shape. `lib/torch_python` is installed by
-  `torch/CMakeLists.txt` whenever `BUILD_PYTHON` is on, python-only modifier
-  included; `BUILD_PYTHON=OFF` skips that file, so shape 3 has none.
-* `share/cmake/Torch/TorchConfig.cmake`: `caffe2/CMakeLists.txt` inside
-  `if(NOT BUILD_LIBTORCHLESS)`; absent under the python-only modifier.
+* **Some Python files exist only because the build made them.** One class
+  is generated into the checkout (gitignored) and installed, so it exists in
+  both trees under shape 2: `torch/version.py`, the generated `.pyi` stubs,
+  `annotated_fn_args.py`, and the CUDA and ROCm specific modules. The other
+  exists in the install tree only: the mirrored cutedsl kernel package and
+  `torchgen/packaged/`. Imports of both resolve deterministically, because
+  the editable finder maps every CMake-installed module to the install tree
+  and gitignored checkout copies never enter the package walk.
+  `importlib.resources` on the first class is the both-trees case: a stub
+  read as data goes to whichever tree the finder listed first, which today
+  varies with the hash seed. Full list in the inventory asset.
+* **The Linux wheels ship test artifacts** the other platforms do not,
+  about 150 MB under `test/`, `bin/` and `lib/`, because `BUILD_TEST`
+  defaults to ON and only the macOS and Windows CD jobs turn it off. The
+  Linux zip inherits the four test libraries. A CD configuration gap, out of
+  scope here.
 
 ### The standalone shape: proposed defaults
 
@@ -239,19 +211,13 @@ install. Proposed: the default prefix becomes a `libtorch/` directory beside
 the build directory the script creates (`<cwd>/build` and `<cwd>/libtorch`),
 `--install-prefix` overrides it, and the script refuses a prefix inside the
 source tree. Callers run from a scratch directory, as every CI caller already
-does. Consumers checked:
-
-* The Linux libtorch trunk jobs build in `/tmp/cpp-build` and are build-only
-  (`build-generates-artifacts: false`); nothing reads their install tree.
-* The macOS C++ API test and the lightweight-dispatch test run binaries from
-  their build directories, not the prefix.
-* The Windows arm64 libtorch script is the one consumer: it moves
-  `torch\{bin,cmake,include,lib,share,test}` into `libtorch\` by hand, moving
-  the DLLs from `bin\` to `lib\` on the way. With the new default it reads
-  the prefix and the moves go away. (Its DLL move also makes the arm64 zip
-  differ from the x64 zip's `bin\` convention; noted for the zip packaging.)
-* The `BUILD_PYTHONLESS` branch of the s390x shell pipeline has had no caller
-  since the libtorch package type left CD; it is removed separately.
+does. Of the five in-tree callers (table in the inventory asset), only the
+Windows arm64 libtorch script reads the prefix: it moves the checkout's
+`torch\{bin,cmake,include,lib,share,test}` into `libtorch\` by hand, and
+with the new default reads the prefix directly. The Linux libtorch trunk jobs
+are build-only, the macOS and lightweight-dispatch tests run binaries from
+their build directories, and the s390x `BUILD_PYTHONLESS` branch has had no
+caller since the libtorch package type left CD.
 
 ### The resolution rules
 
@@ -399,8 +365,9 @@ option for the discussion; either outcome leaves the rest unchanged.
 ## **Drawbacks**
 
 * Documentation of the trees goes stale when install rules change.
-  Mitigation: the table names the CMake rule behind each directory, so a
-  rule change points at the row.
+  Mitigation: the inventory asset names the CMake rule behind each directory
+  and the listing script regenerates the file lists behind the counts, so a
+  rule change points at the row and a release refreshes the numbers.
 * On scikit-build-core releases without `__loader__.paths`
   (scikit-build/scikit-build-core#1567), the resource helper reads a private
   attribute of the editable reader. Mitigation: one function, a test that
