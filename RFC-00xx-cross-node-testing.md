@@ -87,7 +87,7 @@ Success is measured in these ways.
 
 
 ## **Drawbacks**
-The blast radius of implement phase 2 is enormous. All local tensor devices has to now refer to `self.local_rank` instead of `self.rank`. All tests that derive `MultiProcessTestCase` will need to be touched which will take time.  The migration is risky becuase mistakes are silent: since `local_rank == rank` on a single node, a mis-migrated site still passes existing CI and only misbehaves inter-nodally. This is a potential false positive or a false negative. This also introduces one more test design consideration where developers has to take into consideration the correct rank for each category (device placement, PG identity, and tensor data). The wrong choice will not surface until a cross-node run.  The change is additive and non-breaking but it depends on cross-node CI. We will need cross-node CI.
+The blast radius of implement phase 2 is enormous. All local tensor devices has to now refer to `self.local_rank` instead of `self.rank`. All tests that derive `MultiProcessTestCase` will need to be touched which will take time.  The migration is risky because mistakes are silent: since `local_rank == rank` on a single node, a mis-migrated site still passes existing CI and only misbehaves inter-nodally. This is a potential false positive or a false negative. This also introduces one more test design consideration where developers has to take into consideration the correct rank for each category (device placement, PG identity, and tensor data). The wrong choice will not surface until a cross-node run.  The change is additive and non-breaking but it depends on cross-node CI. We will need cross-node CI.
 
 ## **Alternatives**
 <!-- What other designs have been considered? What is the impact of not doing this? -->
@@ -96,7 +96,7 @@ Three alternate designs
 2. **Separate interface** - Create a `MultiNodeTestCase` base class. This avoids touching existing tests and isolates migration risks. However, this forks the test hierarchy and only covers tests that explictly opt in. The impact is minimal coverage gain.
 3. **Read env var** - Have every single instance of `MultiProcessTestCase` to read in the local rank and initialize tensors, process groups, and device placement manually. This is prone to error and introduces possible breaking mistakes.
 
-Therefore, we chose to add `local_rank` to `MultiProcessTestCase` becuase it maximizes coverage while defaulting to a no-op on single node. The risk is minimal with a one time broad migration.
+Therefore, we chose to add `local_rank` to `MultiProcessTestCase` because it maximizes coverage while defaulting to a no-op on single node. The risk is minimal with a one time broad migration.
 
 
 ## **Prior Art**
@@ -117,7 +117,7 @@ The global-vs-local rank distinction this RFC adds to `MultiProcessTestCase` alr
 * **Resolve during implementation**: 
   1. How to migrate device sites safely and at scale. How to detect a *missed* site (one still using `self.rank` for a device)?
 * **Out-of-scope**: 
-  1. The actual multi-node CI launcher or test harness taht sets LOCAL_RANK and orchestrates nodes. Extending the same split across other base classes (DTensorTestBase, MultiThreadedTestCase). 
+  1. The actual multi-node CI launcher or test harness that sets LOCAL_RANK and orchestrates nodes. Extending the same split across other base classes (DTensorTestBase, MultiThreadedTestCase). 
   2. `local_world_size` and `group_rank` support.
 
 
