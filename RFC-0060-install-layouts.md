@@ -330,8 +330,9 @@ flag `__file__`-derived paths and direct `importlib.resources` calls (the
    The resource helper lands with the rule-1 sites already in the tree:
    `torch.utils.model_dump` and `torch._export.serde.schema_check` read
    package data through `importlib.resources`, and the inductor
-   `codegen/aoti_runtime/` sources and `kernel/flex/templates/` and
-   `kernel/templates/` are read relative to `__file__`. Each of these
+   `codegen/aoti_runtime/` sources, `kernel/flex/templates/`,
+   `kernel/templates/` and `csrc/inductor/aoti_runtime/model.h` are read
+   relative to `__file__`. Each of these
    files is tracked and also CMake-installed (`cmake/PackageData.cmake`),
    so under shape 2 it exists in both trees with identical contents;
    they work today by that coincidence and are the both-trees case the
