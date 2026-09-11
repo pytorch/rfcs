@@ -275,6 +275,19 @@ The type difference is deliberate: a `Traversable` for resources, a path for
 locations. A caller that needs a path for a resource is asking for a
 location and uses rule 2.
 
+**`torchgen` is a second anchor with the same two rules.** It is a separate
+top-level package that must not import `torch` (stage-1 codegen runs before
+torch is built), so it cannot use `torch._utils_internal`. Its data,
+`torchgen/packaged/` (the ATen yaml, the templates, the autograd files), is
+gitignored and mirrored by `cmake/FileMirroring.cmake` straight into the
+install tree, so under shape 2 it exists only there. `files("torchgen")`
+spans both trees and finds it; `torchgen.gen.get_torchgen_root()`, the
+public location helper documented for out-of-tree users, returns
+`Path(__file__).parent` today and so points at the checkout, where
+`packaged/` is absent. It gets the anchor chain below with `torchgen` in
+place of `torch`. `gen_backend_stubs` prefers the checkout's `aten/src` and
+is correct as is.
+
 Both helpers anchor on the import system, in this order:
 
 1. **The editable loader's `paths`.** scikit-build/scikit-build-core#1567 (in
@@ -305,15 +318,26 @@ Two constraints:
   not clutter.
 
 **Enforcement.** With one allowed call site per rule, the lint is a grep:
-flag `__file__`-derived paths and direct `importlib.resources.files("torch")`
-calls in `torch/` outside `torch._utils_internal`. It backs the first metric.
+flag `__file__`-derived paths and direct `importlib.resources` calls (the
+`files()` and the functional `read_text()` forms alike) in `torch/` outside
+`torch._utils_internal`. It backs the first metric.
 
 ### Sequencing
 
 1. **The helpers and the known call sites.** `get_file_path` re-anchored on
    the `_C` spec and the seven `__file__` sites fixed (pytorch/pytorch#195587,
    open; the pytorch/pytorch#195887 sub-issues #195889, #195890, #195891).
-   The resource helper lands with the first call site that reads a file.
+   The resource helper lands with the rule-1 sites already in the tree:
+   `torch.utils.model_dump` and `torch._export.serde.schema_check` read
+   package data through `importlib.resources`, and the inductor
+   `codegen/aoti_runtime/` sources and `kernel/flex/templates/` and
+   `kernel/templates/` are read relative to `__file__`. Each of these
+   files is tracked and also CMake-installed (`cmake/PackageData.cmake`),
+   so under shape 2 it exists in both trees with identical contents;
+   they work today by that coincidence and are the both-trees case the
+   helper's shim orders. `torchgen` is a separate item with its own
+   reviewers: `get_torchgen_root()` re-anchored, and a resource entry point
+   for `packaged/`.
 2. **The editable-install CI job** (pytorch/pytorch#195888), so shape 2 is
    exercised on every PR.
 3. **The lint**, once the inventory is at zero.
@@ -355,7 +379,7 @@ option for the discussion; either outcome leaves the rest unchanged.
 ## **Metrics**
 
 * Zero in-tree `__file__`-derived asset lookups and zero direct
-  `importlib.resources.files("torch")` calls outside the helper module; the
+  `importlib.resources` calls outside the helper module; the
   pytorch/pytorch#195887 inventory reaches zero and the lint keeps it there.
 * An editable-install CI job (pytorch/pytorch#195888) exists and stays green.
 * Every shape is described in exactly one place; every other place links
