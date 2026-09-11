@@ -9,7 +9,7 @@ The current distributed testing infrastructure is designed for single node intra
 
 
 ## **Motivation**
-Currently the module `MultiProcessTestCase` only sets a global rank attribute in its setUp.  Every test that inherits this class has this constraint. Since `MultiProcessTestCase` tests initialize their own independent process group and these tests assume that these are only run on a single node, a global rank is utilized for PG initialization and the corresponding tensor devices are set to the same rank.  Since there is no way to differentiate global rank and local rank, cross node tests are limited.  By creating a cross node friendly framework, the coverage of tests is increased and robustness of the distributed code is improved. 
+Currently the module `MultiProcessTestCase` only sets a global rank attribute in its setup (`_run`).  Every test that inherits this class has this constraint. Since the `MultiProcessTestCase` tests initialize their own independent process group (PG) and these tests assume that they are only run on a single node, a global rank is utilized for PG initialization and the corresponding tensor devices are set to the same rank.  Since there is no way to differentiate global rank and local rank, cross node tests are limited.  By creating a cross node friendly framework, the coverage of tests is increased and robustness of the distributed code is improved. 
 
 
 ## **Proposed Implementation**
@@ -78,7 +78,7 @@ sequenceDiagram
 Success is measured in these ways.
 
 **Coverage**
-1. Number of `MultiProcessTestCase`-derived tests executable across >= 2 nodes (baseline: 0) and the fraction of device-placement call sites migrated from `self.rank` to `self.local_rank` (N of M).
+1. Number of `MultiProcessTestCase` derived tests executable across >= 2 nodes (baseline: 0) and the fraction of device-placement call sites migrated from `self.rank` to `self.local_rank` (N of M).
 
 **Correctness**
 1. 100% of existing single-node distributed tests continue to pass with identical results. Confirming the `local_rank == rank` default is a no-op. 
@@ -89,7 +89,7 @@ Success is measured in these ways.
 
 
 ## **Drawbacks**
-The blast radius of implement phase 2 is enormous. All local tensor devices has to now refer to `self.local_rank` instead of `self.rank`. All tests that derive `MultiProcessTestCase` will need to be touched which will take time.  The migration is risky because mistakes are silent: since `local_rank == rank` on a single node, a mis-migrated site still passes existing CI and only misbehaves inter-nodally. This is a potential false positive or a false negative. This also introduces one more test design consideration where developers has to take into consideration the correct rank for each category (device placement, PG identity, and tensor data). The wrong choice will not surface until a cross-node run.  The change is additive and non-breaking but it depends on cross-node CI. We will need cross-node CI.
+The blast radius of implementing phase 2 is enormous. All local tensor devices has to now refer to `self.local_rank` instead of `self.rank`. All tests that derive `MultiProcessTestCase` will need to be touched which will take time.  The migration is risky because mistakes are silent: since `local_rank == rank` on a single node, a mis-migrated site still passes existing CI and only misbehaves inter-nodally. This is a potential false positive or a false negative. This also introduces one more test design consideration where developers have to take into consideration the correct rank for each category (device placement, PG identity, and tensor data). The wrong choice will not surface until a cross-node run.  The change is additive and non-breaking but it depends on cross-node CI. We will need cross-node CI.
 
 ## **Alternatives**
 <!-- What other designs have been considered? What is the impact of not doing this? -->
@@ -108,8 +108,8 @@ The global-vs-local rank distinction this RFC adds to `MultiProcessTestCase` alr
 ## **How we teach this**
 * **Terminology**: Reuse the runtime's existing names. Rank (global) and local rank (per-node) precisely because of `torchrun`'s established convention.
 * **The One Rule**: Use `self.rank` for process-group identity, control flow, and tensor *data*. Use `self.local_rank` only for device placement (`.cuda(...)`, `set_device`, `torch.device`).
-* **Docs**: No reorganization needed. A note in the distributed testing contributor docs and a docstring in `MultiProcessTestCase` explaining the two attributes would be needed.
-* **Rollout**: since `rank == local_rank` by default, existing authors don't have to learning anything until they write cross-node tests. Could be taught as an opt-in advance topic.
+* **Docs**: No reorganization needed. A note in the distributed testing contributor docs and a docstring in `MultiProcessTestCase` explaining the two attributes will be needed.
+* **Rollout**: Since `rank == local_rank` by default, existing authors don't have to learning anything until they write cross-node tests. Could be taught as an opt-in advance topic.
 
 
 ## **Unresolved questions**
