@@ -77,13 +77,15 @@ sequenceDiagram
 ## **Metrics**
 Success is measured in these ways.
 
-**Coverage** - Number of `MultiProcessTestCase`-derived tests executable across >= 2 nodes (baseline: 0) and the fraction of device-placement call sites migrated from `self.rank` to `self.local_rank` (N of M).
+**Coverage**
+1. Number of `MultiProcessTestCase`-derived tests executable across >= 2 nodes (baseline: 0) and the fraction of device-placement call sites migrated from `self.rank` to `self.local_rank` (N of M).
 
 **Correctness**
 1. 100% of existing single-node distributed tests continue to pass with identical results. Confirming the `local_rank == rank` default is a no-op. 
 2. Count of real distributed bugs surfaced by cross-node execution that single-node testing could not catch.
 
-**Operational** - A cross-node CI lane is added. We track its wall-clock runtime and flaky-run rate over a rolling window to ensure the new coverage does not introduce unstable signals.
+**Operational**
+1. A cross-node CI lane is added. We track its wall-clock runtime and flaky-run rate over a rolling window to ensure the new coverage does not introduce unstable signals.
 
 
 ## **Drawbacks**
