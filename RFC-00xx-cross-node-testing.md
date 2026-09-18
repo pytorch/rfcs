@@ -89,7 +89,7 @@ Success is measured in these ways.
 
 
 ## **Drawbacks**
-The blast radius of implementing phase 2 is enormous. All local tensor devices has to now refer to `self.local_rank` instead of `self.rank`. All tests that derive `MultiProcessTestCase` will need to be touched which will take time.  The migration is risky because mistakes are silent: since `local_rank == rank` on a single node, a mis-migrated site still passes existing CI and only misbehaves inter-nodally. This is a potential false positive or a false negative. This also introduces one more test design consideration where developers have to take into consideration the correct rank for each category (device placement, PG identity, and tensor data). The wrong choice will not surface until a cross-node run.  The change is additive and non-breaking but it depends on cross-node CI. We will need cross-node CI.
+The blast radius of implementing phase 2 is enormous. All local tensor devices has to now refer to `self.local_rank` instead of `self.rank`. All tests that derive `MultiProcessTestCase` will need to be touched which will take time.  The migration is risky because mistakes are silent: since `local_rank == rank` on a single node, a mis-migrated site still passes existing CI and only misbehaves inter-nodally. This is a potential false positive or a false negative. This also introduces one more test design consideration where developers have to take into consideration the correct rank for each category (device placement, PG identity, and tensor data). The wrong choice will not surface until a cross-node run.  The change is additive and non-breaking but it depends on cross-node CI.
 
 ## **Alternatives**
 <!-- What other designs have been considered? What is the impact of not doing this? -->
