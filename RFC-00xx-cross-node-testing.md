@@ -119,7 +119,7 @@ The global-vs-local rank distinction this RFC adds to `MultiProcessTestCase` alr
 * **Resolve during implementation**: 
   1. How to migrate device sites safely and at scale. How to detect a *missed* site (one still using `self.rank` for a device)?
 * **Out-of-scope**: 
-  1. The actual multi-node CI launcher or test harness that sets LOCAL_RANK and orchestrates nodes. Extending the same split across other base classes (DTensorTestBase, MultiThreadedTestCase). 
+  1. The actual multi-node CI launcher or test harness that sets LOCAL_RANK and orchestrates nodes. Extending the same split across other base classes (`DTensorTestBase`, `MultiThreadedTestCase`). 
   2. `local_world_size` and `group_rank` support.
 
 
