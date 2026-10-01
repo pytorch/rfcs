@@ -19,15 +19,15 @@ This RFC will cover:
 
 - Done: Implementation for single level in core
 - Done: Add codegen mechanisms for adding more formulas
-- Add gradcheck tools to test both real and complex valued functions
-- Add a limited set of formulas that enable basic use cases
-- Add it as backend for high level autograd API
-- Update OpInfo to natively test forward mode
-- Update custom Function API to allows overwriting forward AD
+- Done: Add gradcheck tools to test both real and complex valued functions
+- Done: Add a limited set of formulas that enable basic use cases
+- Partially done: Add it as backend for high level autograd API (opt-in only, see below)
+- Done: Update OpInfo to natively test forward mode
+- Done: Update custom Function API to allows overwriting forward AD
 
 Follow ups
-- Long running issue to add remaining formulas
-- Decide and implement multi-level version
+- Ongoing: Long running issue to add remaining formulas (the feature is still documented as beta until coverage improves)
+- Decided: no multi-level version in core. Nested and higher order forward AD is provided by `torch.func` (`jvp`, `jacfwd`, `hessian`) instead
 
 
 ## Goal of this feature
@@ -64,6 +64,9 @@ This flag will allow to fall back to the slow, backward mode AD based, implement
 
 In the final state, the `jvp`, `hvp` and `hessian` functions will have an extra `fw_mode` flag that will be `False` at the beginning and will become `True` once we are satisfied with our coverage.
 
+Update: no `fw_mode` flag was added. Instead, forward AD is available opt-in via `jacobian(..., vectorize=True, strategy="forward-mode")` and `hessian(..., vectorize=True, outer_jacobian_strategy="forward-mode")`, both still defaulting to reverse mode.
+`jvp` and `hvp` still use the backward mode based implementation, and their documentation points users to `torch.func.jvp` or the standalone API below for performance.
+
 ### Standalone API
 
 Since this API is only intended for advanced users, we decided to keep it close to the design principal of using dual numbers and close in spirit to the current autograd API.
@@ -86,6 +89,7 @@ with fwAD.dual_level():
     res = f(dual_x)
 
     # Unpack the result to get both the function and the J v value
+    # This returns a namedtuple UnpackedDualTensor(primal, tangent)
     f_val, jvp = fwAD.unpack_dual(res)
 
 ```
@@ -106,7 +110,7 @@ _, jvp = fwAD.unpack_dual(dual_x)
 assert jvp is None
 
 ```
-- This API supports nesting levels and providing a specific level kwarg for each function to enable higher order gradients easily.
+- ~This API supports nesting levels and providing a specific level kwarg for each function to enable higher order gradients easily.~ Update: nested levels are not supported and entering a second level raises an error. The `level` kwarg exists on each function but only level 0 can be used. Higher order forward gradients should use `torch.func.jvp`, which manages its own levels and only enters a single `dual_level` for the outermost transform.
 
 
 ## Implementation
@@ -121,11 +125,15 @@ The first part is implemented in PyTorch with an extra field on the `AutogradMet
 It will store a special structure there that will handle storing dual values from different levels.
 
 The second part is implemented in codegen and manual functions by having special code that ensure that the output is properly updated if any input is a dual Tensor.
-This is done within the VariableType kernel for now even though it will most likely move to a different key in the future as needed.
+This is done within the VariableType kernel (Autograd key). It did not end up moving to a different key.
 
 Finally, to ensure the strict scoping presented above, we introduce a global state tracking the different levels and which Tensor belongs to which level to ensure that we can clear them properly on exit.
 
 All of these are now part of core pytorch and was added via these two PRs: https://github.com/pytorch/pytorch/pull/49734 and https://github.com/pytorch/pytorch/pull/56083.
+
+Note that while the per-Tensor structure can store dual values for multiple levels, only level 0 is used in practice (see the nesting note above).
+On top of this design, the final implementation also requires the tangent to have the same layout (sizes, strides, storage offset and size, conj/neg bits) as the primal: `make_dual` uses the tangent as-is when that is the case and copies it into a correctly laid out Tensor otherwise.
+This is what allows the view and inplace semantic below to hold.
 
 ### View and inplace handling
 
@@ -133,7 +141,7 @@ View and inplace is a key feature of pytorch that we want to preserve for this n
 The semantic that we are looking for here is described in the Appendix of this document and is based on the bidirectional lens idea.
 
 The practical implication of this semantic in this implementation are the following:
-- backward and forward "differentiable" views are two different things: `detach` is backward non-differentiable and forward differentiable while operations, like `fwAD.make_dual`, are backward differentiable and forward non-differentiable.
+- backward and forward "differentiable" views are two different things: operations like `fwAD.make_dual` are backward differentiable and forward non-differentiable. Note that `detach` was originally planned to be backward non-differentiable and forward differentiable but the final implementation makes it non-differentiable for both: `detach()` on a dual Tensor returns a Tensor without tangent.
 - we need to track differentiable views both for backward and forward AD independently as, in general, their base could be different.
 - for operations that only involve dual Tensors, the semantic from the appendix is easily achieved by ensuring that:
   - view operation forward AD formula generate a dual that is a view of the input's dual
@@ -147,13 +155,13 @@ The practical implication of this semantic in this implementation are the follow
 For testing purposed, we can update the current `autograd.gradcheck` function to compare numerically computed Jacobian with the one constructed using forward mode AD.
 In a similar way the backward mode AD gradcheck reconstruct the full Jacobian matrix row by row, the forward AD can reconstruct the full Jacobian matrix column by column and we can compare the final result with the numerical Jacobian.
 
-The fast mode will also be done similarly to the backward mode implementation where we will use the forward AD to compute `J_f u` with a single forward AD pass. We then compute the full reduction by doing a dot product with `v`.
+The fast mode will also be done similarly to the backward mode implementation where we will use the forward AD to compute `J_f u` with a single forward AD pass. The result is then compared directly with the numerical `J_f u` (no reduction with `v` is needed in forward mode).
 For the complex case, we will consider only functions with real-valued inputs and perform the same computation as the finite difference.
 
 The overall testing plan is going to be done in 3 phases:
 - Done: Test of the core implementation and the view semantic (proposed in https://github.com/pytorch/pytorch/pull/49098)
-- Once few formulas are added, enable gradcheck for forward by default in our test suite and allow it to silently fail when encountering functions that are not implemented. This allows to easily check the behavior with other components such as the high level API, complex, Modules, etc
-- Once we have most formulas implemented, make gradcheck properly fail when it is not able to verify a forward gradient and audit the test suite to disable forward check for every function that is not supported yet.
+- Superseded by the next phase: Once few formulas are added, enable gradcheck for forward by default in our test suite and allow it to silently fail when encountering functions that are not implemented. This allows to easily check the behavior with other components such as the high level API, complex, Modules, etc
+- Done: Once we have most formulas implemented, make gradcheck properly fail when it is not able to verify a forward gradient and audit the test suite to disable forward check for every function that is not supported yet. This is now controlled by the `supports_forward_ad` and `supports_fwgrad_bwgrad` OpInfo flags, and ops with the flag set to `False` are tested to raise an error.
 
 
 ## Appendix: View semantic definition
