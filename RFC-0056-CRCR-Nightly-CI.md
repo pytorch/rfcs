@@ -5,11 +5,11 @@
 * @jewelkm89
 * @subinz1
 
-**Status:** Implemented — nightly self-reporting, event-scoped backend enrollment, and separate PR/nightly HUD views are live. Pass-rate aggregation alignment is tracked in [pytorch/test-infra#8897](https://github.com/pytorch/test-infra/issues/8897).
+**Status:** Implemented — nightly self-reporting, event-scoped backend enrollment, and separate PR/nightly HUD views are live. Follow-on reporting accuracy, matrix pagination, and per-repository level-history work are in review.
 
 **Date:** June 2026
 
-**Last updated:** September 2026
+**Last updated:** October 2026
 
 ## Summary
 
@@ -223,7 +223,50 @@ Nightly pass rate measures completed CI job executions, not the number of cells 
 2. Retain the highest `run_attempt` for each `(downstream_repo, run_id, job_name)`.
 3. Count each completed retained job once; `success` is passing for normal downstream repos.
 
-The nightly matrix may group results by PyTorch SHA for presentation, but that visual grouping must not change the pass-rate numerator or denominator. [pytorch/test-infra#8897](https://github.com/pytorch/test-infra/issues/8897) tracks applying this contract consistently to the CRCR summary, per-repo stat card, and success-rate trends.
+The nightly matrix may group results by PyTorch SHA for presentation, but that visual grouping must not change the pass-rate numerator or denominator. The pass-rate contract was captured in [pytorch/test-infra#8897](https://github.com/pytorch/test-infra/issues/8897); its implementation is under review in [pytorch/test-infra#8927](https://github.com/pytorch/test-infra/pull/8927).
+
+### Reporting Accuracy and Matrix Completeness
+
+The HUD has two distinct responsibilities that must remain separate:
+
+1. **Metrics** count every completed job from the selected range exactly once,
+   using the final attempt for its logical workflow job.
+2. **The matrix** presents complete nightly rows. If one completed job makes a
+   PyTorch SHA or fallback run key eligible for the selected range, every job
+   for that logical row must be available for display, including unfinished
+   siblings. The visible matrix must not be used as the metrics population.
+
+The in-review [pytorch/test-infra#8927](https://github.com/pytorch/test-infra/pull/8927)
+applies this model consistently across the CRCR summary, per-repository card,
+and trends. It also pages logical matrix rows before expanding their jobs, so a
+raw job-count cap cannot truncate a nightly with a large job matrix. Retry
+selection keeps all parallel shards tied at the latest attempt and uses the
+fallback run key for reporters without a real PyTorch SHA.
+
+### Health and Timeout Semantics
+
+PR relay health is deliberately separate from nightly self-reporting. The
+canonical health state is **Healthy** or **Degraded**. A normal in-progress
+probe does not degrade health. Expected CRCR probe outcomes are interpreted
+only once terminal: `xfail` is a failure, `xcancel` is cancelled, and an
+`xtimeout` remains in progress until the sweeper records it as `timed_out`.
+
+[pytorch/test-infra#8801](https://github.com/pytorch/test-infra/pull/8801)
+added overdue in-progress probe handling, and
+[pytorch/test-infra#8834](https://github.com/pytorch/test-infra/pull/8834)
+added health-card triage details. A separate operational issue,
+[pytorch/test-infra#9019](https://github.com/pytorch/test-infra/issues/9019),
+tracks callback rate-limit saturation in `pytorch/crcr-test`, which can leave
+jobs without terminal callbacks and subsequently appear as swept timeouts.
+
+### Time and Level History
+
+[pytorch/test-infra#8896](https://github.com/pytorch/test-infra/pull/8896)
+normalizes ClickHouse's zone-less UTC timestamps before converting them to the
+viewer’s locale, keeping the CRCR summary and per-repository pages consistent.
+The in-review [pytorch/test-infra#8894](https://github.com/pytorch/test-infra/pull/8894)
+adds per-repository level history with an explicit unavailable state when the
+history query fails, rather than presenting a failed query as an empty history.
 
 ## Metrics
 
@@ -329,6 +372,8 @@ Two alternative approaches were evaluated. The authenticated self-report model (
 ## Resolution
 
 Implemented — the self-report path and event-scoped enrollment are operational.
+The reporting and observability follow-ups above are tracked separately so they
+do not change the core nightly callback contract.
 
 ### Level of Support
 
@@ -337,6 +382,10 @@ Accepted — adopted by CRCR Working Group. At this update, `NVIDIA/pytorch-wind
 ### Next Steps
 
 - Onboard additional downstream backends requesting nightly reporting
+- Land the canonical pass-rate and complete-matrix work in
+  [pytorch/test-infra#8927](https://github.com/pytorch/test-infra/pull/8927)
+- Resolve the callback rate-limit behavior tracked in
+  [pytorch/test-infra#9019](https://github.com/pytorch/test-infra/issues/9019)
 - Consider automated staleness alerting (>36h without callback → degraded health)
 - Extend `ci_providers.yml` for GitLab CI providers when demand arises
 
