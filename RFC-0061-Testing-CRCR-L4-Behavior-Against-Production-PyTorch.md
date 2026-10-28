@@ -11,6 +11,12 @@ This RFC proposes how to do that with the existing canary repo [`pytorch/crcr-te
 1. Promote `pytorch/crcr-test` from allowlist level **L3 → L4** in the production CRCR relay.
 2. Use a new, purpose-built workflow (`crcr-l4-ci.yml`), gated by a PR **label** (`ciflow/crcr/crcr-test-L4`), to validate that at L4 a Check Run is created on the upstream PR and can block merge, with effectively zero blast radius on other people's PRs.
 
+Once this test has been completed, the next steps are:
+
+- **Draft the L4 criteria.** Define both the promotion criteria (what a downstream repo must satisfy to be promoted to L4) and the demotion criteria (when an L4 repo is moved back down).
+- **Optimize Check Run behavior and HUD from L1 to L4 as a whole.** Treat the four levels as one coherent experience instead of tuning each level in isolation.
+- **Make L4 safer against unrelated failures.** Since an L4 Check Run can block a PR from merging, AI integration could be a way to keep it from being tripped by failures unrelated to the PR.
+
 ## Inventory of `crcr-test` Workflows
 
 The client-side trigger conditions below are evaluated by `crcr-test` itself and do not depend on the allowlist level. What changes when the relay moves `crcr-test` from L3 to L4 is only whether the Check Runs those jobs report become visible on (and able to block) the upstream PR.
